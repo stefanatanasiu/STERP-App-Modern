@@ -1,0 +1,231 @@
+@inherits StListPage
+@* frmBomExplosion (page:bom/explosion-enquiry, FR-STERP-BOM-021; frmBomExplosion.vb:14-186): one calculation, four readings
+   (INDENTED, SINGLE, LEAF through BOMLEAF, COSTED through BOMCOST, NETTED through BOMNET); where used and revision comparison
+   from the same window; argument COMPARE opens it as "Bill Revision Comparison". *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Parent item:" Inline="true" Width="170" @bind-Value="_item" Id="@Uid("item")" />
+        <StTextField Caption="Re&v:" Inline="true" Width="40" @bind-Value="_rev" Id="@Uid("rev")" />
+        <StTextField Caption="&Quantity:" Inline="true" Width="80" @bind-Value="_qty" Id="@Uid("qty")" />
+        <StTextField Caption="&As at:" Inline="true" Width="80" @bind-Value="_asAt" Id="@Uid("asat")" />
+        <StSelectField Caption="&View:" Inline="true" Width="110" Items="Views" Value="@_view" ValueChanged="ViewChangedAsync" Id="@Uid("view")" />
+        <StTextField Caption="Cost &set:" Inline="true" Width="90" @bind-Value="_costSet" Id="@Uid("costset")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Explode (F10)" Glyph="ENGINE" OnClick="ExplodeAsync" />
+        <StToolButton Text="Where used" Glyph="FIND" OnClick="WhereUsedAsync" />
+        <StToolButton Text="Compare revisions" Glyph="RUN" OnClick="CompareAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Views = StSelectField.Of("INDENTED", "SINGLE", "LEAF", "COSTED", "NETTED");
+    private string _item = "";
+    private string _rev = "";
+    private string _qty = "1";
+    private string _asAt = "";
+    private string _view = "INDENTED";
+    private string _costSet = "BOMDEMO";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Bill of Material Explosion");
+        _asAt = Fmt.Date(Session.BusinessDate);
+        if (FormArgument != "" && FormArgument != "COMPARE") _item = FormArgument;
+        if (FormArgument == "COMPARE")
+        {
+            Window.SetTitle("Bill Revision Comparison");
+            _view = "INDENTED";
+        }
+    }
+
+    private string Item() => _item.Trim().ToUpperInvariant();
+
+    private string Rev() => _rev.Trim().ToUpperInvariant();
+
+    /// <summary>ListForm.LoadData: explode when an item is present, else the prompt.</summary>
+    protected override Task LoadDataAsync()
+    {
+        if (Item() == "")
+        {
+            Populate(GridData.Empty);
+            SetStatus("Enter a parent item, a quantity and a date, then press F10 to explode.");
+            return Task.CompletedTask;
+        }
+        return ExplodeAsync();
+    }
+
+    protected override Task OnConfirmAsync() => ExplodeAsync();
+
+    /// <summary>Changing the view re-runs the enquiry (SelectedIndexChanged -> LoadData).</summary>
+    private Task ViewChangedAsync(string value)
+    {
+        _view = value;
+        return LoadDataAsync();
+    }
+
+    private bool TryAsAt(out DateOnly asAt)
+    {
+        var parsed = Fmt.ParseDate(_asAt);
+        asAt = parsed ?? default;
+        if (parsed is null)
+        {
+            SetStatus("Enter a valid as-at date in dd/MM/yyyy form.", CueWarning);
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>The engine owns the calculation; the view only decides which reading is shown.</summary>
+    private async Task ExplodeAsync()
+    {
+        Populate(GridData.Empty);
+        if (Item() == "")
+        {
+            SetStatus("Enter a parent item code first.", CueWarning);
+            return;
+        }
+        if (!Fmt.TryNumber(_qty, out var quantity) || quantity <= 0m)
+        {
+            SetStatus("Enter a positive numeric quantity before exploding the bill.", CueWarning);
+            return;
+        }
+        if (!TryAsAt(out var asAt)) return;
+        var view = _view;
+        await GuardAsync(async () =>
+        {
+            var path = "/api/bom/v1/items/" + Query.Path(Item());
+            ApiResponse r;
+            switch (view)
+            {
+                case "NETTED":
+                    r = await Api.PostAsync(path + "/net", new JsonObject { ["quantity"] = quantity, ["effectiveDate"] = Fmt.Iso(asAt) });
+                    break;
+                case "COSTED":
+                    r = await Api.PostAsync(path + "/cost", new JsonObject
+                    {
+                        ["revision"] = Rev(),
+                        ["quantity"] = quantity,
+                        ["effectiveDate"] = Fmt.Iso(asAt),
+                        ["costSet"] = _costSet.Trim().ToUpperInvariant(),
+                    });
+                    break;
+                default:
+                    r = await Api.PostAsync(path + "/explode", new JsonObject
+                    {
+                        ["revision"] = Rev(),
+                        ["quantity"] = quantity,
+                        ["effectiveDate"] = Fmt.Iso(asAt),
+                        ["view"] = view,
+                        ["maxDepth"] = 0,
+                    });
+                    break;
+            }
+            if (!await ShowResultAsync(r)) return;
+            var data = r.Data;
+            if (data?["lines"] is JsonArray lines) Populate(Rows(view, lines));
+            Report(view, data);
+        });
+    }
+
+    /// <summary>The facade tables (BomService.NewExplosionTable / NewCostedTable / NewNettedTable): Decimal columns show as money.</summary>
+    private static GridData Rows(string view, JsonArray lines) => view switch
+    {
+        "NETTED" => GridData.FromItems(lines, Fmt.Col("level", "INT"), Fmt.Col("item"), Fmt.Col("description"), Fmt.Col("unit"),
+            Fmt.Col("required", "MONEY"), Fmt.Col("stockUsed", "MONEY"), Fmt.Col("inbound", "MONEY"), Fmt.Col("toMake", "MONEY"),
+            Fmt.Col("shortage", "MONEY"), Fmt.Col("excess", "MONEY"), Fmt.Col("stopReason")),
+        "COSTED" => GridData.FromItems(lines, Fmt.Col("level", "INT"), Fmt.Col("item"), Fmt.Col("revision"), Fmt.Col("description"),
+            Fmt.Col("kind"), Fmt.Col("element"), Fmt.Col("source"), Fmt.Col("required", "MONEY"), Fmt.Col("unit"),
+            Fmt.Col("unitCost", "MONEY"), Fmt.Col("extendedCost", "MONEY"), Fmt.Col("branchCost", "MONEY"), Fmt.Col("path"), Fmt.Col("warning")),
+        _ => GridData.FromItems(lines, Fmt.Col("level", "INT"), Fmt.Col("item"), Fmt.Col("revision"), Fmt.Col("description"),
+            Fmt.Col("kind"), Fmt.Col("supply"), Fmt.Col("basis"), Fmt.Col("usage", "MONEY"), Fmt.Col("unit"), Fmt.Col("required", "MONEY"),
+            Fmt.Col("unrounded", "MONEY"), Fmt.Col("stopReason"), Fmt.Col("path"), Fmt.Col("warning")),
+    };
+
+    private void Report(string view, JsonNode? data)
+    {
+        var completeness = Fmt.Str(data?["completeness"]);
+        var cue = completeness == "COMPLETE" ? CueOk : CueWarning;
+        switch (view)
+        {
+            case "NETTED":
+                SetStatus("Netted plan " + completeness + " | maximum buildable " + Fmt.Qty(Fmt.Dec(data?["maxBuildable"]), "") + " | " +
+                          Fmt.Int(data?["shortages"]) + " shortage(s).", cue);
+                break;
+            case "COSTED":
+                var missing = Fmt.Int(data?["missingRates"]);
+                SetStatus("Costed roll-up " + completeness + " | total " + Fmt.Money(Fmt.Dec(data?["totalCost"])) +
+                          " | unit " + Fmt.Money(Fmt.Dec(data?["unitCost"])) + " | material " + Fmt.Money(Fmt.Dec(data?["materialCost"])) +
+                          " | conversion " + Fmt.Money(Fmt.Dec(data?["conversionCost"])) + " | recovery " +
+                          Fmt.Money(Fmt.Dec(data?["recoveryCredit"])) + (missing > 0 ? " | " + missing + " missing rate(s)" : ""),
+                          missing > 0 ? CueWarning : cue);
+                break;
+            default:
+                var stop = Fmt.Str(data?["stopSummary"]).Trim();
+                SetStatus(view + " explosion " + completeness + " | " + Fmt.Int(data?["occurrences"]) + " occurrence(s), depth " +
+                          Fmt.Int(data?["depthReached"]) + (stop != "" ? " | " + stop : ""), cue);
+                break;
+        }
+    }
+
+    private async Task WhereUsedAsync()
+    {
+        var code = SelectedText("item").Trim();
+        if (code == "") code = Item();
+        Populate(GridData.Empty);
+        if (code == "")
+        {
+            SetStatus("Select a component row, or enter a parent item.", CueWarning);
+            return;
+        }
+        if (!TryAsAt(out var asAt)) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/bom/v1/items/" + Query.Path(code) + "/where-used" +
+                                       Query.Build(("asOf", Fmt.Iso(asAt)), ("maxLevels", "25"), ("includeDraft", "true")));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(GridData.FromItems(r.Json));
+            SetStatus("Where used for " + code + " as at " + Fmt.Date(asAt) + ".", CueOk);
+        });
+    }
+
+    /// <summary>Two revisions of the same bill: added, removed and changed, with the cost impact.</summary>
+    private async Task CompareAsync()
+    {
+        Populate(GridData.Empty);
+        if (Item() == "")
+        {
+            SetStatus("Enter the bill reference in the parent item field to compare revisions.", CueWarning);
+            return;
+        }
+        if (!TryAsAt(out var asAt)) return;
+        await GuardAsync(async () =>
+        {
+            var revs = await Api.GetAsync("/api/bom/v1/bill-revisions" + Query.Build(("parentItemCode", Item()), ("asOf", Fmt.Iso(asAt))));
+            if (!revs.IsSuccess) throw new ApiFailure(revs);
+            var items = revs.Items;
+            var bomRef = Item();
+            if (items.Count > 0) bomRef = Fmt.Str(items[0]?["bomRef"]);
+            var fromRev = "";
+            var toRev = Rev();
+            if (items.Count > 1)
+            {
+                if (toRev == "") toRev = Fmt.Str(items[0]?["bomRevision"]);
+                fromRev = Fmt.Str(items[1]?["bomRevision"]);
+            }
+            if (fromRev == "" || toRev == "")
+            {
+                SetStatus("Bill " + bomRef + " has only one revision - nothing to compare.", CueWarning);
+                return;
+            }
+            var r = await Api.GetAsync("/api/bom/v1/bills/" + Query.Path(bomRef) + "/revision-comparison" +
+                                       Query.Build(("fromRevision", fromRev), ("toRevision", toRev), ("costSetCode", _costSet.Trim().ToUpperInvariant())));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(GridData.FromItems(r.Json));
+            SetStatus("Bill " + bomRef + ": revision " + fromRev + " compared with " + toRev + ".", CueOk);
+        });
+    }
+}

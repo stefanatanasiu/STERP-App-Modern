@@ -1,0 +1,4 @@
+# po-approval-sync
+ok 1 - generic inbox approval transitions the exact purchase-order version
+ok 2 - rejection returns the pending order to draft without an approval timestamp
+ok 3 - a stale inbox request cannot approve changed purchase-order content

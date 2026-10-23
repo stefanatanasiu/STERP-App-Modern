@@ -1,0 +1,585 @@
+@inherits SoPageBase
+@* frmSalesOrderEntry (page:so/sales-order-entry, FR-STERP-SO-020; frmSalesOrderEntry.vb:14-381, .Designer.vb:43-132): the
+   header and lines of so.SalesOrder (so_getSalesOrder); every figure is the engine's - SODISC totals after each load
+   (so_calculateDocumentTotals), PRICING EXPLAIN then SOVAT DECIDE and SOMARGN LINE for the selected line, SOAVAIL by labelled
+   source (F2), SORESV RESERVE, SOACCEPT VALIDATE then ACCEPT (F10). States and the hold reason are words, never colour. *@
+<div class="st-page" style="overflow:auto">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Load order (F5)" Glyph="REFRESH" OnClick="LoadOrderAsync" />
+        <StToolButton Text="Explain price" Glyph="FIND" OnClick="ExplainAsync" />
+        <StToolButton Text="Availability (F2)" Glyph="ENGINE" OnClick="ShowAvailabilityAsync" />
+        <StToolButton Text="Reserve line" Glyph="SAVE" OnClick="ReserveAsync" />
+        <StToolButton Text="Accept / release (F10)" Glyph="POST" OnClick="OnConfirmAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <fieldset class="st-group" style="flex:0 0 auto; margin:4px 4px 2px; padding:2px 6px 4px">
+        <legend>Order header</legend>
+        <div style="@RowStyle">
+            <StTextField Caption="&Order number:" Inline="true" LabelWidth="104" Width="114" MaxLength="30" Field="Order" @bind-Value="_order" Id="@Uid("order")" />
+            <StTextField Caption="C&ustomer:" Inline="true" LabelWidth="104" Width="114" MaxLength="20" Field="Customer" @bind-Value="_customer" Id="@Uid("customer")" />
+            <StTextField Caption="Customer order &ref:" Inline="true" LabelWidth="108" Width="124" MaxLength="40" Field="CustomerRef" @bind-Value="_customerRef" Id="@Uid("custref")" />
+            <StTextField Caption="Sales&person:" Inline="true" LabelWidth="100" Width="114" MaxLength="20" Field="Salesperson" @bind-Value="_salesperson" Id="@Uid("salesperson")" />
+        </div>
+        <div style="@RowStyle">
+            <StTextField Caption="Order &date:" Inline="true" LabelWidth="104" Width="114" MaxLength="10" Field="OrderDate" @bind-Value="_orderDate" Id="@Uid("date")" />
+            <StTextField Caption="Curre&ncy:" Inline="true" LabelWidth="104" Width="114" MaxLength="3" Field="Currency" @bind-Value="_currency" Id="@Uid("currency")" />
+            <StTextField Caption="Payment &terms:" Inline="true" LabelWidth="108" Width="124" MaxLength="12" Field="Terms" @bind-Value="_terms" Id="@Uid("terms")" />
+            <span class="st-filter"><span style="@(CapStyle)width:100px">Order type:</span><span style="@(ValStyle)width:120px">@_orderType</span></span>
+        </div>
+        <div style="@RowStyle">
+            <StTextField Caption="&Incoterms rule:" Inline="true" LabelWidth="104" Width="114" MaxLength="3" Field="Incoterms" @bind-Value="_incoterms" Id="@Uid("inco")" />
+            <StTextField Caption="Named p&lace:" Inline="true" LabelWidth="104" Width="114" MaxLength="60" Field="IncoPlace" @bind-Value="_incoPlace" Id="@Uid("place")" />
+            <StTextField Caption="Delivery &address:" Inline="true" LabelWidth="108" Width="124" MaxLength="10" Field="DeliveryRef" @bind-Value="_deliveryRef" Id="@Uid("delivery")" />
+            <span class="st-filter"><span style="@(CapStyle)width:100px">Customer name:</span><span style="@(ValStyle)width:120px">@_customerName</span></span>
+        </div>
+        <div style="@RowStyle">
+            <span class="st-filter"><span style="@(CapStyle)width:104px">Release status:</span><span style="@(ValStyle)width:120px">@_release</span></span>
+            <span class="st-filter"><span style="@(CapStyle)width:104px">Fulfilment status:</span><span style="@(ValStyle)width:120px">@_fulfil</span></span>
+            <span class="st-filter"><span style="@(CapStyle)width:108px">Billing status:</span><span style="@(ValStyle)width:130px">@_billing</span></span>
+            <span class="st-filter"><span style="@(CapStyle)width:100px">Document net:</span><span style="@(ValStyle)width:120px">@_docNet</span></span>
+        </div>
+        <div style="@RowStyle">
+            <span class="st-filter"><span style="@(CapStyle)width:104px">Hold reason:</span><span style="@(ValStyle)width:830px">@_hold</span></span>
+        </div>
+    </fieldset>
+    <div style="padding:2px 6px">Order lines - quantity, unit, unit price and price source are the engine's, not the screen's:</div>
+    <StGrid Id="@Uid("lines")" Data="_linesData" Selected="_selected" SelectedChanged="i => _selected = i" Label="Order lines" Style="flex:1 1 auto; min-height:80px; margin:0 4px" />
+    <div style="display:flex; flex:0 0 196px; min-height:0; gap:8px; margin:0 4px 2px">
+        <fieldset class="st-group" style="flex:1 1 596px; display:flex; flex-direction:column; min-width:0; margin:4px 0 0; padding:2px 6px 6px">
+            <legend>Price explanation - PRICING EXPLAIN, ranked candidates and why each was or was not chosen</legend>
+            <StGrid Id="@Uid("why")" Data="_whyData" Selected="_whySelected" SelectedChanged="i => _whySelected = i" Label="Price explanation" Style="flex:1 1 auto" />
+        </fieldset>
+        <fieldset class="st-group" style="flex:0 1 360px; display:flex; flex-direction:column; min-width:0; margin:4px 0 0; padding:2px 6px 6px">
+            <legend>Availability (F2) - SOAVAIL, each source on its own line</legend>
+            <pre class="st-pre st-sunken" id="@Uid("avail")" tabindex="0" style="font-size:11px">@_avail</pre>
+        </fieldset>
+    </div>
+</div>
+
+@code {
+    private const string RowStyle = "display:flex; flex-wrap:nowrap; align-items:center; gap:2px 8px; padding:1px 0";
+    private const string CapStyle = "display:inline-block; white-space:nowrap; overflow:hidden; ";
+    private const string ValStyle = "display:inline-block; white-space:pre; overflow:hidden; text-overflow:ellipsis; ";
+
+    private const string AvailHint = "Press F2 on a line for free stock, reservations and expected receipts.";
+
+    /// <summary>LineSql columns in result-set order (SalesOrderService.vb:56-60) - the grid keeps this order.</summary>
+    private static readonly string[] LineColumns =
+    [
+        "LineNum", "ItemCode", "Description", "AcceptedQty", "UomCode", "ConversionFactor", "UnitPrice", "PricePerQty", "PriceSource",
+        "DiscountPct1", "DiscountPct2", "NetAmount", "VatCode", "VatRatePct", "VatAmount", "MarginPct", "CostSnapshotGBP",
+        "DespatchedQty", "CancelledQty", "Status",
+    ];
+
+    /// <summary>PR-CAND elementary items in copybook order (PRICINGCA.cpy; CommArea.GetTable keeps it): JSON name, COBOL name.</summary>
+    private static readonly (string Json, string Cobol)[] CandColumns =
+    [
+        ("cLevel", "PR-C-LEVEL"), ("cScope", "PR-C-SCOPE"), ("cList", "PR-C-LIST"), ("cCurrency", "PR-C-CURRENCY"), ("cUom", "PR-C-UOM"),
+        ("cQtybrk", "PR-C-QTYBRK"), ("cPrice", "PR-C-PRICE"), ("cPerQty", "PR-C-PER-QTY"), ("cDisc", "PR-C-DISC"), ("cMinmgn", "PR-C-MINMGN"),
+        ("cFrom", "PR-C-FROM"), ("cTo", "PR-C-TO"), ("cRank", "PR-C-RANK"), ("cChosen", "PR-C-CHOSEN"), ("cWhy", "PR-C-WHY"),
+    ];
+
+    /// <summary>The order line inputs SalesOrderService.AddDiscountLine reads (SoDiscountLineInput).</summary>
+    private static readonly string[] DiscountInputs =
+    [
+        "lineNum", "itemCode", "acceptedQty", "uomCode", "conversionFactor", "unitPrice", "pricePerQty", "discountPct1", "discountPct2",
+        "vatCode", "vatRatePct", "costSnapshotGbp",
+    ];
+
+    /// <summary>SalesOrderService.MaxLines: the lines SODISC carries in one link.</summary>
+    private const int MaxLines = 30;
+
+    private string _order = "";
+    private string _customer = "";
+    private string _customerRef = "";
+    private string _salesperson = "";
+    private string _orderDate = "";
+    private string _currency = "";
+    private string _terms = "";
+    private string _incoterms = "";
+    private string _incoPlace = "";
+    private string _deliveryRef = "";
+    private string _orderType = "-";
+    private string _customerName = "-";
+    private string _release = "-";
+    private string _fulfil = "-";
+    private string _billing = "-";
+    private string _docNet = "-";
+    private string _hold = "(none - the order is not on hold)";
+    private string _avail = AvailHint;
+
+    /// <summary>The order lines (null = nothing loaded, legacy _lines Is Nothing).</summary>
+    private List<JsonObject>? _lines;
+    private GridData _linesData = GridData.Empty;
+    private int _selected = -1;
+    private GridData _whyData = GridData.Empty;
+    private int _whySelected = -1;
+
+    /// <summary>The order whose data is on the screen; "" when nothing is loaded.</summary>
+    private string _loaded = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        SoWindow.Size(Window, Browser, 980, 604);
+    }
+
+    /// <summary>frmSalesOrderEntry.OnLoad: order date = business date, currency = base currency, the form argument is the order.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _orderDate = SoFmt.Date(Session.BusinessDate);
+        _currency = BaseCurrency;
+        if (FormArgument != "") _order = FormArgument;
+        SetStatus("Key an order number (F2 for the list) and press F5.  Dates are dd/MM/yyyy.");
+        if (_order != "") await LoadOrderAsync();
+    }
+
+    private string Currency()
+    {
+        var c = _currency.Trim().ToUpperInvariant();
+        return c == "" ? BaseCurrency : c;
+    }
+
+    private DateOnly OrderDate() => SoFmt.ParseDate(_orderDate) ?? Session.BusinessDate;
+
+    // ------------------------------------------------------------------ load and display
+
+    protected override Task OnRefreshKeyAsync() => LoadOrderAsync();
+
+    private async Task LoadOrderAsync()
+    {
+        var order = _order.Trim().ToUpperInvariant();
+        ClearOrder();
+        if (order == "")
+        {
+            SetStatus("Key an order number, or press F2 for the list of orders.", CueWarning);
+            return;
+        }
+        _order = order;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/so/v1/sales-orders/" + Query.Path(order));
+            if (r.Status == 404)
+            {
+                SetStatus("Order " + order + " is not on file in " + Session.CompanyCode + ".", CueError);
+                return;
+            }
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            ShowHeader(r.Json?["header"]);
+            _lines = (r.Json?["lines"] as JsonArray ?? []).OfType<JsonObject>().ToList();
+            BindLines();
+            _loaded = order;
+            await TotalsAsync();
+        });
+    }
+
+    /// <summary>
+    /// Removes everything that belonged to the previous order - header, state, lines, the price explanation and the
+    /// availability pane - so nothing on view or actionable can be mistaken for the order now being loaded.
+    /// </summary>
+    private void ClearOrder()
+    {
+        _loaded = "";
+        _lines = null;
+        _customer = _customerRef = _salesperson = _terms = _incoterms = _incoPlace = _deliveryRef = "";
+        _orderDate = SoFmt.Date(Session.BusinessDate);
+        _currency = BaseCurrency;
+        _orderType = _customerName = _release = _fulfil = _billing = _docNet = _hold = "-";
+        _linesData = GridData.Empty;
+        _selected = -1;
+        _whyData = GridData.Empty;
+        _whySelected = -1;
+        _avail = AvailHint;
+    }
+
+    /// <summary>True when the order keyed is the one on the screen; otherwise asks for F5.</summary>
+    private bool OrderLoaded()
+    {
+        if (_loaded != "" && _order.Trim().ToUpperInvariant() == _loaded) return true;
+        SetStatus("Load the order first - key the order number and press F5.", CueWarning);
+        return false;
+    }
+
+    private void ShowHeader(JsonNode? h)
+    {
+        _customer = SoFmt.ColText(h, "CustomerCode", "");
+        _customerRef = SoFmt.ColText(h, "CustomerOrderRef", "");
+        _salesperson = SoFmt.ColText(h, "SalespersonCode", "");
+        _orderDate = SoFmt.Col(h, "OrderDate") is { } date ? SoFmt.Date(date) : SoFmt.Date(Session.BusinessDate);
+        _currency = SoFmt.ColText(h, "CurrencyCode", BaseCurrency);
+        _terms = SoFmt.ColText(h, "TermsCode", "");
+        _incoterms = SoFmt.ColText(h, "IncotermsRule", "");
+        _incoPlace = SoFmt.ColText(h, "IncotermsNamedPlace", "");
+        _deliveryRef = SoFmt.ColText(h, "DeliveryAddressRef", "");
+        _orderType = SoFmt.ColText(h, "OrderType", "-");
+        _customerName = SoFmt.ColText(h, "CustomerName", "-");
+        ShowState(SoFmt.ColText(h, "ReleaseStatus", ""), SoFmt.ColText(h, "FulfilmentStatus", ""),
+                  SoFmt.ColText(h, "BillingStatus", ""), SoFmt.ColText(h, "HoldReason", ""));
+        _docNet = SoFmt.Amount(SoFmt.Dec(SoFmt.Col(h, "NetAmount")), Currency());
+    }
+
+    /// <summary>COM-024 - the state is text, and the hold reason is spelled out in words.</summary>
+    private void ShowState(string release, string fulfil, string billing, string holdReason)
+    {
+        _release = SoFmt.StatusText(release, "");
+        _fulfil = SoFmt.StatusText(fulfil, "");
+        _billing = SoFmt.StatusText(billing, "");
+        _hold = holdReason.Trim() == "" ? "(none - the order is not on hold)" : "## HOLD - " + holdReason.Trim();
+    }
+
+    /// <summary>GridHelper.Bind of the LineSql rows, then frmSalesOrderEntry.DecorateLines (captions in the order currency).</summary>
+    private void BindLines()
+    {
+        var rows = _lines ?? [];
+        var columns = LineColumns.Select(l => new GridColumn(JsonName(rows, l), legacyName: l)).ToArray();
+        var data = new GridData(columns, rows);
+        var cur = Currency();
+        data.Decorate("LineNum", "Line", "INT", 44);
+        data.Decorate("ItemCode", "Item", "CODE", 130);
+        data.Decorate("Description", "Description", "TEXT", 170);
+        data.Decorate("AcceptedQty", "Quantity", "QTY", 92);
+        data.Decorate("UomCode", "Unit", "CODE", 44);
+        data.Decorate("UnitPrice", "Unit price " + cur, "RATE", 94);
+        data.Decorate("PriceSource", "Price source", "CODE", 86);
+        data.Decorate("DiscountPct1", "Disc 1 %", "PCT", 62);
+        data.Decorate("DiscountPct2", "Disc 2 %", "PCT", 62);
+        data.Decorate("NetAmount", "Net " + cur, "MONEY", 92);
+        data.Decorate("VatCode", "VAT code", "CODE", 62);
+        data.Decorate("VatAmount", "VAT " + cur, "MONEY", 86);
+        data.Decorate("MarginPct", "Margin %", "PCT", 68);
+        foreach (var hidden in new[] { "ConversionFactor", "PricePerQty", "VatRatePct", "CostSnapshotGBP", "DespatchedQty", "CancelledQty", "Status" })
+        {
+            data.Hide(hidden);
+        }
+        _linesData = data;
+        _selected = rows.Count > 0 ? 0 : -1;
+    }
+
+    private static string JsonName(List<JsonObject> rows, string legacy)
+    {
+        foreach (var r in rows)
+        {
+            foreach (var p in r)
+            {
+                if (string.Equals(p.Key, legacy, StringComparison.OrdinalIgnoreCase)) return p.Key;
+            }
+        }
+        return char.ToLowerInvariant(legacy[0]) + legacy[1..];
+    }
+
+    /// <summary>GridHelper.SelectedRow: the current line, null when none.</summary>
+    private JsonObject? SelectedLine() => _lines is { } l && _selected >= 0 && _selected < l.Count ? l[_selected] : null;
+
+    /// <summary>SODISC DOCUMENT - the document net, VAT and gross as the engine reconciles them.</summary>
+    private async Task TotalsAsync()
+    {
+        if (_lines is null || _lines.Count == 0) return;
+        var cur = Currency();
+        var lines = new JsonArray();
+        foreach (var row in _lines.Take(MaxLines))
+        {
+            var line = new JsonObject();
+            foreach (var name in DiscountInputs)
+            {
+                if (SoFmt.Col(row, name) is { } v) line[name] = v.DeepClone();
+            }
+            lines.Add(line);
+        }
+        var body = new JsonObject
+        {
+            ["docRef"] = _order.Trim(),
+            ["customer"] = _customer.Trim(),
+            ["currency"] = cur,
+            ["priceDate"] = SoFmt.Iso(OrderDate()),
+            ["lines"] = lines,
+        };
+        var res = SoResult.From(await Api.PostAsync("/api/so/v1/discounts/document", body));
+        if (res.IsNotFound)
+        {
+            SetStatus("SODISC is not in the engine yet (" + res.ReasonCode + ") - the stored totals are shown.", CueWarning);
+            return;
+        }
+        var a = res.Area;
+        _docNet = SoFmt.Amount(SoFmt.Dec(SoFmt.Col(a, "totNet")), cur);
+        SetStatus(_linesData.Count + " line(s).  SODISC: net " + SoFmt.Amount(SoFmt.Dec(SoFmt.Col(a, "totNet")), cur) + ", VAT " +
+                  SoFmt.Amount(SoFmt.Dec(SoFmt.Col(a, "totVat")), cur) + ", gross " +
+                  SoFmt.Amount(SoFmt.Dec(SoFmt.Col(a, "totGrossTotal")), cur) + ".",
+                  res.Succeeded ? CueOk : res.Severity);
+    }
+
+    // --------------------------------------------- price explanation, VAT and margin (SO-004/5/6)
+
+    private async Task ExplainAsync()
+    {
+        if (!OrderLoaded()) return;
+        var r = SelectedLine();
+        if (r is null)
+        {
+            SetStatus("Select an order line first - the explanation is for one line.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var cur = Currency();
+            var res = SoResult.From(await Api.PostAsync("/api/so/v1/pricing/explain", new JsonObject
+            {
+                ["itemCode"] = SoFmt.Str(SoFmt.Col(r, "ItemCode")),
+                ["customer"] = _customer.Trim(),
+                ["uomCode"] = SoFmt.Str(SoFmt.Col(r, "UomCode")),
+                ["currency"] = cur,
+                ["quantity"] = SoFmt.Dec(SoFmt.Col(r, "AcceptedQty")),
+                ["orderDate"] = SoFmt.Iso(OrderDate()),
+                ["docRef"] = _order.Trim(),
+            }));
+            var a = res.Area;
+            BindWhy(a);
+            var chosen = SoFmt.AreaText(a, "priceSource") + " level " + SoFmt.Int(SoFmt.Col(a, "priceLevel")) + " list " +
+                         SoFmt.AreaText(a, "priceListCode") + ", " + SoFmt.Amount(SoFmt.Dec(SoFmt.Col(a, "unitPrice")), cur) +
+                         " per " + SoFmt.AreaText(a, "priceUom");
+            if (!res.Succeeded)
+            {
+                await ShowResultAsync(res);
+            }
+            else
+            {
+                var explanation = SoFmt.AreaText(a, "explanation");
+                var chain = await ChainAsync(r);
+                SetStatus("PRICING: " + chosen + ".  " + explanation + "  " + chain, res.IsWarning ? CueWarning : CueOk);
+            }
+        });
+    }
+
+    /// <summary>SOVAT DECIDE then SOMARGN LINE for one line, reported in the engine's words.</summary>
+    private async Task<string> ChainAsync(JsonObject r)
+    {
+        var net = SoFmt.Dec(SoFmt.Col(r, "NetAmount"));
+        var line = SoFmt.Int(SoFmt.Col(r, "LineNum"));
+        var item = SoFmt.Str(SoFmt.Col(r, "ItemCode"));
+        var text = "";
+        var v = SoResult.From(await Api.PostAsync("/api/so/v1/vat/decide", new JsonObject
+        {
+            ["docRef"] = _order.Trim(),
+            ["lineNum"] = line,
+            ["itemCode"] = item,
+            ["customer"] = _customer.Trim(),
+            ["itemVatCode"] = SoFmt.ColText(r, "VatCode", ""),
+            ["netAmount"] = net,
+            ["currency"] = Currency(),
+            ["supplyDate"] = SoFmt.Iso(OrderDate()),
+        }));
+        if (!v.IsNotFound)
+        {
+            text += "SOVAT: " + SoFmt.AreaText(v.Area, "vatCode") + " " + SoFmt.Pct(SoFmt.Dec(SoFmt.Col(v.Area, "vatRatePct"))) + " " +
+                    SoFmt.AreaText(v.Area, "liability") + ".  ";
+        }
+        var m = SoResult.From(await Api.PostAsync("/api/so/v1/margins/line", new JsonObject
+        {
+            ["docRef"] = _order.Trim(),
+            ["lineNum"] = line,
+            ["itemCode"] = item,
+            ["customer"] = _customer.Trim(),
+            ["quantity"] = SoFmt.Dec(SoFmt.Col(r, "AcceptedQty")),
+            ["netAmount"] = net,
+            ["currency"] = Currency(),
+            ["effDate"] = SoFmt.Iso(OrderDate()),
+        }));
+        if (!m.IsNotFound)
+        {
+            var state = SoFmt.AreaText(m.Area, "marginState");
+            text += "SOMARGN: margin " + (state == "OK" ? SoFmt.Pct(SoFmt.Dec(SoFmt.Col(m.Area, "marginPct"))) : state) +
+                    (SoFmt.AreaText(m.Area, "approvalReqd") == "Y" ? " - approval required." : ".");
+        }
+        return text;
+    }
+
+    /// <summary>GridHelper.Bind of the PRICING EXPLAIN candidates, then frmSalesOrderEntry.DecorateWhy.</summary>
+    private void BindWhy(JsonNode? area)
+    {
+        if (area is not JsonObject a || !SoFmt.Has(a, "cand"))
+        {
+            _whyData = GridData.Empty;
+            _whySelected = -1;
+            return;
+        }
+        var rows = (SoFmt.Col(a, "cand") as JsonArray ?? []).OfType<JsonObject>().ToList();
+        var data = new GridData(CandColumns.Select(c => new GridColumn(c.Json, c.Cobol, legacyName: c.Cobol)), rows);
+        data.Decorate("cRank", "Rank", "INT", 44);
+        data.Decorate("cLevel", "Level", "INT", 44);
+        data.Decorate("cScope", "Scope", "CODE", 76);
+        data.Decorate("cList", "Price list", "CODE", 84);
+        data.Decorate("cPrice", "Unit price", "RATE", 84);
+        data.Decorate("cChosen", "Chosen", "TEXT", 50);
+        data.Decorate("cWhy", "Why this candidate was or was not chosen", "TEXT", 300);
+        foreach (var hidden in new[] { "cCurrency", "cUom", "cQtybrk", "cPerQty", "cDisc", "cMinmgn", "cFrom", "cTo" })
+        {
+            data.Hide(hidden);
+        }
+        _whyData = data;
+        _whySelected = rows.Count > 0 ? 0 : -1;
+    }
+
+    // ------------------------------------------------------ F2 availability and reservation (SO-010)
+
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        if (key.TargetField == "Order")
+        {
+            var code = await Dialogs.LookupAsync("named", "SO.ORDER", "Sales order");
+            if (code != "")
+            {
+                _order = code;
+                await LoadOrderAsync();
+            }
+            return;
+        }
+        await ShowAvailabilityAsync();
+    }
+
+    /// <summary>SO-010: free stock, reservations and expected receipts are separate labelled lines; an expected receipt is never an allocation.</summary>
+    private async Task ShowAvailabilityAsync()
+    {
+        if (!OrderLoaded()) return;
+        var r = SelectedLine();
+        if (r is null)
+        {
+            SetStatus("Select an order line, then press F2 for its availability.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var item = SoFmt.Str(SoFmt.Col(r, "ItemCode"));
+            var uom = SoFmt.Str(SoFmt.Col(r, "UomCode"));
+            var qty = SoFmt.Dec(SoFmt.Col(r, "AcceptedQty"));
+            var res = SoResult.From(await Api.PostAsync("/api/so/v1/availability/enquire", new JsonObject
+            {
+                ["itemCode"] = item,
+                ["site"] = "",
+                ["uomCode"] = uom,
+                ["qtyRequired"] = qty,
+                ["requiredDate"] = SoFmt.Iso(OrderDate()),
+            }));
+            if (res.IsNotFound)
+            {
+                _avail = "SOAVAIL is not in the engine yet (" + res.ReasonCode + ").";
+                SetStatus("Availability is not available: " + res.Display, CueWarning);
+                return;
+            }
+            var a = res.Area;
+            var sb = new System.Text.StringBuilder();
+            sb.Append(item + " at " + Session.SiteCode + ", required " + SoFmt.Qty(qty, uom)).Append('\n');
+            sb.Append('\n');
+            sb.Append("Physical free stock (guaranteed) : " + SoFmt.Qty(SoFmt.Dec(SoFmt.Col(a, "qtyFree")), uom)).Append('\n');
+            sb.Append("Reserved for other demand        : " + SoFmt.Qty(SoFmt.Dec(SoFmt.Col(a, "qtyReserved")), uom)).Append('\n');
+            sb.Append("Expected receipts (NOT allocated): " + SoFmt.Qty(SoFmt.Dec(SoFmt.Col(a, "qtyExpected")), uom) +
+                      "  first " + SoFmt.AreaDate(a, "expectedDate")).Append('\n');
+            sb.Append("Shortfall                        : " + SoFmt.Qty(SoFmt.Dec(SoFmt.Col(a, "qtyShortfall")), uom)).Append('\n');
+            sb.Append('\n');
+            sb.Append("Labelled supply lines - each source stands on its own:").Append('\n');
+            foreach (var s in (SoFmt.Col(a, "lines") as JsonArray ?? []).OfType<JsonObject>())
+            {
+                sb.Append(SoFmt.Str(SoFmt.Col(s, "lKind")).PadRight(11) + SoFmt.Str(SoFmt.Col(s, "lLabel")).PadRight(26) +
+                          SoFmt.Qty(SoFmt.Dec(SoFmt.Col(s, "lQty")), uom).PadLeft(16) + "  " +
+                          (SoFmt.Str(SoFmt.Col(s, "lGuaranteed")) == "Y" ? "GUARANTEED    " : "NOT GUARANTEED") + "  " +
+                          SoFmt.Str(SoFmt.Col(s, "lText"))).Append('\n');
+            }
+            _avail = sb.ToString();
+            SetStatus("SOAVAIL: " + SoFmt.AreaText(a, "promiseText"), res.Succeeded ? CueOk : res.Severity);
+        });
+    }
+
+    /// <summary>SORESV RESERVE - the only instruction that stops another order taking the units.</summary>
+    private async Task ReserveAsync()
+    {
+        if (!OrderLoaded()) return;
+        var r = SelectedLine();
+        if (r is null)
+        {
+            SetStatus("Select the order line to reserve.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var line = SoFmt.Int(SoFmt.Col(r, "LineNum"));
+            var res = SoResult.From(await Api.PostAsync(
+                "/api/so/v1/sales-orders/" + Query.Path(_order.Trim()) + "/lines/" + line.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/reserve",
+                new JsonObject
+                {
+                    ["itemCode"] = SoFmt.Str(SoFmt.Col(r, "ItemCode")),
+                    ["site"] = "",
+                    ["customer"] = _customer.Trim(),
+                    ["qtyRequested"] = SoFmt.Dec(SoFmt.Col(r, "AcceptedQty")),
+                    ["requiredDate"] = SoFmt.Iso(OrderDate()),
+                }, Instruction.New().Options()));
+            if (!await ShowResultAsync(res)) return;
+            var uom = SoFmt.Str(SoFmt.Col(r, "UomCode"));
+            SetStatus("SORESV: reserved " + SoFmt.Qty(SoFmt.Dec(SoFmt.Col(res.Area, "qtyReserved")), uom) + ", shortfall " +
+                      SoFmt.Qty(SoFmt.Dec(SoFmt.Col(res.Area, "qtyShortfall")), uom) + ", reservation " +
+                      SoFmt.Dec(SoFmt.Col(res.Area, "reservationId")).ToString(System.Globalization.CultureInfo.InvariantCulture) + ".", CueOk);
+        });
+    }
+
+    // ------------------------------------------------- F10 accept and release (SO-002, SO-003, SO-011)
+
+    protected override async Task OnConfirmAsync()
+    {
+        if (!OrderLoaded()) return;
+        await GuardAsync(async () =>
+        {
+            var res = await AcceptanceAsync("validate");
+            var findings = BlockerText(res.Area);
+            if (!res.Succeeded)
+            {
+                if (findings != "") await InfoAsync(findings, "Order validation - SOACCEPT");
+                await ShowResultAsync(res);
+                SetStatus("Order " + _order.Trim() + " is NOT accepted: " + res.Display, CueError);
+                return;
+            }
+            if (findings != "") await InfoAsync(findings, "Order validation - SOACCEPT");
+            if (!await ConfirmAsync("Accept and release order " + _order.Trim() + " for " + _customer.Trim() + "?")) return;
+            res = await AcceptanceAsync("accept");
+            var a = res.Area;
+            ShowState(SoFmt.AreaText(a, "releaseStatus"), SoFmt.AreaText(a, "fulfilStatus"), SoFmt.AreaText(a, "billingStatus"),
+                      SoFmt.AreaText(a, "holdReason"));
+            if (!await ShowResultAsync(res))
+            {
+                SetStatus("Order " + _order.Trim() + " is " + SoFmt.AreaText(a, "releaseStatus") + ": " + res.Display,
+                          res.IsHold ? CueHold : CueError);
+                return;
+            }
+            SetStatus("Order " + _order.Trim() + " accepted, release status " + SoFmt.AreaText(a, "releaseStatus") + ".", CueOk);
+            await LoadOrderAsync();
+        });
+    }
+
+    /// <summary>SalesOrderService.Accept: VALIDATE without a correlation id, ACCEPT under a new one (COM-015).</summary>
+    private async Task<SoResult> AcceptanceAsync(string function)
+    {
+        var body = new JsonObject
+        {
+            ["customer"] = _customer.Trim(),
+            ["orderDate"] = SoFmt.Iso(OrderDate()),
+            ["currency"] = Currency(),
+            ["termsCode"] = _terms.Trim(),
+            ["salesperson"] = _salesperson.Trim(),
+            ["incotermsRule"] = _incoterms.Trim(),
+            ["incotermsPlace"] = _incoPlace.Trim(),
+            ["deliveryRef"] = _deliveryRef.Trim(),
+        };
+        var path = "/api/so/v1/sales-orders/" + Query.Path(_order.Trim()) + "/" + function;
+        return SoResult.From(await Api.PostAsync(path, body, function == "accept" ? Instruction.New().Options() : null));
+    }
+
+    /// <summary>Every finding at once, severity first, so nothing is discovered one at a time.</summary>
+    private static string BlockerText(JsonNode? area)
+    {
+        var sb = new System.Text.StringBuilder();
+        foreach (var b in (SoFmt.Col(area, "blockers") as JsonArray ?? []).OfType<JsonObject>())
+        {
+            sb.Append(SoFmt.Str(SoFmt.Col(b, "bSeverity")).PadRight(9) + SoFmt.Str(SoFmt.Col(b, "bReason")) + "  line " +
+                      SoFmt.Int(SoFmt.Col(b, "bLineNum")).ToString(System.Globalization.CultureInfo.InvariantCulture) + "  " +
+                      SoFmt.Str(SoFmt.Col(b, "bField")) + ": " + SoFmt.Str(SoFmt.Col(b, "bText"))).Append('\n');
+        }
+        return sb.ToString();
+    }
+}

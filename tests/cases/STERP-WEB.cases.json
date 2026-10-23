@@ -1,0 +1,2468 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-WEB",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-WEB-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-001-AC1",
+          "ac": 1,
+          "title": "A data-backed GUI page loads through the APIs while no database session carries an STERP.Web application name",
+          "layer": "contract",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/itm/stock-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "text": "NUT-M6-NYLOC"
+            },
+            {
+              "on": "page",
+              "notText": "STERP-E-9999"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE program_name LIKE 'STERP.Web%'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC 'STERP.Web assemblies reference no SQL client package; network trace of a demo journey shows only HTTPS calls to the API hosts' with STERP-WEB.md sections 8-9 and contracts 5.6 (only STERP.Api/STERP.Jobs application names connect); the assembly-reference and network-trace checks are build/trace checks outside the DSL, so the scenario pins their runtime consequence on the Stock Enquiry page.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-002-AC1",
+          "ac": 1,
+          "title": "WHSE menu bar shows exactly its permitted top-level menus, entries route to pages, empty menu table uses the fallback",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "bar",
+              "gui": "/",
+              "actions": []
+            },
+            {
+              "save": "stock",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "Stock Control"
+                }
+              ]
+            },
+            {
+              "save": "enq",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Enquiry..."
+                  ]
+                }
+              ]
+            },
+            {
+              "sql": "UPDATE core.MenuItem SET IsActive = 0"
+            },
+            {
+              "save": "fallback",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "File"
+                }
+              ]
+            },
+            {
+              "sql": "UPDATE core.MenuItem SET IsActive = 1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "bar",
+              "text": "File"
+            },
+            {
+              "on": "bar",
+              "text": "System"
+            },
+            {
+              "on": "bar",
+              "text": "Sales"
+            },
+            {
+              "on": "bar",
+              "text": "Purchasing"
+            },
+            {
+              "on": "bar",
+              "text": "Kits"
+            },
+            {
+              "on": "bar",
+              "text": "Stock Control"
+            },
+            {
+              "on": "bar",
+              "text": "Reports"
+            },
+            {
+              "on": "bar",
+              "text": "Window"
+            },
+            {
+              "on": "bar",
+              "text": "Help"
+            },
+            {
+              "on": "bar",
+              "notText": "Finance"
+            },
+            {
+              "on": "bar",
+              "notText": "Debtors"
+            },
+            {
+              "on": "bar",
+              "notText": "Creditors"
+            },
+            {
+              "on": "bar",
+              "notText": "Bills of Material"
+            },
+            {
+              "on": "bar",
+              "notText": "Costing"
+            },
+            {
+              "on": "stock",
+              "text": "Stock Enquiry..."
+            },
+            {
+              "on": "stock",
+              "text": "Ctrl+K"
+            },
+            {
+              "on": "stock",
+              "text": "Item and Part Maintenance..."
+            },
+            {
+              "on": "stock",
+              "text": "Ctrl+I"
+            },
+            {
+              "on": "stock",
+              "notText": "Units of Measure..."
+            },
+            {
+              "on": "enq",
+              "text": "Stock Enquiry"
+            },
+            {
+              "on": "enq",
+              "notText": "STERP-E-0004"
+            },
+            {
+              "on": "fallback",
+              "text": "Select Company / Site..."
+            },
+            {
+              "on": "fallback",
+              "text": "Exit"
+            },
+            {
+              "on": "fallback",
+              "notText": "Continue as User..."
+            },
+            {
+              "on": "fallback",
+              "notText": "Stock Control"
+            }
+          ],
+          "derivation": "AC 'rendered menu equals core.usp_UiMenuLoad rows for each demo user; every entry opens its mapped page or command; empty menu table shows the built-in fallback' with frmMain.vb:39-71 (emptied top-level items hidden) and :233-250 (BuiltInMenu FILE = Select Company / Site, Exit), expected WHSE rows derived from the db/seed core.MenuItem rows and the WHSE role grants (03-core-roles-users.sql:49); the menu of the other demo users and every entry are swept by FR-STERP-WEB-002-EDGE-SMOKE-SWEEP and the slice navigation scenarios.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-WEB-002-EDGE-SMOKE-SWEEP",
+          "ac": null,
+          "title": "GUI smoke sweep: SYSADM opens all 141 distinct menu FormClass/argument entries; page or placeholder opens without error",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "sweep",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "File",
+                    "View Spool File..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "System Parameters..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Companies..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Sites..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Users..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Roles..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "User Roles..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Permissions..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Currencies..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Exchange Rates..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Payment Terms..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Calendars..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Calendar Holidays..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Number Series..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "File Maintenance..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Approvals Inbox..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Exception Worklist..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Audit Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Job Monitor..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Engine Diagnostics..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Journal Entry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Journal Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Period Close Checklist..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "VAT Return..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Bank Reconciliation..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Maintenance",
+                    "Chart of Accounts..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Maintenance",
+                    "Account Classes..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Maintenance",
+                    "VAT Codes..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Maintenance",
+                    "VAT Rates..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Maintenance",
+                    "Budget Versions..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Maintenance",
+                    "Budget Lines..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Maintenance",
+                    "Bank Accounts..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Runs",
+                    "Recurring Journals..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Runs",
+                    "Currency Revaluation..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Runs",
+                    "Year End..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Runs",
+                    "MTD Submission File..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Reports",
+                    "Trial Balance..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Reports",
+                    "Profit and Loss..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Reports",
+                    "Balance Sheet..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Reports",
+                    "Cash Book..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Finance",
+                    "Finance Reports",
+                    "Budget Variance..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Customer Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Receipt Entry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Credit Control Worklist..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Credit Limits and Holds..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Credit Overrides..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Direct Debit Mandates..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Debtors Reports",
+                    "Aged Debt..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Debtors Reports",
+                    "Customer Statements..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Debtors Reports",
+                    "Dunning Letters..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Debtors Reports",
+                    "Direct Debit Collections..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Debtors Reports",
+                    "Debtors to Ledger Reconciliation..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Debtors",
+                    "Debtors Reports",
+                    "Electronic Invoice Export..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Creditors",
+                    "Supplier and Bank Verification..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Creditors",
+                    "Invoice Register and Matching..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Creditors",
+                    "Payment Proposal and Run..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Creditors",
+                    "Creditors Reports",
+                    "Aged Creditors..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Creditors",
+                    "Creditors Reports",
+                    "Remittance Advices..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Creditors",
+                    "Creditors Reports",
+                    "Bacs Payment File..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Creditors",
+                    "Creditors Reports",
+                    "Payment Practices Report..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Creditors",
+                    "Creditors Reports",
+                    "Six Month Unpaid Input VAT..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Sales Order Entry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Request Credit Override..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Despatch Confirmation..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Sales Invoice Run..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Returns and Authorisations..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Price Lists..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Price List Breaks..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Rebate Agreements..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Sales Reports",
+                    "Sales Backlog and Fulfilment..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Bill Maintenance..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Bill Headers (list)..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Explosion Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Where Used Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Revision Comparison..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Engineering Changes..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Bulk Change Preview..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Indented Parts List..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Costed Explosion..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Requisitions..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Purchase Orders..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Goods Receipt and Inspection..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Supplier Sources..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Purchase Prices..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Tolerance Rules..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Purchasing Reports",
+                    "Pipeline and GRNI..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Purchasing Reports",
+                    "Overdue Orders..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Purchasing Reports",
+                    "Supplier Performance..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Purchasing Reports",
+                    "Print Purchase Order Document..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Purchasing",
+                    "Purchasing Reports",
+                    "Requisition Generation..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Kit Maintenance..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Commercial Kit Definitions..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Trial Kitting..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Kit Execution..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Genealogy Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Disassembly..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Kit Readiness..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Kit Execution Position..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Kits",
+                    "Kit Shortage List..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Item and Part Maintenance..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Movement Entry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Count and Adjustment..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Units of Measure..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Item Unit Conversions..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Item Revisions..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Item Site Planning Data..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Partner Part Numbers..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Approved Substitutes..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Warehouses..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Locations..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Lots..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Serial Numbers..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Item VAT Liability..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Commodity Codes and Origin..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Packaging Composition..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Count Line Entry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Reports..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Item Cost Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Cost Sets..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Roll-up and What-if..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Work Centre Rates..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Cost Elements..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Valuation Policy..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Job Cost Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Work in Progress..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Variance Analysis..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Landed Cost Allocation..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Net Realisable Value..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Inventory Valuation..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Job Profitability..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Work in Progress Roll-forward..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Cost Set Comparison..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Control account reconciliation"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Exception ageing and escalation"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Statutory obligations register"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "On time in full (KPI)"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Business chain trace"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Chain trace report"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Legacy conversion load"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Run Report..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "sweep",
+              "notText": "STERP-E-0004"
+            },
+            {
+              "on": "sweep",
+              "notText": "STERP-E-0005"
+            },
+            {
+              "on": "sweep",
+              "notText": "STERP-E-9999"
+            }
+          ],
+          "derivation": "STERP-WEB.md section 10 (BE-WEB-07) smoke sweep replacing QaScreens.Run (QaScreens.vb:45-108: SYSADM opens every distinct core.MenuItem FormClass/FormArgument pair); the menu paths are the seeded core.MenuItem captions without access keys (db/seed/05,12,27,32,41,43,52,61,72,73,81,85,97), each top-level group followed by Window > Close All; undelivered slices must show the contracts 9.2 placeholder, never STERP-E-0004/0005/9999.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-010-AC1",
+          "ac": 1,
+          "title": "Start-up checks both API hosts and opens the shell without STERP-E-9999 when they are ready",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "start",
+              "gui": "/",
+              "actions": []
+            }
+          ],
+          "assertions": [
+            {
+              "on": "start",
+              "text": "Engine: ONLINE"
+            },
+            {
+              "on": "start",
+              "notText": "STERP-E-9999"
+            }
+          ],
+          "derivation": "AC 'with an API host stopped the start-up reports it and sign-on is not offered; forced client exception shows STERP-E-9999 dialog' with Program.vb:13-69 (STERP-E-9999: An unexpected error has occurred.) and FR-STERP-WEB-013 (Engine: status from readiness); stopping a host and forcing a client exception are environment manipulations outside the DSL, so only the ready path is pinned and the failure presentation is unknown.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-011-AC1",
+          "ac": 1,
+          "title": "Sales Order Entry opened twice stays one window; Cascade/Tile arrange; Close All asks the journal close guard",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "win",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Sales",
+                    "Sales Order Entry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Sales Order Entry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Cascade"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Tile Horizontally"
+                  ]
+                },
+                {
+                  "click": "Window"
+                }
+              ]
+            },
+            {
+              "save": "guard",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Finance",
+                    "Journal Entry..."
+                  ]
+                },
+                {
+                  "fill": {
+                    "label": "Account",
+                    "value": "6500"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Cost centre",
+                    "value": "ADMIN"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Project",
+                    "value": "GEN"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Debit",
+                    "value": "25.00"
+                  }
+                },
+                {
+                  "click": "Add line"
+                },
+                {
+                  "menu": [
+                    "Window",
+                    "Close All"
+                  ]
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "win",
+              "text": "Sales Order Entry"
+            },
+            {
+              "on": "win",
+              "notText": "STERP-E-0005"
+            },
+            {
+              "on": "guard",
+              "text": "Abandon this unposted journal?"
+            }
+          ],
+          "derivation": "AC 'opening Sales Order Entry twice yields one window; Window>Cascade/Tile rearranges; Close all runs each close guard' with frmMain.vb:81-90 (re-activate same class and argument), :111-120 ($CASCADE/$TILEH/$CLOSEALL), seeded Window rows (05-core-menu-system.sql:57-61) and the frmJournalEntry close guard 'Abandon this unposted journal?' (frmJournalEntry.vb:84-86); the single-instance count is not countable by text assertions.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-012-AC1",
+          "ac": 1,
+          "title": "Each toolbar button opens its page with an empty argument and the key legend matches the legacy text",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "tb",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "Approvals"
+                },
+                {
+                  "click": "Exceptions"
+                },
+                {
+                  "click": "Audit"
+                },
+                {
+                  "click": "Reports"
+                },
+                {
+                  "click": "Spool"
+                },
+                {
+                  "click": "Jobs"
+                },
+                {
+                  "click": "File maintenance"
+                },
+                {
+                  "click": "Engine"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "tb",
+              "text": "Approvals Inbox"
+            },
+            {
+              "on": "tb",
+              "text": "Exception Worklist"
+            },
+            {
+              "on": "tb",
+              "text": "Audit Enquiry"
+            },
+            {
+              "on": "tb",
+              "text": "Run Report"
+            },
+            {
+              "on": "tb",
+              "text": "Spool File Viewer"
+            },
+            {
+              "on": "tb",
+              "text": "Job Monitor"
+            },
+            {
+              "on": "tb",
+              "text": "File Maintenance"
+            },
+            {
+              "on": "tb",
+              "text": "Service diagnostics"
+            },
+            {
+              "on": "tb",
+              "text": "F1 Help"
+            },
+            {
+              "on": "tb",
+              "text": "F2 Lookup"
+            },
+            {
+              "on": "tb",
+              "text": "F3 Close"
+            },
+            {
+              "on": "tb",
+              "text": "F5 Refresh"
+            },
+            {
+              "on": "tb",
+              "text": "F10 Post"
+            }
+          ],
+          "derivation": "AC 'each toolbar button opens its page with empty argument; legend text matches legacy' with frmMain.vb:183-205 (buttons and legend text 'F1 Help   F2 Lookup   F3 Close   F5 Refresh   F10 Post', compared item by item because rendered text collapses runs of spaces) and the legacy captions of frmApprovals, frmExceptions, frmAudit, frmReportLauncher, frmSpoolViewer, frmJobMonitor, frmMaintLauncher; Engine opens the PLATFORM Service diagnostics page (contracts 10).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-013-AC1",
+          "ac": 1,
+          "title": "Status bar after sign-on to CAL/GLA shows user, company, site, period, business date and service status of the session",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "CAL",
+            "site": "GLA",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "shell",
+              "gui": "/",
+              "actions": []
+            },
+            {
+              "save": "sess",
+              "call": "platform_getSession"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "shell",
+              "text": "User: SYSADM"
+            },
+            {
+              "on": "shell",
+              "text": "Co: CAL"
+            },
+            {
+              "on": "shell",
+              "text": "Site: GLA"
+            },
+            {
+              "on": "shell",
+              "text": "Period: 2026/07 OPEN"
+            },
+            {
+              "on": "shell",
+              "text": "07/10/2026"
+            },
+            {
+              "on": "shell",
+              "text": "Engine: ONLINE"
+            },
+            {
+              "on": "sess",
+              "json": "$.fiscalPeriod.periodText",
+              "equals": "2026/07"
+            },
+            {
+              "on": "sess",
+              "json": "$.fiscalPeriod.status",
+              "equals": "OPEN"
+            }
+          ],
+          "derivation": "AC 'after sign-on status values equal the PLATFORM session context; service status refreshes every 60 s' with the FR-STERP-WEB-013 example (Co: CAL, Site: GLA, Period: 2026/07 OPEN, 07/10/2026; docs/img/main-mdi.png) and frmMain.vb:208-228; the 60 s refresh cadence is not observable without a wait action in the DSL.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-014-AC1",
+          "ac": 1,
+          "title": "Context change: Cancel keeps the context, an unsaved journal blocks the change, Continue as WHSE rebuilds the menu",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "cancel",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "File",
+                    "Select Company / Site..."
+                  ]
+                },
+                {
+                  "click": "Cancel"
+                }
+              ]
+            },
+            {
+              "save": "blocked",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Finance",
+                    "Journal Entry..."
+                  ]
+                },
+                {
+                  "fill": {
+                    "label": "Account",
+                    "value": "6500"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Cost centre",
+                    "value": "ADMIN"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Project",
+                    "value": "GEN"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Debit",
+                    "value": "25.00"
+                  }
+                },
+                {
+                  "click": "Add line"
+                },
+                {
+                  "menu": [
+                    "File",
+                    "Select Company / Site..."
+                  ]
+                },
+                {
+                  "select": {
+                    "label": "Company / site",
+                    "value": "STC / BHM"
+                  }
+                },
+                {
+                  "click": "OK"
+                },
+                {
+                  "click": "No"
+                }
+              ]
+            },
+            {
+              "save": "changed",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "File",
+                    "Continue as User..."
+                  ]
+                },
+                {
+                  "select": {
+                    "label": "Continue as",
+                    "value": "WHSE"
+                  }
+                },
+                {
+                  "click": "OK"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cancel",
+              "text": "Sign-on unchanged - still SYSADM in STC/RDG."
+            },
+            {
+              "on": "blocked",
+              "text": "Sign-on unchanged - close the open windows first (1 still open)."
+            },
+            {
+              "on": "changed",
+              "text": "Signed on as WHSE (as SYSADM) in STC/RDG."
+            },
+            {
+              "on": "changed",
+              "notText": "Finance"
+            }
+          ],
+          "derivation": "AC 'cancel leaves context unchanged with legacy message; unsaved window blocks the change with close the open windows first; successful change rebuilds menu' with frmMain.vb:151-180 message texts, SterpSession.Title '<user> (as <real>)', frmLogin captions (Company / site:, Continue as:, OK, Cancel; frmLogin.Designer.vb) and the frmJournalEntry close guard; WHSE holds no FIN permission so Finance disappears from the rebuilt menu (03-core-roles-users.sql:49).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-015",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-015-AC1",
+          "ac": 1,
+          "title": "Outcome presentation: RC 04 warning and RC 06 hold dialogs with reason codes, 422 error dialog, Esc closes",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "error-mapping",
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "warn",
+              "gui": "/bom/bom-explosion",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Parent item",
+                    "value": "DEMO-ERR-TOP"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "sql": "UPDATE inv.Item SET LifecycleStatus = 'BLOCKED', StatusReason = 'A07 hold presentation' WHERE CompanyCode = 'STC' AND ItemCode = 'WASHER-M6-SS'"
+            },
+            {
+              "save": "hold",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Movement",
+                    "value": "RECEIPT"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "WASHER-M6-SS"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Location",
+                    "value": "STKA01"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "10"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            },
+            {
+              "sql": "UPDATE inv.Item SET LifecycleStatus = 'RELEASED', StatusReason = NULL WHERE CompanyCode = 'STC' AND ItemCode = 'WASHER-M6-SS'"
+            },
+            {
+              "save": "error",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Movement",
+                    "value": "RELEASE"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Location",
+                    "value": "QUAR01"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "10"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason code",
+                    "value": "QCRELEASE"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason",
+                    "value": "A07 release"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            },
+            {
+              "save": "esc",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "press": "Esc"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "warn",
+              "text": "Reason code: BOM0512"
+            },
+            {
+              "on": "warn",
+              "text": "WARNING"
+            },
+            {
+              "on": "hold",
+              "text": "The document has been placed on hold and an approval has been requested."
+            },
+            {
+              "on": "hold",
+              "text": "Reason code: STK0001"
+            },
+            {
+              "on": "hold",
+              "text": "## HOLD"
+            },
+            {
+              "on": "error",
+              "text": "Reason code: STK0014"
+            },
+            {
+              "on": "error",
+              "text": "*** ERROR"
+            },
+            {
+              "on": "esc",
+              "notText": "Complete the movement and press F10 to post it."
+            }
+          ],
+          "derivation": "AC 'RC04 shows warning dialog with reason; RC06 shows hold dialog and stops; 422 problem shows error dialog with reason; Esc closes' with BaseForm.vb:77-110,189-244 (cues, hold text, 'Reason code: <code>'), contracts 9.3, the one-window INCOMPLETE explosion BOM0512 (seed BOM-DEMO-ERR), the BLOCKED-item RECEIPT STK0001 RC 06 and the facade RELEASE refusal STK0014 (SME-184); stock movement captions from frmStockMovement.vb:14-37.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-WEB-015-EDGE-KEYBOARD-PARITY",
+          "ac": null,
+          "title": "Keyboard parity on Stock Movement Entry: F1 help, F2 lookup, F10 confirm, F5 refresh, F3 and Esc close, Ctrl+K shortcut",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "f1",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "press": "F1"
+                }
+              ]
+            },
+            {
+              "save": "f2",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "press": "F2"
+                }
+              ]
+            },
+            {
+              "save": "f10",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "f5",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "f3",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "press": "F3"
+                }
+              ]
+            },
+            {
+              "save": "esc",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "press": "Esc"
+                }
+              ]
+            },
+            {
+              "save": "ctrlk",
+              "gui": "/",
+              "actions": [
+                {
+                  "press": "Ctrl+K"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "f1",
+              "text": "Screen: Stock Movement Entry"
+            },
+            {
+              "on": "f1",
+              "text": "F2 lookup"
+            },
+            {
+              "on": "f1",
+              "text": "F3/Esc close"
+            },
+            {
+              "on": "f1",
+              "text": "F5 refresh"
+            },
+            {
+              "on": "f1",
+              "text": "F10 confirm"
+            },
+            {
+              "on": "f2",
+              "text": "Description"
+            },
+            {
+              "on": "f10",
+              "text": "An item code and a quantity are required."
+            },
+            {
+              "on": "f5",
+              "text": "DEMO-QH-66"
+            },
+            {
+              "on": "f3",
+              "notText": "Complete the movement and press F10 to post it."
+            },
+            {
+              "on": "esc",
+              "notText": "Complete the movement and press F10 to post it."
+            },
+            {
+              "on": "ctrlk",
+              "text": "Stock Enquiry"
+            }
+          ],
+          "derivation": "STERP-WEB.md section 10 keyboard parity (F1, F2, F3, Esc, F5, F10 and menu shortcuts; QaScreens.vb:285-300) with BaseForm.vb:77-115 (help text, close keys), frmStockMovement.vb:57-110 (ITM.ITEM lookup, empty-quantity warning, 90-day movements grid holding the DEMO-QH-66 legs of 91-itm-demo.sql:71-74) and the Ctrl+K shortcut of ITM.STOCKENQ (27-itm-menu.sql:22).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-WEB-015-EDGE-ACCESSIBILITY",
+          "ac": null,
+          "title": "Accessibility: keyboard-only focus and access keys, labelled fields, status cues given as text",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "accessibility",
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "focus",
+              "gui": "/itm/stock-movement",
+              "actions": []
+            },
+            {
+              "save": "labels",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "access",
+              "gui": "/",
+              "actions": [
+                {
+                  "press": "Alt+K"
+                }
+              ]
+            },
+            {
+              "save": "access2",
+              "gui": "/",
+              "actions": [
+                {
+                  "press": "Alt+N"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "focus",
+              "focused": "Movement"
+            },
+            {
+              "on": "labels",
+              "text": "An item code and a quantity are required."
+            },
+            {
+              "on": "labels",
+              "text": "WARNING"
+            },
+            {
+              "on": "access",
+              "notText": "Stock Enquiry..."
+            },
+            {
+              "on": "access2",
+              "text": "Journal Entry..."
+            }
+          ],
+          "derivation": "Contracts 9.6 (WCAG 2.2 AA keyboard operation, labels, text cues never colour alone; COM-024 text cues BaseForm.vb:125-133) and STERP-WEB.md section 10; the first control and labels are the legacy captions of frmStockMovement.vb:14-37 ('&Movement:', '&Item:', '&Quantity:'), the cue '!  WARNING' is text (BaseForm.vb:144-147) and Alt+K is the access key of 'Stoc&k Control' (27-itm-menu.sql:20). K is the access key of both '&Kits' (SortOrder 75) and 'Stoc&k Control' (80) on the SYSADM menu (legacy core.usp_UiMenuLoad on the restored freshc; db/seed/85-kit-menu.sql:18, 27-itm-menu.sql:19); the legacy WinForms MenuStrip (frmMain.vb:39-54) only selects the first of two items sharing a mnemonic and opens nothing (ToolStrip mnemonic processing), so Alt+K must not open Stock Control; the access-key behaviour is pinned with the unique key N of 'Fi&nance', whose menu lists '&Journal Entry...' (db/seed/12-fin-menu.sql:43). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-110: Alt+K is a duplicated access key (Kits first); access keys checked with the unique Alt+N]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-016",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-016-AC1",
+          "ac": 1,
+          "title": "Journal enquiry list page: Refresh (F5)/Close (F3) toolbar, wrapping filters and '<n> record(s)' after loading",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "list",
+              "gui": "/fin/journal-enquiry",
+              "actions": [
+                {
+                  "press": "F5"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "list",
+              "text": "Refresh (F5)"
+            },
+            {
+              "on": "list",
+              "text": "Close (F3)"
+            },
+            {
+              "on": "list",
+              "text": "record(s)"
+            }
+          ],
+          "derivation": "AC 'journal enquiry shows same columns and count as legacy for same filters; filters wrap' with ListForm.vb:24-100 (toolbar, filter row, '<n> record(s)'); the legacy column list and record count for the default filters are values of the legacy oracle not fixed by the specification, so they are unknown here.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-017",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-017-AC1",
+          "ac": 1,
+          "title": "Stock enquiry grid humanises captions and formats the quarantine quantity like the legacy grid",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "WHSE"
+          },
+          "steps": [
+            {
+              "save": "grid",
+              "gui": "/itm/stock-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "grid",
+              "text": "Qty On Hand"
+            },
+            {
+              "on": "grid",
+              "text": "Not Eligible Reason"
+            },
+            {
+              "on": "grid",
+              "text": "60.000000"
+            },
+            {
+              "on": "grid",
+              "text": "Quality condition quarantine"
+            }
+          ],
+          "derivation": "AC 'formatted cell text equals legacy grid for the same data' with GridHelper.vb:89-101 (Humanise QtyOnHand -> 'Qty On Hand') and :125-160 (decimal column starting 'Qty' -> QTY '#,##0.000000', the legacy oracle, where the spec text says #,##0.00##), on the QUAR01 bucket of 60 left by 91-itm-demo.sql:71-73 and the usp_StockEnquiry reason text.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-018",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-018-AC1",
+          "ac": 1,
+          "title": "A doubled F10 on a stock movement posts once; a sales invoice run opens the spool viewer when a spool exists",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "post",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Movement",
+                    "value": "ADJUST"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Location",
+                    "value": "STKA01"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "1"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason code",
+                    "value": "COUNT"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason",
+                    "value": "A07 WEB-018 double"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "Yes"
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "inv",
+              "gui": "/so/sales-invoice-run",
+              "actions": [
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "post",
+              "json": "$.shown[*]",
+              "contains": "posted; balance now"
+            },
+            {
+              "on": "post",
+              "text": "An item code and a quantity are required."
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE Reason = 'A07 WEB-018 double'",
+              "equals": 1
+            },
+            {
+              "on": "inv",
+              "text": "Spool - "
+            }
+          ],
+          "derivation": "AC 'API logs show headers; double click posts once; invoice run opens spool viewer when spool exists' with contracts 4.5/4.8 (one Idempotency-Key per instruction), frmStockMovement.vb:80-103 and frmSalesInvoiceRun.vb:45-69 (opens frmSpoolViewer 'Spool - <file>'); API log content is not observable through the DSL, so that clause is unknown. After F10 the legacy page opens the spool viewer itself when the run produced a spool file (frmSalesInvoiceRun.vb:59-62 OpenSpool, :66-70 main.OpenForm(\"frmSpoolViewer\")), and the new viewer window is the active window on top of the run window, so no further click is part of the flow. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-101: re-run after exact labels: the spool viewer opens on F10; the extra toolbar click is not legacy] The posted message 'Movement <id> posted; balance now <qty>.' is written, the quantity box is cleared and the second F10 then finds no quantity and writes 'An item code and a quantity are required.' with cue !  WARNING (frmStockMovement.vb:80-103), so the posted text is asserted among the texts the page showed and the final status is the local warning (no second posting). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-106: the second F10 overwrites the posted message with the empty-quantity warning]",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-019",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-019-AC1",
+          "ac": 1,
+          "title": "Help, About, Exit and an unknown $ command behave as the legacy shell commands",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "help",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Help",
+                    "Contents"
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "about",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Help",
+                    "About STERP - Stefan's ERP..."
+                  ]
+                }
+              ]
+            },
+            {
+              "sql": "INSERT core.MenuItem (MenuCode, ParentMenuCode, Caption, FormClass, FormArgument, PermissionCode, SortOrder, Shortcut, IsActive) VALUES ('A07.NOSUCHCMD', 'HELP', 'A07 Unknown Command', NULL, '$NOSUCH', NULL, 95, NULL, 1)"
+            },
+            {
+              "save": "unknown",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Help",
+                    "A07 Unknown Command"
+                  ]
+                }
+              ]
+            },
+            {
+              "sql": "DELETE FROM core.MenuItem WHERE MenuCode = 'A07.NOSUCHCMD'"
+            },
+            {
+              "save": "exit",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "File",
+                    "Exit"
+                  ]
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "help",
+              "text": "F10 confirm or post"
+            },
+            {
+              "on": "help",
+              "text": "compiler was retired in 2011"
+            },
+            {
+              "on": "about",
+              "text": "(c) 1994-2026 Stellar Business Systems Limited."
+            },
+            {
+              "on": "unknown",
+              "text": "Command $NOSUCH is not available."
+            },
+            {
+              "on": "exit",
+              "notText": "Engine:"
+            }
+          ],
+          "derivation": "AC 'each File/Window/Help command behaves as legacy text describes' with frmMain.vb:111-149 ($HELP text, $ABOUT, $EXIT, 'Command <cmd> is not available.'), frmAbout.Designer.vb copyright line and the seeded Help/File rows (05-core-menu-system.sql:27-64); $PRINTSETUP opens the browser's native print dialog (D-WEB-04), which DSL page assertions cannot observe.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-WEB-020",
+      "scenarios": [
+        {
+          "id": "FR-STERP-WEB-020-AC1",
+          "ac": 1,
+          "title": "Sales Order Entry shows the not-yet-modernized placeholder before W3; an unmapped FormClass shows STERP-E-0004",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "placeholder",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Sales",
+                    "Sales Order Entry..."
+                  ]
+                }
+              ]
+            },
+            {
+              "sql": "INSERT core.MenuItem (MenuCode, ParentMenuCode, Caption, FormClass, FormArgument, PermissionCode, SortOrder, Shortcut, IsActive) VALUES ('A07.UNMAPPED', 'FILE', 'A07 Unmapped Screen...', 'frmA07Unmapped', NULL, NULL, 85, NULL, 1)"
+            },
+            {
+              "save": "unmapped",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "File",
+                    "A07 Unmapped Screen..."
+                  ]
+                }
+              ]
+            },
+            {
+              "sql": "DELETE FROM core.MenuItem WHERE MenuCode = 'A07.UNMAPPED'"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "placeholder",
+              "text": "Not yet available in the modernized application"
+            },
+            {
+              "on": "placeholder",
+              "text": "W3"
+            },
+            {
+              "on": "unmapped",
+              "text": "STERP-E-0004: Screen frmA07Unmapped is not installed in this release."
+            }
+          ],
+          "derivation": "AC 'before W3 Sales Order Entry shows the placeholder; unmapped class shows STERP-E-0004' with contracts 9.2 (placeholder naming slice and wave) and frmMain.vb:91-95 (STERP-E-0004 text); the unmapped class is an arranged core.MenuItem row because every seeded FormClass is mapped in STERP-WEB.md section 7.2; precondition: STERP-SO not delivered.",
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ]
+}

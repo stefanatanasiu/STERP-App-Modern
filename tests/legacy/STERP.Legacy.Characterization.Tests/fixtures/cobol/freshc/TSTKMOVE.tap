@@ -1,0 +1,25 @@
+# suite TSTKMOVE
+ok 1 - a movement of nothing has no business effect
+ok 2 - nothing was posted for the refused movement
+ok 3 - a receipt of minus ten posts nothing
+ok 4 - an issue beyond physical stock is blocked
+ok 5 - the balance after the refusal is untouched
+ok 6 - stock cannot be received against an unknown item
+ok 7 - a lot controlled item may not arrive without a lot
+ok 8 - the refusal names the missing traceability
+ok 9 - a transfer to the same place is not a transfer
+ok 10 - ten units cannot leave without leaving the origin
+ok 11 - a hold of no quantity changes no availability
+ok 12 - no hold identity was created
+ok 13 - an adjustment without a reason posts nothing
+ok 14 - an input error returns reason STK0007
+ok 15 - an input error returns return code 8
+ok 16 - an unsupported movement type posts nothing
+ok 17 - receipt carries the rounded document GBP evidence
+ok 18 - native replay reads the duplicate in column ten
+ok 19 - native inter-site transfer carries origin relief
+ok 20 - unpriced native issue returns actual pool relief
+ok 21 - native movements create site-scoped pool histories
+1..21
+# TSTKMOVE passed 00021 failed 00000
+# exit 0

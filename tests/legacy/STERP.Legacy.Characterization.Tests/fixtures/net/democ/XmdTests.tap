@@ -1,0 +1,8 @@
+ok - catalogue: every seeded xmd report names a program that is installed  # REQ: RPT-004,RPT-015,RPT-016,XMD-013
+ok - catalogue: the ParamSpec of a report matches the program's own arguments  # REQ: RPT-004,RPT-007,FIN-019,AR-021
+ok - chain trace: the enquiry screen is installed and reachable from the menu  # REQ: XMD-001,XMD-004,COM-017
+ok - chain trace: the set based twin answers the same question  # REQ: XMD-004
+ok - chain trace: the step window is shaped for the 24 step COMMAREA  # REQ: XMD-001,XMD-002,XMD-003
+ok - ops console: SMOKE honours the signed on operator and company  # REQ: XMD-005,COM-002
+ok - ops console: SMOKE runs clean and paints all six panels  # REQ: XMD-005,COM-017,COM-018
+ok - report launcher: a JOB. catalogue entry is submitted as jobs\<name>.cmd  # REQ: XMD-005,COM-018

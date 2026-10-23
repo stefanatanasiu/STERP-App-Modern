@@ -1,0 +1,31 @@
+# suite TKITMTRL multi-kit trial run
+ok 1 - A multi-kit trial run commits nothing
+ok 2 - The bicycle trial runs without an error
+ok 3 - Components beyond the first 25-line window are pooled
+ok 4 - GETCOMP pages every pooled component
+ok 5 - Services are not drawn from the stock pool
+ok 6 - Every pooled component gave what was asked or fell short by the rest
+ok 7 - No component gave more than was free
+ok 8 - A part used in six places is one claim by one kit
+ok 9 - One kit on its own is never in conflict
+ok 10 - The verdict agrees with the component shortages
+ok 11 - A multi-kit trial run commits nothing
+ok 12 - The pin in frame, brace and pack is still one claim
+ok 13 - A multi-kit trial run commits nothing
+ok 14 - Served first, the small kit fares exactly as it does alone
+ok 15 - A million frames cannot be covered
+ok 16 - Competing kits that run short are reported as a conflict
+ok 17 - Every pooled component gave what was asked or fell short by the rest
+ok 18 - No component gave more than was free
+ok 19 - Both kits are counted as claimants of the shared parts
+ok 20 - A multi-kit trial run commits nothing
+ok 21 - Served after the big kit, the same units are not promised again
+ok 22 - A multi-kit trial run commits nothing
+ok 23 - A kit whose bill is incomplete is never called complete
+ok 24 - A cake with no ingredients in stock is not feasible
+ok 25 - The trial names the limiting ingredient
+ok 26 - The bicycle trial assesses its stocked parts
+ok 27 - Bought-in services are not assessed against stock
+1..27
+# TKITMTRL multi-kit trial run passed 00027 failed 00000
+# exit 0

@@ -1,0 +1,31 @@
+@inherits StListPage
+@* frmMaintLauncher (page:platform/maintenance-launcher, FR-STERP-PLATFORM-041): every maintenance definition the user may
+   open; Open or a double-click opens the generic maintenance page of the selected MaintCode. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnActivate="_ => OpenSelected()"
+              OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Tools>
+        <StToolButton Text="Open" Glyph="RUN" OnClick="OpenSelected" />
+    </Tools>
+</StListLayout>
+
+@code {
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("File Maintenance");
+    }
+
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/platform/v1/maintenance-definitions");
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json, new GridColumn("maintCode"), new GridColumn("title"), new GridColumn("moduleCode")));
+    });
+
+    private void OpenSelected()
+    {
+        var code = SelectedText("maintCode");
+        if (code.Length == 0) return;
+        OpenForm("frmGenericMaint", code);
+    }
+}

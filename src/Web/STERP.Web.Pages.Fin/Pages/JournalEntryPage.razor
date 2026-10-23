@@ -1,0 +1,314 @@
+@inherits StPage
+@* frmJournalEntry (page:fin/journal-entry, FR-STERP-FIN-040): the journal header, the line fields (F2 looks up an account),
+   Add line / Remove / Validate / Post (F10) and the lines grid. GLVALID checks each line as it is added
+   (fin_validateJournalLine), JNLENTRY validates and stages the journal (fin_validateJournalDraft, fin_saveJournalDraft) and
+   JNLPOST posts it (fin_postJournal), all under the one Idempotency-Key of the journal (JournalService.StartNew, D-FIN-02). *@
+<div class="st-page" style="padding:4px 8px 6px">
+    <div style="@Block">
+        <StTextField Caption="Journal &ref:" LabelWidth="86" Width="150" Field="REF" Id="@Uid("REF")" @bind-Value="_ref" />
+        <StTextField Caption="T&ype:" LabelWidth="86" Width="90" Field="TYPE" Id="@Uid("TYPE")" @bind-Value="_type" />
+        <StTextField Caption="&Posting date:" LabelWidth="86" Width="90" Field="POSTDATE" Id="@Uid("POSTDATE")" @bind-Value="_postDate" />
+        <StTextField Caption="D&ocument date:" LabelWidth="86" Width="90" Field="DOCDATE" Id="@Uid("DOCDATE")" @bind-Value="_docDate" />
+        <StTextField Caption="C&urrency:" LabelWidth="86" Width="60" Field="CCY" Id="@Uid("CCY")" @bind-Value="_ccy" />
+        <StTextField Caption="&Evidence ref:" LabelWidth="86" Width="250" Field="EVIDENCE" Id="@Uid("EVIDENCE")" @bind-Value="_evidence" />
+        <StTextField Caption="Descri&ption:" LabelWidth="86" Width="250" Field="DESC" Id="@Uid("DESC")" @bind-Value="_desc" />
+    </div>
+    <div style="margin:4px 0 2px">Journal line - F2 looks up an account:</div>
+    <div style="@Block; margin-left:4px">
+        <StTextField Caption="&Account:" LabelWidth="86" Width="110" Field="AccountCode" Id="@Uid("AccountCode")" @bind-Value="_account" />
+        <StTextField Caption="&Cost centre:" LabelWidth="86" Width="90" Field="CostCentre" Id="@Uid("CostCentre")" @bind-Value="_costCentre" />
+        <StTextField Caption="Pro&ject:" LabelWidth="86" Width="90" Field="Project" Id="@Uid("Project")" @bind-Value="_project" />
+        <StTextField Caption="V&AT code:" LabelWidth="86" Width="50" Field="VatCode" Id="@Uid("VatCode")" @bind-Value="_vatCode" />
+        <StTextField Caption="De&bit:" LabelWidth="86" Width="90" Field="Debit" Id="@Uid("Debit")" @bind-Value="_debit" />
+        <StTextField Caption="Cre&dit:" LabelWidth="86" Width="90" Field="Credit" Id="@Uid("Credit")" @bind-Value="_credit" />
+        <StTextField Caption="&Narrative:" LabelWidth="86" Width="250" Field="Narrative" Id="@Uid("Narrative")" @bind-Value="_narrative" />
+    </div>
+    <div style="display:flex; gap:6px; margin:4px 0 6px 4px">
+        <button type="button" class="st-button" style="width:90px" @onclick="AddLineAsync"><StMnemonic Text="&Add line" /></button>
+        <button type="button" class="st-button" style="width:90px" @onclick="RemoveClicked"><StMnemonic Text="&Remove" /></button>
+        <button type="button" class="st-button" style="width:90px" @onclick="ValidateAsync"><StMnemonic Text="Va&lidate" /></button>
+        <button type="button" class="st-button" style="width:90px" @onclick="PostAsync"><StMnemonic Text="P&ost (F10)" /></button>
+    </div>
+    <StGrid Id="@Uid("lines")" Data="_view" Selected="_selected" SelectedChanged="i => _selected = i" Label="Journal lines" />
+</div>
+
+@code {
+    /// <summary>frmJournalEntry.Build: captions 86 wide, a new column of fields every four rows (26 pixels apart, 352 apart).</summary>
+    private const string Block = "display:grid; grid-template-rows:repeat(4, 26px); grid-auto-flow:column; grid-auto-columns:352px; align-items:center";
+
+    private string _ref = "";
+    private string _type = "";
+    private string _postDate = "";
+    private string _docDate = "";
+    private string _ccy = "";
+    private string _evidence = "";
+    private string _desc = "";
+
+    private string _account = "";
+    private string _costCentre = "";
+    private string _project = "";
+    private string _vatCode = "";
+    private string _debit = "";
+    private string _credit = "";
+    private string _narrative = "";
+
+    /// <summary>JournalService.NewLineTable rows: AccountCode, CostCentre, Project, VatCode, Narrative, Debit, Credit.</summary>
+    private readonly List<JsonObject> _lines = [];
+
+    /// <summary>JournalService.LineResults: the JE-LINES table JNLENTRY returned (kept until a call with lines replaces it).</summary>
+    private List<JsonObject>? _lineResults;
+
+    private GridData _view = GridData.Empty;
+    private bool _viewShowsResults;
+    private int _selected = -1;
+    private bool _staged;
+
+    /// <summary>JournalService.CorrelationId: one Idempotency-Key per journal (StartNew on open and after each post).</summary>
+    private Instruction _journal = Instruction.New();
+
+    private decimal _totalDebit;
+    private decimal _totalCredit;
+    private decimal _outOfBalance;
+    private string _periodStatus = "";
+    private int _errorCount;
+    private string _journalNumber = "";
+    private bool _wasDuplicate;
+    private string _accountName = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Journal Entry");
+        _type = FormArgument != "" ? FormArgument : "GL";
+        _ccy = Session.Selected?.BaseCurrency ?? "";
+        _postDate = LegacyFmt.Date(Session.BusinessDate);
+        _docDate = _postDate;
+        _journal = Instruction.New();
+        BindLines();
+        SetStatus("Enter the header, add the lines, then Validate and press F10 to post.  Period " + Session.PeriodText + ".");
+    }
+
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        var code = await Dialogs.LookupAsync("master", "FIN.ACCOUNT", "Account");
+        if (code != "") _account = code;
+        StateHasChanged();
+    }
+
+    protected override Task OnConfirmAsync() => PostAsync();
+
+    public override async Task<bool> CanCloseAsync() => _lines.Count == 0 || await ConfirmAsync("Abandon this unposted journal?");
+
+    /// <summary>frmJournalEntry.AddLineClicked: GLVALID checks the account and its dimensions before the line is accepted.</summary>
+    private async Task AddLineAsync()
+    {
+        var account = _account.Trim().ToUpperInvariant();
+        decimal debit = LegacyFmt.Dec(_debit), credit = LegacyFmt.Dec(_credit);
+        if (account == "" || (debit == 0m && credit == 0m))
+        {
+            SetStatus("A line needs an account and either a debit or a credit.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = LegacyResult.From(await Api.PostAsync("/api/fin/v1/journal-lines/validate", new JsonObject
+            {
+                ["account"] = account,
+                ["costCentre"] = _costCentre.Trim().ToUpperInvariant(),
+                ["project"] = _project.Trim().ToUpperInvariant(),
+                ["vatCode"] = _vatCode.Trim().ToUpperInvariant(),
+                ["drCr"] = debit > 0m ? "DR" : "CR",
+                ["amount"] = debit > 0m ? debit : credit,
+            }));
+            _accountName = LegacyFmt.Str(r["accountName"]);
+            if (r.IsError)
+            {
+                await ShowErrorAsync(r.Message, r.ReasonCode);
+                return;
+            }
+            _lines.Add(new JsonObject
+            {
+                ["AccountCode"] = account,
+                ["CostCentre"] = _costCentre.Trim(),
+                ["Project"] = _project.Trim(),
+                ["VatCode"] = _vatCode.Trim(),
+                ["Narrative"] = _narrative.Trim(),
+                ["Debit"] = LegacyFmt.Dec(_debit),
+                ["Credit"] = LegacyFmt.Dec(_credit),
+            });
+            _staged = false;
+            _account = _costCentre = _project = _vatCode = _debit = _credit = _narrative = "";
+            BindLines();
+            SetStatus("Line " + _lines.Count + " added - " + account + " " + _accountName + ".  Debits " +
+                      LegacyFmt.Money(Total("Debit")) + ", credits " + LegacyFmt.Money(Total("Credit")) + ".", CueOk);
+        });
+    }
+
+    /// <summary>
+    /// frmJournalEntry.RemoveClicked: deletes the current row of the grid and binds the lines again. While the grid shows the
+    /// validation results the row is deleted from that table only, so no journal line goes (as in the legacy form).
+    /// </summary>
+    private void RemoveClicked()
+    {
+        if (_selected < 0 || _selected >= _view.Count)
+        {
+            SetStatus("Select the line to remove first.", CueWarning);
+            return;
+        }
+        if (_viewShowsResults)
+        {
+            _lineResults?.Remove(_view.Rows[_selected]);
+        }
+        else
+        {
+            _lines.RemoveAt(_selected);
+        }
+        _staged = false;
+        BindLines();
+        SetStatus(_lines.Count + " line(s) left.", "");
+    }
+
+    /// <summary>frmJournalEntry.ValidateClicked: JNLENTRY VALIDAT reports the balance, the period and every bad line.</summary>
+    private Task ValidateAsync() => GuardAsync(async () =>
+    {
+        var r = LegacyResult.From(await Api.PostAsync("/api/fin/v1/journal-drafts/validate", Draft(), _journal.Options()));
+        ReadPrepared(r);
+        if (_lineResults is not null) BindResults();
+        if (!await ShowResultAsync(r.Response)) return;
+        SetStatus("Debits " + LegacyFmt.Money(_totalDebit) + ", credits " + LegacyFmt.Money(_totalCredit) + ", out of balance " +
+                  LegacyFmt.Money(_outOfBalance) + ", period " + _periodStatus + ", " + _errorCount + " error(s).",
+                  _errorCount == 0 ? CueOk : CueWarning);
+    });
+
+    /// <summary>frmJournalEntry.PostClicked: SAVE stages the lines (unless staged since the last edit), POST commits them.</summary>
+    private async Task PostAsync()
+    {
+        if (_lines.Count < 2)
+        {
+            SetStatus("A journal needs at least two lines.", CueWarning);
+            return;
+        }
+        if (!await ConfirmAsync("Post this journal of " + LegacyFmt.Money(Total("Debit")) + " each side?")) return;
+        await GuardAsync(async () =>
+        {
+            if (!_staged)
+            {
+                var saved = LegacyResult.From(await Api.PostAsync("/api/fin/v1/journal-drafts/save", Draft(), _journal.Options()));
+                ReadPrepared(saved);
+                if (!await ShowResultAsync(saved.Response)) return;
+                _staged = true;
+            }
+            var r = LegacyResult.From(await Api.PostAsync("/api/fin/v1/journals/post", new JsonObject
+            {
+                ["description"] = _desc.Trim(),
+                ["sourceRef"] = _ref.Trim(),
+                ["journalType"] = _type.Trim(),
+                ["currency"] = _ccy.Trim(),
+                ["evidenceRef"] = _evidence.Trim(),
+                ["postingDate"] = LegacyFmt.Iso(LegacyFmt.ParseDate(_postDate)),
+            }, _journal.Options()));
+            _journalNumber = LegacyFmt.Str(r["journalNumber"]);
+            _totalDebit = LegacyFmt.Dec(r["totalDrGbp"]);
+            _totalCredit = LegacyFmt.Dec(r["totalCrGbp"]);
+            _wasDuplicate = LegacyFmt.Str(r["wasDuplicate"]) == "Y";
+            if (!await ShowResultAsync(r.Response)) return;
+            SetStatus("Journal " + _journalNumber + " posted, " + LegacyFmt.Money(_totalDebit) + " each side." +
+                      (_wasDuplicate ? "  (already posted under this correlation id)" : ""), CueOk);
+            _lines.Clear();
+            _staged = false;
+            _journal = Instruction.New();
+            BindLines();
+        });
+    }
+
+    /// <summary>JournalService.Prepare: the header (trimmed, as Header() gave it) and at most 50 lines.</summary>
+    private JsonObject Draft()
+    {
+        var lines = new JsonArray();
+        foreach (var row in _lines.Take(50))
+        {
+            lines.Add(new JsonObject
+            {
+                ["account"] = LegacyFmt.Str(row["AccountCode"]),
+                ["debit"] = LegacyFmt.Dec(row["Debit"]),
+                ["credit"] = LegacyFmt.Dec(row["Credit"]),
+                ["costCentre"] = LegacyFmt.Str(row["CostCentre"]),
+                ["project"] = LegacyFmt.Str(row["Project"]),
+                ["vatCode"] = LegacyFmt.Str(row["VatCode"]),
+                ["narrative"] = LegacyFmt.Str(row["Narrative"]),
+            });
+        }
+        return new JsonObject
+        {
+            ["journalRef"] = _ref.Trim(),
+            ["journalType"] = _type.Trim(),
+            ["description"] = _desc.Trim(),
+            ["currency"] = _ccy.Trim(),
+            ["evidenceRef"] = _evidence.Trim(),
+            ["documentDate"] = LegacyFmt.Iso(LegacyFmt.ParseDate(_docDate)),
+            ["postingDate"] = LegacyFmt.Iso(LegacyFmt.ParseDate(_postDate)),
+            ["lines"] = lines,
+        };
+    }
+
+    /// <summary>JournalService.Prepare after the LINK: totals, period, error count and (with lines) the JE-LINES results.</summary>
+    private void ReadPrepared(LegacyResult r)
+    {
+        _totalDebit = LegacyFmt.Dec(r["totalDebit"]);
+        _totalCredit = LegacyFmt.Dec(r["totalCredit"]);
+        _outOfBalance = LegacyFmt.Dec(r["outOfBalance"]);
+        _periodStatus = LegacyFmt.Str(r["periodStatus"]);
+        _errorCount = (int)LegacyFmt.Dec(r["errorCnt"]);
+        var n = Math.Min(_lines.Count, 50);
+        if (n == 0) return;
+        var answered = r["lines"] as JsonArray ?? [];
+        _lineResults = [];
+        for (var i = 0; i < n; i++)
+        {
+            var l = i < answered.Count ? answered[i] : null;
+            _lineResults.Add(new JsonObject
+            {
+                ["JE-L-NUM"] = LegacyFmt.Dec(l?["lineNum"]),
+                ["JE-L-ACCOUNT"] = LegacyFmt.Str(l?["account"]),
+                ["JE-L-DEBIT"] = LegacyFmt.Dec(l?["debit"]),
+                ["JE-L-CREDIT"] = LegacyFmt.Dec(l?["credit"]),
+                ["JE-L-DIM-CC"] = LegacyFmt.Str(l?["costCentre"]),
+                ["JE-L-DIM-PROJ"] = LegacyFmt.Str(l?["project"]),
+                ["JE-L-NARRATIVE"] = LegacyFmt.Str(l?["narrative"]),
+                ["JE-L-VAT-CODE"] = LegacyFmt.Str(l?["vatCode"]),
+                ["JE-L-SUBLDG-TYP"] = "",
+                ["JE-L-SUBLDG-REF"] = "",
+                ["JE-L-BANK-ACCT"] = "",
+                ["JE-L-STATUS"] = LegacyFmt.Str(l?["lineStatus"]),
+                ["JE-L-MESSAGE"] = LegacyFmt.Str(l?["lineMessage"]),
+            });
+        }
+    }
+
+    private decimal Total(string column) => _lines.Sum(l => LegacyFmt.Dec(l[column]));
+
+    /// <summary>GridHelper.Bind(_grid, _lines): the first line becomes the current row.</summary>
+    private void BindLines()
+    {
+        _view = new GridData(
+        [
+            LegacyGrid.Col("AccountCode", "AccountCode", "TEXT"), LegacyGrid.Col("CostCentre", "CostCentre", "TEXT"),
+            LegacyGrid.Col("Project", "Project", "TEXT"), LegacyGrid.Col("VatCode", "VatCode", "TEXT"),
+            LegacyGrid.Col("Narrative", "Narrative", "TEXT"), LegacyGrid.Col("Debit", "Debit", "MONEY"),
+            LegacyGrid.Col("Credit", "Credit", "MONEY"),
+        ], _lines.ToList());
+        _viewShowsResults = false;
+        _selected = _view.Count > 0 ? 0 : -1;
+    }
+
+    /// <summary>GridHelper.Bind(_grid, LineResults): CommArea.GetTable columns (COBOL names, numeric fields as decimals).</summary>
+    private void BindResults()
+    {
+        string[] money = ["JE-L-NUM", "JE-L-DEBIT", "JE-L-CREDIT"];
+        string[] names = ["JE-L-NUM", "JE-L-ACCOUNT", "JE-L-DEBIT", "JE-L-CREDIT", "JE-L-DIM-CC", "JE-L-DIM-PROJ", "JE-L-NARRATIVE",
+                          "JE-L-VAT-CODE", "JE-L-SUBLDG-TYP", "JE-L-SUBLDG-REF", "JE-L-BANK-ACCT", "JE-L-STATUS", "JE-L-MESSAGE"];
+        _view = new GridData(names.Select(n => LegacyGrid.Col(n, n, money.Contains(n) ? "MONEY" : "TEXT")), _lineResults ?? []);
+        _viewShowsResults = true;
+        _selected = _view.Count > 0 ? 0 : -1;
+    }
+}

@@ -1,0 +1,11 @@
+# cst-valuation
+ok 1 - the enquiry sees both layers and the oldest one at 5.00 -- REQ: CST-006, CST-026
+ok 2 - an issue of twelve is relieved at 66.00, not at an average -- REQ: CST-006  AC: AC-C1
+ok 3 - eight units worth 64.00 remain, all in the newer layer -- REQ: CST-006  AC: AC-C1
+ok 4 - a layer cannot be consumed past empty -- REQ: CST-005, CST-006
+ok 5 - 400.00 over a hundred and 350.00 over fifty average at 5.00 -- REQ: CST-005  AC: AC-C2
+ok 6 - an issue of forty at the average is relieved at 200.00 -- REQ: CST-005  AC: AC-C2
+ok 7 - a hundred and ten worth 550.00 remain and the average is still 5.00 -- REQ: CST-005  AC: AC-C2
+ok 8 - the allowance nets the pool down without touching the cost -- REQ: CST-021
+ok 9 - a pool may only be valued FIFO, MWA or at standard -- REQ: CST-005
+ok 10 - a set approved by its own preparer is reported, not hidden -- REQ: CST-007, CST-012

@@ -1,0 +1,47 @@
+@using Sterp.Web.Framework.Shell
+@* Microsoft.VisualBasic InputBox: prompt, one text box, OK and Cancel; Cancel returns "" (legacy semantics). *@
+<div class="st-dialog st-raised" role="dialog" aria-modal="true" aria-labelledby="@($"{Dialog.Id}-t")" style="min-width:380px">
+    <div class="st-titlebar"><span class="st-title" id="@($"{Dialog.Id}-t")">@Title</span></div>
+    <div class="st-dialog-body" style="flex-direction:column; gap:4px">
+        <label class="st-input-prompt" for="@($"{Dialog.Id}-v")">@Prompt</label>
+        <input id="@($"{Dialog.Id}-v")" class="st-input" style="width:340px" value="@_value" @oninput="e => _value = e.Value?.ToString() ?? string.Empty" />
+    </div>
+    <div class="st-dialog-buttons">
+        <button type="button" class="st-button" id="@($"{Dialog.Id}-OK")" @onclick="Ok">OK</button>
+        <button type="button" class="st-button" id="@($"{Dialog.Id}-Cancel")" @onclick="Cancel">Cancel</button>
+    </div>
+</div>
+
+@code {
+    private string _value = "";
+
+    [CascadingParameter] public DialogInstance Dialog { get; set; } = default!;
+
+    [Parameter] public string Prompt { get; set; } = "";
+
+    [Parameter] public string Title { get; set; } = "STERP";
+
+    [Parameter] public string DefaultValue { get; set; } = "";
+
+    [Inject] private BrowserInterop Browser { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        _value = DefaultValue;
+        Dialog.KeyHandler = key =>
+        {
+            if (key.Is("Escape")) { Cancel(); return true; }
+            if (key.Is("Enter") && key.TargetTag != "button") { Ok(); return true; }
+            return key.Key.StartsWith('F') && key.Key.Length <= 3;
+        };
+    }
+
+    private void Ok() => Dialog.Close(_value);
+
+    private void Cancel() => Dialog.Close("");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.SelectAllAsync($"{Dialog.Id}-v");
+    }
+}

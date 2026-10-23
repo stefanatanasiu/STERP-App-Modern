@@ -1,0 +1,10 @@
+ok - ar: a CREDCHK round trip comes back with a valid return code and a decision  # REQ: AR-007,AR-008,D-06
+ok - ar: a foreign receipt is never shown with a pound sign  # REQ: COM-024
+ok - ar: a receipt COMMAREA carries the header and up to twenty allocations  # REQ: AR-009,AR-010
+ok - ar: a statement can be produced for a seeded account  # REQ: AR-021
+ok - ar: aged debt at a date reports buckets and accounts for both demo companies  # REQ: AR-017
+ok - ar: allocation offers debit items, available credits and the write-off tolerance  # REQ: AR-010,AR-019,D-22
+ok - ar: the credit control worklist names an owner and a dunning stage  # REQ: AR-016,AR-024
+ok - ar: the customer enquiry returns the five result sets the screen lays out  # REQ: AR-017,AR-022
+ok - ar: the three Debtors screens are STERP base forms with the classic function keys  # REQ: COM-024
+ok - ar: the three seeded Debtors menu entries resolve to real screens  # REQ: COM-024

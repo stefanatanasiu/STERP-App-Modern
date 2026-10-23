@@ -1,0 +1,18 @@
+# itm-stock
+ok 1 - the availability view holds no empty stock buckets -- REQ: ITM-012
+ok 2 - 1 third party owned bucket(s) are reported with their owner -- REQ: ITM-012
+ok 3 - customer and supplier owned stock is reported as held, not as available -- REQ: ITM-012, ITM-013
+ok 4 - quarantined and inspection stock is on hand but not eligible -- REQ: ITM-013, ITM-017
+ok 5 - a quality condition enquiry returns only that condition -- REQ: ITM-012, ITM-023
+ok 6 - a receipt of 50 raised the balance from 0.000000 to 50.000000 and left a movement -- REQ: ITM-015, ITM-016
+ok 7 - an issue that would create negative stock is refused -- REQ: ITM-016, D-09
+ok 8 - a quantity that breaks the item quantum is refused -- REQ: ITM-005, ITM-007
+ok 9 - a lot controlled item without a lot reference is refused -- REQ: ITM-011
+ok 10 - a movement into a closed period is refused -- REQ: ITM-015, COM-009
+ok 11 - a movement to an unknown location is refused -- REQ: ITM-012, ITM-015
+ok 12 - 10 of 131.000000 free units are reserved for TST-RESV-1 -- REQ: ITM-014, ITM-013
+ok 13 - releasing TST-RESV-3 returns 12 units to the free quantity -- REQ: ITM-014
+ok 14 - a reservation larger than the free quantity is refused -- REQ: ITM-014, COM-005
+ok 15 - issuing more than the demand reserved is refused -- REQ: ITM-014
+ok 16 - an unsupported reservation action is refused -- REQ: ITM-014
+# itm-stock done

@@ -1,0 +1,52 @@
+# suite po BUDGCHK
+ok 1 - D-08 only the APPROVED version is the budget
+ok 2 - D-08 5,000 of 10,000 is within budget
+ok 3 - D-08 a within-budget check returns 00
+ok 4 - D-08 nothing is used before the purchase
+ok 5 - D-08 the purchase takes it to 50 per cent
+ok 6 - D-08 10,000 is still uncommitted
+ok 7 - D-08 89.9999 per cent is below the warning point
+ok 8 - D-08 the warning point itself is reported
+ok 9 - D-08 the blocking point itself is reported
+ok 10 - PO-005 non recoverable VAT and charges are committed too
+ok 11 - D-08 90 per cent after the purchase warns
+ok 12 - D-08 a warning returns 04 and proceeds
+ok 13 - D-08 the warning carries reason BUD0003
+ok 14 - D-08 nothing was used BEFORE this purchase
+ok 15 - D-08 the measure is taken AFTER the purchase
+ok 16 - D-08 100 per cent after the purchase blocks
+ok 17 - D-08 a block is a hold (06), not a rejection
+ok 18 - D-08 the block carries reason BUD0004
+ok 19 - PO-017 a release gives its commitment back
+ok 20 - PO-005 commitment counts before any invoice
+ok 21 - D-08 4,000 committed plus 5,000 is 90 per cent
+ok 22 - D-08 6,000 of the budget is still uncommitted
+ok 23 - D-08 a committed budget at 90 per cent warns
+ok 24 - PO-005 this request on its own is only 40 per cent
+ok 25 - CR1422 two related open requests are found
+ok 26 - CR1422 the related requests total 8,000
+ok 27 - CR1422 split purchases are aggregated and blocked
+ok 28 - CR1422 the aggregation carries reason BUD0007
+ok 29 - CR1422 another requester's requests are not counted
+ok 30 - CR1422 so the same 4,000 passes for someone else
+ok 31 - PO-005 an override without a name is refused
+ok 32 - PO-005 the refusal carries reason BUD0005
+ok 33 - PO-005 a name without a reason is refused too
+ok 34 - PO-005 a named, reasoned override is accepted
+ok 35 - PO-017 the override is written as a commitment
+ok 36 - PO-005 a missing budget is not an open cheque
+ok 37 - PO-005 a missing budget carries reason BUD0002
+ok 38 - PO-005 a check with no company is refused
+ok 39 - PO-005 a coded commit inside budget is accepted
+ok 40 - PO-017 the commitment movement is returned
+ok 41 - PO-017 issuing a coded line writes one COMMITTED row
+ok 42 - PO-017 an uncoded commit warns, it is not refused
+ok 43 - PO-005 an uncoded commit is reported as NOBUDGET
+ok 44 - PO-005 unbudgeted spend carries reason BUD0008
+ok 45 - PO-017 an uncoded order still records its commitment
+ok 46 - PO-017 an uncoded commitment can be released again
+ok 47 - D-08 a commit that breaks the budget is blocked
+ok 48 - D-08 a blocked purchase encumbers nothing
+1..48
+# po BUDGCHK passed 00048 failed 00000
+# exit 0

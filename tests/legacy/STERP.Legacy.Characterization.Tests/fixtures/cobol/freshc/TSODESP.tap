@@ -1,0 +1,38 @@
+# suite TSODESP pick versus despatch
+ok 1 - a pick list needs an order number
+ok 2 - AC-044 picking never moves stock
+ok 3 - AC-044 picking never creates a cost of sale
+ok 4 - AC-044 picking never despatches a quantity
+ok 5 - an unknown pick function reports PCK0008
+ok 6 - a confirmation needs a correlation id
+ok 7 - a confirmation needs at least one line
+ok 8 - an unknown despatch function reports DSP0008
+ok 9 - a reversal needs authority and a reason
+ok 10 - a refused despatch posts no cost of sale
+ok 11 - a released order generates a pick list
+ok 12 - the pick list carries the one open schedule
+ok 13 - the required quantity is the schedule quantity
+ok 14 - AC-044 generating a pick list moves no stock
+ok 15 - a short pick without a reason is refused
+ok 16 - a reasoned short pick is accepted with a warning
+ok 17 - AC-044 the short quantity is recorded
+ok 18 - AC-044 the outstanding demand survives
+ok 19 - AC-044 picking creates no stock movement
+ok 20 - AC-044 the order line is still undespatched
+ok 21 - AC-044 the schedule is still undespatched
+ok 22 - printing increments the print count
+ok 23 - reprinting increments it again and nothing else
+ok 24 - reprinting moves no stock
+ok 25 - reprinting creates no stock movement
+ok 26 - SO-013 the line is judged, not the missing bin
+ok 27 - SO-013 the despatch names the bin it would take from
+ok 28 - SO-013 the defaulted bin holds owned accepted stock
+ok 29 - AC-044 a repeat confirmation is not a second effect
+ok 30 - AC-044 the repeat is reported as a duplicate
+ok 31 - AC-044 the original despatch is returned
+ok 32 - AC-044 the original cost of sale is unchanged
+ok 33 - AC-044 no second stock movement was created
+ok 34 - AC-044 no second despatch was created
+1..34
+# TSODESP pick versus despatch passed 00034 failed 00000
+# exit 0

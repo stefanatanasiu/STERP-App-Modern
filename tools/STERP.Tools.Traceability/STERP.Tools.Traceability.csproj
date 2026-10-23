@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Sterp.Tools.Traceability</RootNamespace>
+    <Description>Evidence tool (Agent 08): dumps the binding operation -> handler and job -> program bindings of the composed modules as JSON. Opens no database connection.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\STERP.Modules.Composition\STERP.Modules.Composition.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,75 @@
+@using Sterp.Web.Framework.Shell
+@* ApInputDialog (frmSupplierVerify.vb:206-256): the small keyed capture dialog shared by the two purchase-ledger list screens -
+   one captioned box per field with its default and maximum length, OK (Enter) and Cancel (Esc). Typing stops at the maximum
+   length; text placed in a box otherwise is refused afterwards by the width check (ApInput.WidthError). *@
+<div class="st-dialog st-raised" role="dialog" aria-modal="true" aria-labelledby="@($"{Dialog.Id}-t")" style="width:716px; max-width:96vw">
+    <div class="st-titlebar"><span class="st-title" id="@($"{Dialog.Id}-t")">@Title</span></div>
+    <div class="st-dialog-body" style="flex-direction:column; align-items:stretch; gap:8px; padding:12px 10px 4px">
+        @for (var i = 0; i < Fields.Count; i++)
+        {
+            var index = i;
+            var field = Fields[index];
+            var id = $"{Dialog.Id}-v{index}";
+            <div style="display:flex; align-items:center; gap:10px">
+                <label for="@id" style="width:370px; flex:0 0 370px">@(field.Caption):</label>
+                <input id="@id" class="st-input" style="width:299px" aria-label="@field.Caption" data-maxlen="@field.MaxLength" data-sterp-field="@field.Key"
+                       value="@_values[index]" autocomplete="off" spellcheck="false" @oninput="e => _values[index] = e.Value?.ToString() ?? string.Empty" />
+            </div>
+        }
+    </div>
+    <div class="st-dialog-buttons">
+        <button type="button" class="st-button" id="@($"{Dialog.Id}-OK")" style="min-width:90px" @onclick="Ok"><StMnemonic Text="&OK" /></button>
+        <button type="button" class="st-button" id="@($"{Dialog.Id}-Cancel")" style="min-width:90px" @onclick="Cancel"><StMnemonic Text="&Cancel" /></button>
+    </div>
+</div>
+
+@code {
+    private string[] _values = [];
+
+    [CascadingParameter] public DialogInstance Dialog { get; set; } = default!;
+
+    [Parameter] public string Title { get; set; } = "";
+
+    [Parameter] public IReadOnlyList<ApInputField> Fields { get; set; } = [];
+
+    [Inject] private BrowserInterop Browser { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        _values = Fields.Select(f => f.Default).ToArray();
+        Dialog.KeyHandler = key =>
+        {
+            if (key.Is("Escape")) { Cancel(); return true; }
+            if (key.Is("Enter"))
+            {
+                if (key.TargetTag == "button" && key.TargetId.StartsWith(Dialog.Id + "-", StringComparison.Ordinal)) return false;
+                Ok();
+                return true;
+            }
+            if (key.Alt && key.Key.Length == 1)
+            {
+                switch (char.ToUpperInvariant(key.Key[0]))
+                {
+                    case 'O': Ok(); return true;
+                    case 'C': Cancel(); return true;
+                }
+            }
+            return key.Key.StartsWith('F') && key.Key.Length <= 3;
+        };
+    }
+
+    /// <summary>DialogResult.OK: the values of the boxes, trimmed (ApInputDialog.Collect).</summary>
+    private void Ok()
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var i = 0; i < Fields.Count; i++) values[Fields[i].Key] = _values[i].Trim();
+        Dialog.Close(values);
+    }
+
+    private void Cancel() => Dialog.Close(null);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && Fields.Count > 0) await Browser.SelectAllAsync($"{Dialog.Id}-v0");
+    }
+}

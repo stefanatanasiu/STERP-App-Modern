@@ -1,0 +1,376 @@
+@inherits StPage
+@* frmVatReturn (page:fin/vat-return, FR-STERP-FIN-044): the nine box VAT return. Every box is an aggregation computed by
+   VATRET9 (fin_prepareVatReturn), a box drills down to the records behind it (fin_drillVatBox), VATDET answers for a VAT
+   code (F2, fin_getVatRate) and VATERRC decides how an error is corrected (fin_assessVatError). Finalise freezes the
+   return; the local file is a hand-off that is never transmitted to HMRC (fin_writeVatLocalFile). *@
+<div class="st-page" style="padding:6px 8px">
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px">
+        <StTextField Caption="VAT &period key:" Inline="true" Width="90" Field="VatPeriodKey" Id="@Uid("period")" Value="@_period" ValueChanged="SetPeriod" />
+        <StSelectField Caption="&Basis:" Inline="true" Width="90" Field="Basis" Items="Bases" Value="@_basis" ValueChanged="v => _basis = v" Disabled="@(!_basisEnabled)" Id="@Uid("basis")" />
+        <button type="button" class="st-button" style="width:86px" disabled="@(!_canPrepare)" @onclick="PrepareAsync"><StMnemonic Text="&Prepare (F5)" /></button>
+        <button type="button" class="st-button" style="width:80px" @onclick="DrillAsync"><StMnemonic Text="&Drill down" /></button>
+        <button type="button" class="st-button" style="width:70px" disabled="@(!_canApprove)" @onclick="FinaliseAsync"><StMnemonic Text="Fi&nalise" /></button>
+        <button type="button" class="st-button" style="width:126px" disabled="@(!_canSubmit)" @onclick="LocalFileAsync"><StMnemonic Text="&Local file (F10)" /></button>
+        <button type="button" class="st-button" style="width:94px" @onclick="CorrectionAsync"><StMnemonic Text="&Error correction" /></button>
+    </div>
+    <div style="display:grid; grid-template-rows:repeat(5, 26px); grid-auto-flow:column; grid-auto-columns:minmax(0, 416px); align-items:center; margin-top:8px">
+        @for (var i = 0; i < 9; i++)
+        {
+            var boxNo = i + 1;
+            var id = Uid("box" + boxNo);
+            <span class="st-field" data-sterp-field="@($"Box{boxNo}")">
+                <label for="@id" style="width:190px; display:inline-block"><span>@Captions[i]</span>:</label>
+                <output id="@id" class="st-value" tabindex="0" style="width:120px; text-align:right; display:inline-block" @onfocus="() => _selectedBox = boxNo">@_boxText[i]</output>
+            </span>
+        }
+        <span style="display:flex; align-items:center">
+            <button type="button" class="st-button" style="width:130px" @onclick="LoadAsync"><StMnemonic Text="&Load saved return" /></button>
+        </span>
+    </div>
+    <StGrid Id="@Uid("grid")" Data="_grid" Selected="_gridSelected" SelectedChanged="i => _gridSelected = i" Label="VAT records" Style="margin-top:6px" />
+</div>
+
+@code {
+    /// <summary>The box captions of frmVatReturn without their trailing colon (shown after the caption).</summary>
+    private static readonly string[] Captions =
+    [
+        "1 VAT due on sales", "2 VAT due on acquisitions", "3 Total VAT due", "4 VAT reclaimed on purchases",
+        "5 Net VAT to pay or reclaim", "6 Total sales ex VAT", "7 Total purchases ex VAT", "8 Supplies to EU members",
+        "9 Acquisitions from EU members",
+    ];
+
+    private static readonly IReadOnlyList<(string Value, string Text)> Bases = StSelectField.Of("INVOICE", "CASH");
+
+    private string _period = "";
+    private string _basis = "INVOICE";
+    private readonly string[] _boxText = new string[9];
+    private GridData _grid = GridData.Empty;
+    private int _gridSelected = -1;
+    private int _selectedBox;
+    private bool _canPrepare;
+    private bool _canApprove;
+    private bool _canSubmit;
+    private bool _basisEnabled = true;
+
+    // VatService state
+    private readonly decimal[] _box = new decimal[9];
+    private string _vatRegNo = "";
+    private string _returnStatus = "";
+    private string _startDate = "";
+    private string _endDate = "";
+    private string _filingDue = "";
+    private int _recordCount;
+    private int _lateCount;
+    private bool _isRepayment;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("VAT Return - Nine Boxes");
+        for (var i = 0; i < 9; i++) _boxText[i] = "";
+    }
+
+    /// <summary>frmVatReturn.OnLoad: the form argument or the newest VAT period, the authorities, then F5.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        SetPeriod(FormArgument);
+        if (_period == "")
+        {
+            JsonArray? periods = null;
+            await GuardAsync(async () =>
+            {
+                var r = await Api.GetAsync("/api/fin/v1/vat-periods");
+                if (!r.IsSuccess) throw new ApiFailure(r);
+                periods = r.Items;
+            });
+            if (periods is { Count: > 0 }) SetPeriod(LegacyFmt.Str(periods[0]?["vatPeriodKey"]));
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/fin/v1/vat-return-authorities");
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            _canPrepare = Json.Bool(r.Json?["canPrepare"]);
+            _basisEnabled = _canPrepare;
+            _canApprove = Json.Bool(r.Json?["canApprove"]);
+            _canSubmit = Json.Bool(r.Json?["canSubmit"]);
+        });
+        if (_period != "") await OnRefreshKeyAsync();
+    }
+
+    private string PeriodKey() => _period.Trim().ToUpperInvariant();
+
+    private string ReturnPath() => "/api/fin/v1/vat-returns/" + (PeriodKey() == "" ? "%20" : Query.Path(PeriodKey()));
+
+    /// <summary>The period key text box: TextChanged runs only when the text really changes.</summary>
+    private void SetPeriod(string text)
+    {
+        if (text == _period) return;
+        _period = text;
+        PeriodChanged();
+    }
+
+    /// <summary>frmVatReturn _txtPeriod.TextChanged: the boxes and the grid are cleared (the service keeps its figures).</summary>
+    private void PeriodChanged()
+    {
+        for (var i = 0; i < 9; i++) _boxText[i] = "";
+        _selectedBox = 0;
+        BindGrid(null);
+        SetStatus("Period changed. Prepare or load the selected return.", "");
+    }
+
+    protected override Task OnRefreshKeyAsync() => _canPrepare ? PrepareAsync() : LoadAsync();
+
+    protected override Task OnConfirmAsync() => LocalFileAsync();
+
+    /// <summary>frmVatReturn.OnLookup (F2): VATDET answers for a VAT code at the business date.</summary>
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        var code = await InputBoxAsync("VAT code to look up at today's tax point:", "STERP - VAT Code", "S");
+        if (code.Trim() == "") return;
+        var vatCode = code.Trim().ToUpperInvariant();
+        await GuardAsync(async () =>
+        {
+            var r = LegacyResult.From(await Api.GetAsync("/api/fin/v1/vat-codes/" + Query.Path(vatCode) + "/rate" +
+                                                         Query.Build(("taxPoint", LegacyFmt.Iso(Session.BusinessDate)))));
+            var answer = LegacyFmt.Pct(LegacyFmt.Dec(r["ratePct"])) + " " + LegacyFmt.Str(r["liability"]) + " " + LegacyFmt.Str(r["mechanism"]);
+            if (await ShowResultAsync(r.Response)) SetStatus("VAT code " + vatCode + ": " + answer, CueOk);
+        });
+    }
+
+    /// <summary>frmVatReturn.PrepareClicked: box 3 = box 1 + box 2 and box 5 = box 3 - box 4 are VATRET9's arithmetic.</summary>
+    private async Task PrepareAsync()
+    {
+        if (PeriodKey() == "")
+        {
+            SetStatus("Enter a VAT period key first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            _selectedBox = 0;
+            var r = LegacyResult.From(await Api.PostAsync(ReturnPath() + "/prepare", new JsonObject { ["basis"] = _basis }));
+            ClearReturn();
+            if (r.Succeeded) ReadArea(r.Data);
+            DisplayReturn();
+            if (r.IsNotFound)
+            {
+                SetStatus("VATRET9 did not answer for " + PeriodKey() + " (" + r.ReasonCode + "); the boxes come from fin.usp_VatBoxes.", CueWarning);
+                return;
+            }
+            if (!await ShowResultAsync(r.Response)) return;
+            ReturnStatus();
+        });
+    }
+
+    /// <summary>frmVatReturn.LoadClicked: the latest persisted return, without originating or recomputing it.</summary>
+    private async Task LoadAsync()
+    {
+        for (var i = 0; i < 9; i++) _boxText[i] = "";
+        BindGrid(null);
+        await GuardAsync(async () =>
+        {
+            ClearReturn();
+            var r = await Api.GetAsync(ReturnPath());
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            LoadReturn(r.Json);
+            DisplayReturn();
+            ReturnStatus();
+        });
+    }
+
+    /// <summary>frmVatReturn.DrillClicked: the records behind the box that last had the focus.</summary>
+    private async Task DrillAsync()
+    {
+        var boxNo = _selectedBox;
+        if (boxNo == 0)
+        {
+            SetStatus("Put the cursor in the box to drill into, then press Drill down.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = LegacyResult.From(await Api.GetAsync(ReturnPath() + "/boxes/" + boxNo + "/records"));
+            var drilled = Drilled(r);
+            BindGrid(drilled);
+            if (drilled is null)
+            {
+                SetStatus("No records stand behind box " + boxNo + " for " + PeriodKey() + ".  " + r.Display, "");
+            }
+            else
+            {
+                SetStatus(drilled.Count + " record(s) behind box " + boxNo + " of " + PeriodKey() + ", total " +
+                          LegacyFmt.Money(BoxValue(boxNo)) + ".", CueOk);
+            }
+        });
+    }
+
+    private async Task FinaliseAsync()
+    {
+        if (!await ConfirmAsync("Finalise the VAT return for " + PeriodKey() + "?  The figures and their detail are frozen.")) return;
+        await GuardAsync(async () =>
+        {
+            var r = LegacyResult.From(await Api.PostAsync(ReturnPath() + "/finalise", new JsonObject(), Instruction.New().Options()));
+            if (r.Succeeded)
+            {
+                ReadArea(r["answer"]);
+                if (r["savedReturn"] is JsonObject saved) LoadReturn(saved);
+            }
+            if (await ShowResultAsync(r.Response))
+            {
+                DisplayReturn();
+                ReturnStatus();
+            }
+        });
+    }
+
+    /// <summary>frmVatReturn.SubmitClicked: a local hand-off file and a local record only; never an HMRC transmission.</summary>
+    private async Task LocalFileAsync()
+    {
+        if (!await ConfirmAsync("Write a LOCAL VAT hand-off file for " + PeriodKey() +
+                                " and record local filing? Nothing will be transmitted to HMRC.")) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync(ReturnPath() + "/local-file", new JsonObject(), Instruction.New().Options());
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            var path = Json.Str(r.Json?["filePath"]);
+            var name = FileName(path);
+            if (r.Json?["savedReturn"] is JsonObject saved) LoadReturn(saved);
+            DisplayReturn();
+            await InfoAsync("The LOCAL VAT hand-off file has been written to:\n\n" + path + "\n\n" +
+                            "NOT transmitted to HMRC. This is a local file reference, not an HMRC receipt.", "Local VAT File");
+            SetStatus("Local file recorded for " + PeriodKey() + ": " + name + ". NOT transmitted.", CueOk);
+        });
+    }
+
+    /// <summary>frmVatReturn.CorrectionClicked: VATERRC decides between the next return and a separate disclosure.</summary>
+    private async Task CorrectionAsync()
+    {
+        var amount = await InputBoxAsync("Net VAT error found in an earlier period (negative if VAT was overpaid):",
+            "STERP - VAT Error Correction", "");
+        if (amount.Trim() == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = LegacyResult.From(await Api.PostAsync("/api/fin/v1/vat-errors/assess", new JsonObject
+            {
+                ["vatPeriodKey"] = PeriodKey(),
+                ["netError"] = LegacyFmt.Dec(amount),
+                ["box6Turnover"] = BoxValue(6),
+            }));
+            var answer = LegacyFmt.Str(r["method"]) + " - " + LegacyFmt.Str(r["explanation"]);
+            if (await ShowResultAsync(r.Response)) SetStatus("Error of " + LegacyFmt.Money(amount) + ": " + answer, CueOk);
+        });
+    }
+
+    private decimal BoxValue(int boxNo) => boxNo is < 1 or > 9 ? 0m : _box[boxNo - 1];
+
+    /// <summary>frmVatReturn.DisplayReturn: the nine boxes in money format; the drill grid is emptied.</summary>
+    private void DisplayReturn()
+    {
+        for (var i = 1; i <= 9; i++) _boxText[i - 1] = LegacyFmt.Money(BoxValue(i));
+        _selectedBox = 0;
+        BindGrid(null);
+    }
+
+    /// <summary>frmVatReturn.ReturnStatus.</summary>
+    private void ReturnStatus()
+    {
+        SetStatus("VRN " + _vatRegNo + ", " + _startDate + " to " + _endDate + ", filing due " + _filingDue + ". " + _recordCount +
+                  " record(s), " + _lateCount + " late. Return " + _returnStatus + ", net " + LegacyFmt.Money(BoxValue(5)) +
+                  (_isRepayment ? " REPAYMENT" : " PAYABLE") + ". Local filing only; not transmitted.", CueOk);
+    }
+
+    /// <summary>VatService.ClearReturn.</summary>
+    private void ClearReturn()
+    {
+        Array.Clear(_box);
+        _vatRegNo = _returnStatus = _startDate = _endDate = _filingDue = "";
+        _recordCount = _lateCount = 0;
+        _isRepayment = false;
+    }
+
+    /// <summary>VatService.ReadArea: the VATRET9 COMMAREA after PREPARE or FINALISE.</summary>
+    private void ReadArea(JsonNode? ca)
+    {
+        if (ca is null) return;
+        for (var i = 1; i <= 9; i++) _box[i - 1] = LegacyFmt.Dec(ca["box" + i]);
+        _vatRegNo = LegacyFmt.Str(ca["vatRegNo"]);
+        _returnStatus = LegacyFmt.Str(ca["returnStatus"]);
+        _startDate = LegacyFmt.Date(ca["startDate"]);
+        _endDate = LegacyFmt.Date(ca["endDate"]);
+        _filingDue = LegacyFmt.Date(ca["filingDue"]);
+        _recordCount = (int)LegacyFmt.Dec(ca["recordCnt"]);
+        _lateCount = (int)LegacyFmt.Dec(ca["lateCnt"]);
+        _isRepayment = LegacyFmt.Str(ca["isRepayment"]) == "Y";
+    }
+
+    /// <summary>VatService.LoadReturn: the newest version of the persisted return with its period dates and record counts.</summary>
+    private void LoadReturn(JsonNode? row)
+    {
+        ClearReturn();
+        if (row is null) return;
+        for (var i = 1; i <= 9; i++) _box[i - 1] = LegacyFmt.Dec(row["box" + i]);
+        _vatRegNo = LegacyFmt.Str(row["vatRegNo"]);
+        _returnStatus = LegacyFmt.Str(row["status"]);
+        _startDate = LegacyFmt.Date(row["startDate"]);
+        _endDate = LegacyFmt.Date(row["endDate"]);
+        _filingDue = LegacyFmt.Date(row["filingDueDate"]);
+        _recordCount = (int)LegacyFmt.Dec(row["records"]);
+        _lateCount = (int)LegacyFmt.Dec(row["late"]);
+        _isRepayment = BoxValue(5) < 0m;
+    }
+
+    /// <summary>
+    /// VatService.Drill: the VR-DRILL table VATRET9 returned (CommArea.GetTable - COBOL column names, numeric fields as
+    /// decimals, so the PIC 9(8) tax point shows as a number), else the fin.usp_VatBoxDrill rows, else nothing.
+    /// </summary>
+    private static GridData? Drilled(LegacyResult r)
+    {
+        var n = (int)LegacyFmt.Dec(r["drillCnt"]);
+        if (n > 0)
+        {
+            var records = r["records"] as JsonArray ?? [];
+            var rows = new List<JsonObject>();
+            for (var i = 0; i < Math.Min(n, 20); i++)
+            {
+                var d = i < records.Count ? records[i] : null;
+                rows.Add(new JsonObject
+                {
+                    ["VR-D-DOC-TYPE"] = LegacyFmt.Str(d?["docType"]),
+                    ["VR-D-DOC-REF"] = LegacyFmt.Str(d?["docRef"]),
+                    ["VR-D-TAX-POINT"] = LegacyFmt.Yyyymmdd(d?["taxPoint"]),
+                    ["VR-D-VAT-CODE"] = LegacyFmt.Str(d?["vatCode"]),
+                    ["VR-D-NET"] = LegacyFmt.Dec(d?["net"]),
+                    ["VR-D-VAT"] = LegacyFmt.Dec(d?["vat"]),
+                    ["VR-D-AMOUNT"] = LegacyFmt.Dec(d?["amount"]),
+                    ["VR-D-LATE"] = LegacyFmt.Str(d?["late"]),
+                });
+            }
+            string[] names = ["VR-D-DOC-TYPE", "VR-D-DOC-REF", "VR-D-TAX-POINT", "VR-D-VAT-CODE", "VR-D-NET", "VR-D-VAT", "VR-D-AMOUNT", "VR-D-LATE"];
+            string[] text = ["VR-D-DOC-TYPE", "VR-D-DOC-REF", "VR-D-VAT-CODE", "VR-D-LATE"];
+            return new GridData(names.Select(c => LegacyGrid.Col(c, c, text.Contains(c) ? "TEXT" : "MONEY")), rows);
+        }
+        if (r["procedureRows"] is not JsonArray procedureRows) return null;
+        return LegacyGrid.Bind(procedureRows,
+            LegacyGrid.Col("boxNo", "BoxNo", "TEXT"), LegacyGrid.Col("documentType", "DocumentType", "TEXT"),
+            LegacyGrid.Col("documentRef", "DocumentRef", "TEXT"), LegacyGrid.Col("partyCode", "PartyCode", "TEXT"),
+            LegacyGrid.Col("taxPointDate", "TaxPointDate", "DATE"), LegacyGrid.Col("postingDate", "PostingDate", "DATE"),
+            LegacyGrid.Col("vatCode", "VatCode", "TEXT"), LegacyGrid.Col("mechanism", "Mechanism", "TEXT"),
+            LegacyGrid.Col("direction", "Direction", "TEXT"), LegacyGrid.Col("netAmountGbp", "NetAmountGBP", "MONEY"),
+            LegacyGrid.Col("vatAmountGbp", "VatAmountGBP", "MONEY"), LegacyGrid.Col("contributionGbp", "ContributionGBP", "MONEY"),
+            LegacyGrid.Col("isLateEntry", "IsLateEntry", "BOOL"), LegacyGrid.Col("journalId", "JournalId", "INT"),
+            LegacyGrid.Col("sourceKind", "SourceKind", "TEXT"));
+    }
+
+    private void BindGrid(GridData? data)
+    {
+        _grid = data ?? GridData.Empty;
+        _gridSelected = _grid.Count > 0 ? 0 : -1;
+    }
+
+    /// <summary>System.IO.Path.GetFileName of the path the service reported.</summary>
+    private static string FileName(string path)
+    {
+        var cut = path.LastIndexOfAny(['\\', '/', ':']);
+        return cut >= 0 ? path[(cut + 1)..] : path;
+    }
+}

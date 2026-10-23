@@ -1,0 +1,4073 @@
+openapi: "3.1.0"
+info:
+  title: "STERP Costing API (STERP-CST)"
+  version: "1.0.0+a06-20261020T112437Z-034eff00"
+  description: "Costing slice (target application STERP-CST, API segment cst, wave W10) of the modernized STERP ERP. Online operations replace the desktop costing screens' facade CostingService and the COBOL engines STDCOST, COSTROLL (with BOMCOST through the BOM public contract), WHATIF, MARGIN, COSTNORM, LABOVH, JOBCOST and WIPCALC; batch operations replace the report programs CSTINVAL, CSTJOBPR, CSTVARRP, CSTSETCM and CSTWIPRF. The legacy behaviour is the contract: values, messages, reason and return codes, data effects and units of work reproduce the legacy implementation at commit 00631916 (see application-specs/STERP-CST.md and 01-shared-platform-contracts.md). Programs reached only from COBOL test drivers (FIFOVAL, LANDED, MWAVAL, NRVTEST, VARIANCE) are deferred and not exposed (SME-004)."
+servers:
+  - url: "https://localhost:7101"
+    description: "STERP.Api (online)"
+security:
+  - windows: []
+tags:
+  - name: "Item Cost Enquiry"
+    description: "Costing > Item Cost Enquiry (frmCostEnquiry)"
+  - name: "Cost Sets"
+    description: "Costing > Cost Sets (frmCostSet)"
+  - name: "Roll-up and What-if"
+    description: "Costing > Roll-up and What-if (frmCostRollup)"
+  - name: "Job Cost Enquiry"
+    description: "Costing > Job Cost Enquiry and Work in Progress (frmJobCost)"
+  - name: "Costing Reports"
+    description: "Costing report catalogue CSTRP010-CSTRP050 (batch jobs on STERP.Jobs)"
+paths:
+  "/api/cst/v1/items/{itemCode}/cost-bases":
+    get:
+      operationId: "cst_getItemCostBases"
+      summary: "Item cost enquiry - every held basis side by side"
+      description: "Returns every cst.ItemCost pool of the item with average, carrying value, allowance, net carrying value, NRV, pool standard, last purchase cost, the oldest open FIFO layer's unit cost and the open-layer count, and the standard of the latest ACTIVE cost set, exactly as cst.usp_CostEnquiry returns them (ORDER BY SiteCode). Legacy chain: frmCostEnquiry.LoadData -> CostingService.CostEnquiry -> cst.usp_CostEnquiry @CompanyCode, @ItemCode, @Revision, @SiteCode (CostingService.vb:129-134; db/procs/cst/01-cst-enquiry.sql:69-113). A basis is stated, never substituted. Read-only. Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.COST.VIEW) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Item Cost Enquiry"
+      parameters:
+        - "$ref": "#/components/parameters/CstItemCode"
+        - name: "revision"
+          in: "query"
+          required: false
+          description: "Revision; omitted or empty is sent as NULL (all revisions, SqlHelper.cs:33)."
+          schema:
+            type: "string"
+            maxLength: 4
+            x-sterp-length: 4
+            x-sterp-legacy-field: "@Revision varchar(4)"
+          example: ""
+        - name: "site"
+          in: "query"
+          required: false
+          description: "Site of the pool; omitted or blank is sent as NULL (all pools, CostArea.Opt)."
+          schema:
+            type: "string"
+            maxLength: 10
+            x-sterp-length: 10
+            x-sterp-legacy-field: "@SiteCode varchar(10)"
+          example: "RDG"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Complete result set in procedure order."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstItemCostBasisList"
+              examples:
+                demo:
+                  summary: "Company pool of BAR-AL6082-25MM in the CST demo fixture (db/seed/94-cst-demo.sql:196-210); standardSet assumes FY2026STD is the latest ACTIVE set"
+                  value:
+                    items:
+                      - itemCode: "BAR-AL6082-25MM"
+                        revision: ""
+                        siteCode: "*"
+                        costMethod: "MWA"
+                        qtyOnHand: 260.0
+                        averageUnitCost: 18.5
+                        carryingValueGbp: 4810.0
+                        allowanceGbp: 650.0
+                        netCarryingGbp: 4160.0
+                        nrvUnitValue: 16.0
+                        standardUnitCost: 18.5
+                        lastPurchaseCost: null
+                        fifoOldestUnit: null
+                        fifoLayers: 0
+                        standardSet: "FY2026STD"
+                        standardFromSet: 18.5
+                        isImpaired: "Y"
+                    count: 1
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-010"
+        - "FR-STERP-CST-030"
+      x-sterp-legacy:
+        forms:
+          - "frmCostEnquiry"
+        facade:
+          - "CostingService.CostEnquiry"
+          - "CostArea.Opt"
+        procedures:
+          - "cst.usp_CostEnquiry"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:129-134"
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:61-64"
+          - "STERP-App/db/procs/cst/01-cst-enquiry.sql:69-113"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostEnquiry.vb:30-42"
+      x-sterp-permission:
+        - "CST.COST.VIEW"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call in autocommit; read-only."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.COST.VIEW"
+        sources:
+          - "menu:CST.ENQUIRY=CST.COST.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-sets":
+    get:
+      operationId: "cst_listCostSets"
+      summary: "Cost set worklist"
+      description: "Lists the company's cost sets with preparer and approver side by side, item counts and the SelfApproved flag, as cst.usp_CostSetList returns them (status rank ACTIVE, APPROVED, REVIEW, DRAFT, other; EffectiveFrom DESC; CostSetCode). Legacy chain: frmCostSet.LoadData -> CostingService.Sets -> cst.usp_CostSetList @CompanyCode, @Status (CostingService.vb:137-140; db/procs/cst/02-cst-lists.sql:11-41). Read-only. Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.STANDARD.MAINT) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Cost Sets"
+      parameters:
+        - name: "status"
+          in: "query"
+          required: false
+          description: "DRAFT, REVIEW, APPROVED or ACTIVE; omitted (page ALL) is sent as NULL."
+          schema:
+            type: "string"
+            maxLength: 10
+            x-sterp-length: 10
+            x-sterp-legacy-field: "@Status varchar(10)"
+          example: "REVIEW"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Complete result set in procedure order."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstCostSetList"
+              examples:
+                demo:
+                  summary: "status=REVIEW on the demo database (db/seed/94-cst-demo.sql:164-187)"
+                  value:
+                    items:
+                      - costSet: "FY2027STD"
+                        name: "Standard cost set, financial year 2027"
+                        purpose: "STANDARD"
+                        status: "REVIEW"
+                        currency: "GBP"
+                        fiscalYear: 2027
+                        effectiveFrom: "2027-01-01"
+                        comparedTo: "FY2026STD"
+                        preparedBy: "KWATSON"
+                        approvedBy: null
+                        approvedAt: null
+                        activatedAt: null
+                        items: 4
+                        selfApproved: ""
+                    count: 1
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-011"
+        - "FR-STERP-CST-031"
+      x-sterp-legacy:
+        forms:
+          - "frmCostSet"
+        facade:
+          - "CostingService.Sets"
+          - "CostArea.Opt"
+        procedures:
+          - "cst.usp_CostSetList"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:137-140"
+          - "STERP-App/db/procs/cst/02-cst-lists.sql:11-41"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostSet.vb:41-54"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call in autocommit; read-only."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.COSTSET=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-sets/{costSet}/review":
+    post:
+      operationId: "cst_reviewCostSet"
+      summary: "Move a DRAFT cost set to REVIEW (STDCOST REVIEW)"
+      description: "Runs STDCOST REVIEW with SC-COMMIT Y: company required (CST0401), set upper-cased and read (absent: 404 CST0402), status must be DRAFT (else 422 CST0403 'Cost set is <status> - it must be DRAFT for this action'), then UPDATE cst.CostSet SET Status = 'REVIEW', ReviewedBy, ModifiedBy = user, ModifiedAt = SYSDATETIME(). approvedBy in the answer is the acting user (legacy overwrite, BR-STDCOST-020). Legacy chain: frmCostSet.ReviewClicked -> CostingService.Review -> STDCOST 2000/2300/2400 (CostingService.vb:168-172; STDCOST.cob:258-262,286-406). Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.STANDARD.MAINT) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Cost Sets"
+      parameters:
+        - "$ref": "#/components/parameters/CstCostSet"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstEmptyRequest"
+            examples:
+              none:
+                summary: "No fields"
+                value: {}
+      responses:
+        "200":
+          description: "Set moved to REVIEW."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstCostSetActionEnvelope"
+              examples:
+                illustrative:
+                  summary: "Illustrative DRAFT set FY2028STD reviewed by COSTACC"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-007"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      costSet: "FY2028STD"
+                      compareSet: "FY2027STD"
+                      status: "REVIEW"
+                      purpose: "STANDARD"
+                      preparedBy: "KWATSON"
+                      approvedBy: "COSTACC"
+                      itemCount: 0
+                      revalGbp: 0.0
+                      adverse: "N"
+                      completeness: "COMPLETE"
+                      warning: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-012"
+        - "FR-STERP-CST-031"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmCostSet"
+        facade:
+          - "CostingService.Review"
+          - "CostingService.SetArea"
+        programs:
+          - "STDCOST/REVIEW"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:168-172"
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:157-165"
+          - "STERP-App/cobol/online/cst/STDCOST.cob:286-457"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostSet.vb:61-63"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "STDCOST reads the set, then one UPDATE of cst.CostSet in autocommit (no BEGN/COMT in STDCOST, cobol/online/cst/STDCOST.cob:332-371); no lock or rowversion predicate; correlation id only (no IDEMPOT)."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.COSTSET=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-sets/{costSet}/approve":
+    post:
+      operationId: "cst_approveCostSet"
+      summary: "Approve a reviewed cost set; the preparer may not approve (STDCOST APPROVE)"
+      description: "Runs STDCOST APPROVE with SC-COMMIT Y: status must be REVIEW (422 CST0403); when TRIM(PreparedBy) = TRIM(acting user) the answer is RC 06 CST0405 'The preparer of a cost set may not approve it' with nothing written (HTTP 202, severity HOLD); otherwise UPDATE cst.CostSet SET Status = 'APPROVED', ApprovedBy = user, ApprovedAt, ModifiedBy, ModifiedAt. The separation of preparer and approver is never relaxed. Legacy chain: frmCostSet.ApproveClicked (confirmation) -> CostingService.Approve -> STDCOST 2100/2300 (CostingService.vb:178-182; STDCOST.cob:266-270,286-376). Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.STANDARD.MAINT) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Cost Sets"
+      parameters:
+        - "$ref": "#/components/parameters/CstCostSet"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstEmptyRequest"
+            examples:
+              none:
+                summary: "No fields"
+                value: {}
+      responses:
+        "200":
+          description: "Set approved."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstCostSetActionEnvelope"
+              examples:
+                demo:
+                  summary: "FY2027STD approved by COSTACC (demo step 8 cancels this action unless separately authorised)"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-007"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      costSet: "FY2027STD"
+                      compareSet: "FY2026STD"
+                      status: "APPROVED"
+                      purpose: "STANDARD"
+                      preparedBy: "KWATSON"
+                      approvedBy: "COSTACC"
+                      itemCount: 0
+                      revalGbp: 0.0
+                      adverse: "N"
+                      completeness: "COMPLETE"
+                      warning: ""
+        "202":
+          description: "HOLD (RC 06): self-approval refused, nothing written (contracts 4.6)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstCostSetActionEnvelope"
+              examples:
+                selfApproval:
+                  summary: "The preparer tries to approve: refused, nothing written"
+                  value:
+                    outcome:
+                      returnCode: 6
+                      severity: "HOLD"
+                      reasonCode: "CST0405"
+                      message: "The preparer of a cost set may not approve it"
+                      messageCount: 1
+                      documentRef: "CST-007"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      costSet: "FY2027STD"
+                      compareSet: "FY2026STD"
+                      status: "REVIEW"
+                      purpose: "STANDARD"
+                      preparedBy: "KWATSON"
+                      approvedBy: ""
+                      itemCount: 0
+                      revalGbp: 0.0
+                      adverse: "N"
+                      completeness: "COMPLETE"
+                      warning: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-013"
+        - "FR-STERP-CST-031"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmCostSet"
+        facade:
+          - "CostingService.Approve"
+          - "CostingService.SetArea"
+        programs:
+          - "STDCOST/APPROVE"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:178-182"
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:157-165"
+          - "STERP-App/cobol/online/cst/STDCOST.cob:286-457"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostSet.vb:66-70"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "STDCOST reads the set, then one UPDATE of cst.CostSet in autocommit (no BEGN/COMT in STDCOST, cobol/online/cst/STDCOST.cob:332-371); no lock or rowversion predicate; correlation id only (no IDEMPOT)."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.COSTSET=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-sets/{costSet}/activate":
+    post:
+      operationId: "cst_activateCostSet"
+      summary: "Activate an approved STANDARD cost set (STDCOST ACTIVATE)"
+      description: "Runs STDCOST ACTIVATE with SC-COMMIT Y: status must be APPROVED (422 CST0403) and purpose STANDARD (422 CST0404 'A simulation or quote set cannot be activated'); UPDATE cst.CostSet SET Status = 'ACTIVE', ActivatedAt, ModifiedBy, ModifiedAt; then returns the IMPACT figures. Activation revalues nothing (no ItemCost, ItemCostHistory or journal write; previous ACTIVE set not superseded; self-approved sets not refused - SME-743, SME-744, SME-745). Legacy chain: frmCostSet.ActivateClicked (confirmation) -> CostingService.Activate -> STDCOST 2200/2300/3000 (CostingService.vb:185-189; STDCOST.cob:274-282,286-457). Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.STANDARD.MAINT) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Cost Sets"
+      parameters:
+        - "$ref": "#/components/parameters/CstCostSet"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstEmptyRequest"
+            examples:
+              none:
+                summary: "No fields"
+                value: {}
+      responses:
+        "200":
+          description: "Set activated."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstCostSetActionEnvelope"
+              examples:
+                illustrative:
+                  summary: "Illustrative: FY2027STD after approval by COSTACC; impact figures as the preview"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-007"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      costSet: "FY2027STD"
+                      compareSet: "FY2026STD"
+                      status: "ACTIVE"
+                      purpose: "STANDARD"
+                      preparedBy: "KWATSON"
+                      approvedBy: "COSTACC"
+                      itemCount: 7
+                      revalGbp: 16094.69
+                      adverse: "N"
+                      completeness: "COMPLETE"
+                      warning: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-014"
+        - "FR-STERP-CST-031"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmCostSet"
+        facade:
+          - "CostingService.Activate"
+          - "CostingService.SetArea"
+        programs:
+          - "STDCOST/ACTIVATE"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:185-189"
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:157-165"
+          - "STERP-App/cobol/online/cst/STDCOST.cob:286-457"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostSet.vb:73-77"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "STDCOST reads the set, then one UPDATE of cst.CostSet in autocommit (no BEGN/COMT in STDCOST, cobol/online/cst/STDCOST.cob:332-371); no lock or rowversion predicate; correlation id only (no IDEMPOT). The impact queries run afterwards outside any transaction."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.COSTSET=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-sets/{costSet}/impact":
+    post:
+      operationId: "cst_previewCostSetImpact"
+      summary: "Preview what activation would do (STDCOST IMPACT)"
+      description: "Runs STDCOST IMPACT with SC-COMMIT N: reads the set (absent: 404 CST0402; any status), then COUNT(*), SUM(QtyOnHand) and SUM(QtyOnHand x (TotalUnitCost - ISNULL(StandardUnitCost, AverageUnitCost))) over the set's cst.StandardCost rows joined to every cst.ItemCost pool of the item with QtyOnHand <> 0; values truncated to the COMMAREA scales; adverse Y when the revaluation is negative; warning 'No stock has been revalued - this is a preview'; return code 0. Writes nothing. Legacy chain: frmCostSet.ImpactClicked -> CostingService.Impact -> STDCOST 3000 (CostingService.vb:192-194; STDCOST.cob:378-457). Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.STANDARD.MAINT) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Cost Sets"
+      parameters:
+        - "$ref": "#/components/parameters/CstCostSet"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstEmptyRequest"
+            examples:
+              none:
+                summary: "No fields"
+                value: {}
+      responses:
+        "200":
+          description: "Impact preview."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstCostSetActionEnvelope"
+              examples:
+                demo:
+                  summary: "Demo workflow 2 step 8 (docs/DEMO-WORKFLOWS.md:76; to be confirmed by the legacy oracle, U-CST-02)"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-007"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      costSet: "FY2027STD"
+                      compareSet: "FY2026STD"
+                      status: "REVIEW"
+                      purpose: "STANDARD"
+                      preparedBy: "KWATSON"
+                      approvedBy: ""
+                      itemCount: 7
+                      revalGbp: 16094.69
+                      adverse: "N"
+                      completeness: "COMPLETE"
+                      warning: "No stock has been revalued - this is a preview"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-015"
+        - "FR-STERP-CST-031"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmCostSet"
+        facade:
+          - "CostingService.Impact"
+          - "CostingService.SetArea"
+        programs:
+          - "STDCOST/IMPACT"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:192-194"
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:157-165"
+          - "STERP-App/cobol/online/cst/STDCOST.cob:286-457"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostSet.vb:80-82"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only; no transaction."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.COSTSET=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-sets/{costSet}/compare":
+    post:
+      operationId: "cst_compareCostSets"
+      summary: "Compare a cost set with another, line by line (STDCOST COMPARE)"
+      description: "Runs STDCOST COMPARE with SC-COMMIT N and SC-FROM-LINE 0. compareTo as supplied, else the set's ComparedToSetCode, else 422 CST0410 'No comparison cost set was named'. Rows = the set's cst.StandardCost rows LEFT JOIN the comparison set on item LEFT JOIN every cst.ItemCost pool on item, ordered by item; the first 20 rows are returned (oldCost 0 when absent; differencePct ROUNDED 4 dp, or 0 with note 'New item in this set'; revaluation ROUNDED 2 dp); itemCount counts all rows; revalGbp sums the window only; items only in the comparison set are not listed (SME-746, SME-748). Legacy chain: frmCostSet.CompareClicked -> CostingService.Compare -> STDCOST 5000/5100 (CostingService.vb:197-204; STDCOST.cob:538-626). Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.STANDARD.MAINT) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Cost Sets"
+      parameters:
+        - "$ref": "#/components/parameters/CstCostSet"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstCompareRequest"
+            examples:
+              demo:
+                summary: "Demo workflow 2 step 8"
+                value:
+                  compareTo: "FY2026STD"
+      responses:
+        "200":
+          description: "First comparison window."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstCostSetComparisonEnvelope"
+              examples:
+                demo:
+                  summary: "Illustrative: FY2027STD against FY2026STD over the company pools of the CST demo fixture only (db/seed/94-cst-demo.sql:173-210)"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-007"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      costSet: "FY2027STD"
+                      compareSet: "FY2026STD"
+                      status: ""
+                      purpose: ""
+                      preparedBy: ""
+                      approvedBy: ""
+                      itemCount: 4
+                      revalGbp: 573.4
+                      lineCnt: 4
+                      moreLines: "N"
+                      lines:
+                        - item: "BAR-AL6082-25MM"
+                          revision: ""
+                          oldCost: 18.5
+                          newCost: 19.98
+                          difference: 1.48
+                          differencePct: 8.0
+                          qtyHeld: 260.0
+                          revaluation: 384.8
+                          note: ""
+                        - item: "BAR-TI6AL4V-16MM"
+                          revision: ""
+                          oldCost: 73.0
+                          newCost: 73.73
+                          difference: 0.73
+                          differencePct: 1.0
+                          qtyHeld: 140.0
+                          revaluation: 102.2
+                          note: ""
+                        - item: "BATTERY-36V-14AH"
+                          revision: ""
+                          oldCost: 0.0
+                          newCost: 148.0
+                          difference: 148.0
+                          differencePct: 0.0
+                          qtyHeld: 0.0
+                          revaluation: 0.0
+                          note: "New item in this set"
+                        - item: "BEARING-6802-2RS"
+                          revision: ""
+                          oldCost: 3.85
+                          newCost: 4.21
+                          difference: 0.36
+                          differencePct: 9.3506
+                          qtyHeld: 240.0
+                          revaluation: 86.4
+                          note: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-016"
+        - "FR-STERP-CST-031"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmCostSet"
+        facade:
+          - "CostingService.Compare"
+          - "CostingService.SetArea"
+        programs:
+          - "STDCOST/COMPARE"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:197-204"
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:157-165"
+          - "STERP-App/cobol/online/cst/STDCOST.cob:286-457"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostSet.vb:85-102"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only; no transaction."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.COSTSET=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/items/{itemCode}/rollup":
+    post:
+      operationId: "cst_rollUpItemCost"
+      summary: "Roll up the cost of a made item through the engineering explosion (COSTROLL)"
+      description: "Reproduces CostingService.Rollup. COSTROLL ROLLUP (target set blank, effective and cost date = business date, currency = company base currency, max depth 10, window 20, from-line 0): refusals CST0601/CST0602/CST0606 (422); BOMCOST COST for the STANDARD engineering bill at lotSize good units via the BOM public contract on this request's connection (STOP = depth 1); BOMCOST failure -> reason CST0603 with BOMCOST's return code and message; missing rates -> INCOMPLETE, CST0604, RC 04 (WARNING); labour = conversion - setup; LABOVH OVERHEAD only when a work centre is present (never on this route); total = material + labour + machine + setup + subcontract + overhead + other - recovery; total < 0 -> RC 06 CST0609 (HTTP 202 HOLD, no lines); unit = ROUNDED(total / good output, 6 dp). When ROLLUP RC <= 4 the costed tree is paged exactly as the facade does (GETLINE from 1 + lines read while moreLines = Y, at most 25 windows, silent stop on a failed GETLINE). The summary is the COMMAREA after the last engine call: after any GETLINE the totals are 0.00 and completeness COMPLETE (legacy parity F-COSTROLL-01; BC-CST-01 proposes returning the ROLLUP totals). Writes nothing in CST. Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.STANDARD.MAINT) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Roll-up and What-if"
+      parameters:
+        - "$ref": "#/components/parameters/CstItemCode"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstRollupRequest"
+            examples:
+              demo:
+                summary: "Bike roll-up on the BOM demo cost set (docs/DEMO-WORKFLOWS.md:68)"
+                value:
+                  revision: ""
+                  costSet: "BOMDEMO"
+                  lotSize: 10.0
+                  boundary: "EXPAND"
+      responses:
+        "200":
+          description: "Roll-up answered (RC 00 or 04)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstRollupEnvelope"
+              examples:
+                paged:
+                  summary: "Illustrative excerpt for a tree longer than 20 lines: all windows are returned (only the first line shown here) and the summary carries the zeroed GETLINE state (legacy parity)"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-010"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      itemCode: "FG-BIKE-COMMUTE-M"
+                      revision: ""
+                      costSet: "BOMDEMO"
+                      lotSize: 10.0
+                      boundary: "EXPAND"
+                      grossStarts: 0.0
+                      goodOutput: 0.0
+                      materialCost: 0.0
+                      labourCost: 0.0
+                      machineCost: 0.0
+                      setupCost: 0.0
+                      subconCost: 0.0
+                      overheadCost: 0.0
+                      otherCost: 0.0
+                      recoveryCredit: 0.0
+                      totalCost: 0.0
+                      unitCost: 0.0
+                      branchValue: 0.0
+                      occCount: 0
+                      missingCount: 0
+                      completeness: "COMPLETE"
+                      errorPath: ""
+                      warning: ""
+                      moreLines: "N"
+                      lines:
+                        - seq: 1
+                          depth: 0
+                          item: "FG-BIKE-COMMUTE-M"
+                          revision: ""
+                          description: "Commuter bike, medium"
+                          element: "MATERIAL"
+                          source: "BOM"
+                          boundary: "BRANCH"
+                          requiredQty: 10.0
+                          unitCost: 0.0
+                          extendedCost: 0.0
+                          contributes: "N"
+                          warning: ""
+        "202":
+          description: "HOLD (RC 06 CST0609)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstRollupEnvelope"
+              examples:
+                negative:
+                  summary: "Recovery credit drives the cost below zero: HOLD, no lines"
+                  value:
+                    outcome:
+                      returnCode: 6
+                      severity: "HOLD"
+                      reasonCode: "CST0609"
+                      message: "The recovery credit drives the cost below zero - the controller must review it"
+                      messageCount: 1
+                      documentRef: "CST-010"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      itemCode: "FG-BIKE-COMMUTE-M"
+                      revision: ""
+                      costSet: "BOMDEMO"
+                      lotSize: 10.0
+                      boundary: "EXPAND"
+                      grossStarts: 10.0
+                      goodOutput: 10.0
+                      materialCost: 100.0
+                      labourCost: 0.0
+                      machineCost: 0.0
+                      setupCost: 0.0
+                      subconCost: 0.0
+                      overheadCost: 0.0
+                      otherCost: 0.0
+                      recoveryCredit: 150.0
+                      totalCost: -50.0
+                      unitCost: -5.0
+                      branchValue: -50.0
+                      occCount: 3
+                      missingCount: 0
+                      completeness: "COMPLETE"
+                      errorPath: ""
+                      warning: ""
+                      moreLines: "N"
+                      lines: []
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-017"
+        - "FR-STERP-CST-032"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmCostRollup"
+        facade:
+          - "CostingService.Rollup"
+        programs:
+          - "COSTROLL/ROLLUP"
+          - "COSTROLL/GETLINE"
+          - "BOMCOST/COST (BOM, IC-BOM-BOMCOST)"
+          - "BOMCOST/GETLINE (BOM)"
+          - "LABOVH/OVERHEAD (dormant)"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:212-243"
+          - "STERP-App/cobol/online/cst/COSTROLL.cob:75-366"
+          - "STERP-App/cobol/online/cst/LABOVH.cob:128-306"
+          - "STERP-App/cobol/online/bom/BOMCOST.cob:333-353"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostRollup.vb:56-75"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Reads only on the request connection; BOMCOST runs in-process on the same connection and unit of work (contracts 6.4); no CST write; no transaction opened."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.ROLLUP=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/items/{itemCode}/what-if":
+    post:
+      operationId: "cst_runWhatIf"
+      summary: "Price a base case and three variants (WHATIF) - nothing is written"
+      description: "Reproduces CostingService.Scenario: scenario ref SCR-<business date yyyyMMdd>; three fixed variants AS ENTERED (factors as supplied, STOP), MATERIAL -5% (material factor x 0.95, STOP), LOT X2 RATE +10% (lot x 2, rate factor x 1.1, EXPAND); MARGINWI when targetPrice > 0 else SCENARIO. WHATIF refusals CST1201/CST1205/CST1203/CST1202 (422); base roll-up EXPAND with factors 1 and a fresh COSTROLL ROLLUP per variant (header with company and user only); material x factor and conversion/overhead x rate factor ROUNDED; base not COMPLETE -> RC 04 CST1204; a failed variant roll-up -> completeness FAILED with COSTROLL's message; MARGINWI picks the cheapest COMPLETE variant (none -> RC 04) and prices each variant with MARGIN EXPECTED (quantity 1, price = targetPrice, basis QUOTE, cost = variant unit truncated to pence; COSTNORM CONTEXT only for a zero unit). Overhead includes the recovery credit as WHATIF adds it (SME-792). No database write by CST programs (SME-057 for BOMCOST internals). Legacy chain: frmCostRollup.WhatIfClicked -> CostingService.Scenario -> WHATIF -> COSTROLL, MARGIN, COSTNORM (CostingService.vb:250-284; WHATIF.cob:74-366). Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.STANDARD.MAINT) through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate code."
+      tags:
+        - "Roll-up and What-if"
+      parameters:
+        - "$ref": "#/components/parameters/CstItemCode"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstWhatIfRequest"
+            examples:
+              demo:
+                summary: "Bike priced against its list price (docs/DEMO-WORKFLOWS.md:68)"
+                value:
+                  revision: ""
+                  costSet: "BOMDEMO"
+                  lotSize: 10.0
+                  targetPrice: 780.0
+                  materialFactor: 1.0
+                  rateFactor: 1.0
+      responses:
+        "200":
+          description: "Scenario priced."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstWhatIfEnvelope"
+              examples:
+                illustrative:
+                  summary: "Illustrative MARGINWI answer at the 780.00 list price (figures depend on the BOM fixture)"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-023"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      itemCode: "FG-BIKE-COMMUTE-M"
+                      revision: ""
+                      scenarioRef: "SCR-20261007"
+                      effDate: "2026-10-07"
+                      baseCostSet: "BOMDEMO"
+                      baseLotSize: 10.0
+                      targetPrice: 780.0
+                      sideEffects: "N"
+                      baseTotal: 5682.5
+                      baseUnit: 568.25
+                      baseComplete: "COMPLETE"
+                      variantCnt: 3
+                      bestVariant: 2
+                      warning: ""
+                      variants:
+                        - label: "AS ENTERED"
+                          costSet: "BOMDEMO"
+                          lotSize: 10.0
+                          material: 4200.0
+                          conversion: 1200.0
+                          overhead: 282.5
+                          total: 5682.5
+                          unit: 568.25
+                          difference: 0.0
+                          differencePct: 0.0
+                          marginPct: 27.1474
+                          completeness: "COMPLETE"
+                          warning: ""
+                        - label: "MATERIAL -5%"
+                          costSet: "BOMDEMO"
+                          lotSize: 10.0
+                          material: 3990.0
+                          conversion: 1200.0
+                          overhead: 282.5
+                          total: 5472.5
+                          unit: 547.25
+                          difference: -210.0
+                          differencePct: -3.6956
+                          marginPct: 29.8397
+                          completeness: "COMPLETE"
+                          warning: ""
+                        - label: "LOT X2 RATE +10%"
+                          costSet: "BOMDEMO"
+                          lotSize: 20.0
+                          material: 8400.0
+                          conversion: 2640.0
+                          overhead: 621.5
+                          total: 11661.5
+                          unit: 583.075
+                          difference: 5979.0
+                          differencePct: 105.2178
+                          marginPct: 25.2474
+                          completeness: "COMPLETE"
+                          warning: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-018"
+        - "FR-STERP-CST-032"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmCostRollup"
+        facade:
+          - "CostingService.Scenario"
+          - "CostingService.SetVariant"
+        programs:
+          - "WHATIF/SCENARIO"
+          - "WHATIF/MARGINWI"
+          - "COSTROLL/ROLLUP"
+          - "MARGIN/EXPECTED"
+          - "COSTNORM/CONTEXT"
+          - "BOMCOST/COST (BOM)"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:250-284"
+          - "STERP-App/cobol/online/cst/WHATIF.cob:74-366"
+          - "STERP-App/cobol/online/cst/MARGIN.cob:269-379"
+          - "STERP-App/cobol/online/cst/COSTNORM.cob:181-224"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmCostRollup.vb:79-94"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Reads only; no transaction is opened (WHATIFCA.cpy:9-10); every roll-up runs on the request connection."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.ROLLUP=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-jobs":
+    get:
+      operationId: "cst_listCostJobs"
+      summary: "Job worklist - sub-jobs under their parent"
+      description: "Returns cst.usp_JobList @CompanyCode, @JobRef, @Status (blank -> NULL; @Customer not sent): with a job reference the job and its direct sub-jobs; status filters OperationalStatus; ordered by root job, level, job; Budget = latest APPROVED version, Actual/Committed = all transactions except REVENUE (no approval filter), Variance = Budget - Actual - Committed, Wip = latest WipBalance closing. Legacy chain: frmJobCost.LoadData -> CostingService.Jobs -> cst.usp_JobList (CostingService.vb:143-147; db/procs/cst/02-cst-lists.sql:46-74). Read-only. Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.JOB.MAINT or CST.WIP.VIEW) through core.usp_UiCheckAccess; either code admits; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate codes."
+      tags:
+        - "Job Cost Enquiry"
+      parameters:
+        - name: "jobRef"
+          in: "query"
+          required: false
+          description: "Job reference; the job and its direct sub-jobs are returned. Omitted -> all jobs."
+          schema:
+            type: "string"
+            maxLength: 20
+            x-sterp-length: 20
+            x-sterp-legacy-field: "@JobRef varchar(20)"
+          example: "CST27000"
+        - name: "status"
+          in: "query"
+          required: false
+          description: "OperationalStatus filter (PLANNED, OPEN, COMPLETE, CANCELLED); omitted (page ALL) -> NULL. SUSPENDED and CLOSED offered by the page return no rows."
+          schema:
+            type: "string"
+            maxLength: 14
+            x-sterp-length: 14
+            x-sterp-legacy-field: "@Status varchar(14)"
+          example: "OPEN"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Complete result set in procedure order."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstCostJobList"
+              examples:
+                demo:
+                  summary: "CST27000 and its two sub-jobs (db/seed/94-cst-demo.sql:45-135)"
+                  value:
+                    items:
+                      - job: "CST27000"
+                        parent: null
+                        level: 1
+                        description: "Ridgeway conveyor replacement, phase 2"
+                        customer: "C0010"
+                        operational: "OPEN"
+                        financial: "OPEN"
+                        budget: 56500.0
+                        actual: 0.0
+                        committed: 0.0
+                        variance: 56500.0
+                        wip: 33985.0
+                      - job: "CST27001"
+                        parent: "CST27000"
+                        level: 2
+                        description: "Ridgeway conveyor - mechanical build"
+                        customer: "C0010"
+                        operational: "OPEN"
+                        financial: "OPEN"
+                        budget: 31000.0
+                        actual: 27347.0
+                        committed: 4380.0
+                        variance: -727.0
+                        wip: 0.0
+                      - job: "CST27002"
+                        parent: "CST27000"
+                        level: 2
+                        description: "Ridgeway conveyor - control panel"
+                        customer: "C0010"
+                        operational: "OPEN"
+                        financial: "OPEN"
+                        budget: 19500.0
+                        actual: 4998.0
+                        committed: 0.0
+                        variance: 14502.0
+                        wip: 0.0
+                    count: 3
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-019"
+        - "FR-STERP-CST-033"
+      x-sterp-legacy:
+        forms:
+          - "frmJobCost"
+        facade:
+          - "CostingService.Jobs"
+          - "CostArea.Opt"
+        procedures:
+          - "cst.usp_JobList"
+        views:
+          - "cst.vw_JobSummary"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:143-147"
+          - "STERP-App/db/procs/cst/02-cst-lists.sql:46-74"
+          - "STERP-App/db/views/cst/01-cst-views.sql:32-57"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmJobCost.vb:42-49"
+      x-sterp-permission:
+        - "CST.JOB.MAINT"
+        - "CST.WIP.VIEW"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call in autocommit; read-only."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.JOB.MAINT"
+          - "CST.WIP.VIEW"
+        sources:
+          - "menu:CST.JOB=CST.JOB.MAINT"
+          - "menu:CST.WIP=CST.WIP.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-jobs/{jobRef}/enquire":
+    post:
+      operationId: "cst_enquireCostJob"
+      summary: "Job cost by element with budget, actual and commitment (JOBCOST ENQUIRE)"
+      description: "Runs JOBCOST ENQUIRE (JC-COMMIT N, JC-FROM-LINE 0): company and job required (422 CST0801); job read (absent: 404 CST0802 'Job <ref> was not found in this company'); totals over approved transactions of the job and, when includeSubJobs = Y, its direct sub-jobs (actual excludes REVENUE; accrued; committed; estimate into etcGbp; revenue sign-reversed; transaction count); original and approved budget of the job itself (approved falls back to original); element lines of the job's own approved transactions by element code (max 20, line budget 0, EAC = actual + committed + estimate, variance = EAC); sub-job count; wipGbp stays 0. Legacy chain: frmJobCost.ElementsClicked -> CostingService.JobEnquire -> JOBCOST 4000-4400 (CostingService.vb:288-299; JOBCOST.cob:571-756). Read-only. Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.JOB.MAINT or CST.WIP.VIEW) through core.usp_UiCheckAccess; either code admits; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate codes."
+      tags:
+        - "Job Cost Enquiry"
+      parameters:
+        - "$ref": "#/components/parameters/CstJobRef"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstJobCostRequest"
+            examples:
+              demo:
+                summary: "Sub-jobs included (page default INCLUDED)"
+                value:
+                  includeSubJobs: "Y"
+      responses:
+        "200":
+          description: "Job enquiry."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstJobCostEnquiryEnvelope"
+              examples:
+                demo:
+                  summary: "Demo workflow 2 step 9: CST27000 with two sub-jobs rolled up once (txnCount 9 in the CST demo fixture alone)"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-014"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      jobRef: "CST27000"
+                      parentJob: ""
+                      jobLevel: 1
+                      description: "Ridgeway conveyor replacement, phase 2"
+                      operStatus: "OPEN"
+                      finStatus: "OPEN"
+                      originalBudget: 48000.0
+                      approvedBudget: 56500.0
+                      actualGbp: 32345.0
+                      accruedGbp: 1640.0
+                      committedGbp: 4380.0
+                      etcGbp: 0.0
+                      revenueGbp: 38000.0
+                      wipGbp: 0.0
+                      subjobCount: 2
+                      txnCount: 9
+                      disposition: ""
+                      warning: ""
+                      budgetTotal: 56500.0
+                      lineCnt: 1
+                      moreLines: "N"
+                      lines:
+                        - key: "REVENUE"
+                          description: ""
+                          element: "REVENUE"
+                          budget: 0.0
+                          actual: -38000.0
+                          committed: 0.0
+                          etc: 0.0
+                          eac: -38000.0
+                          variance: -38000.0
+                          adverse: "N"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-020"
+        - "FR-STERP-CST-033"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmJobCost"
+        facade:
+          - "CostingService.JobEnquire"
+        programs:
+          - "JOBCOST/ENQUIRE"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:288-299"
+          - "STERP-App/cobol/online/cst/JOBCOST.cob:83-166"
+          - "STERP-App/cobol/online/cst/JOBCOST.cob:571-786"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmJobCost.vb:57-71"
+      x-sterp-permission:
+        - "CST.JOB.MAINT"
+        - "CST.WIP.VIEW"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only; no transaction."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.JOB.MAINT"
+          - "CST.WIP.VIEW"
+        sources:
+          - "menu:CST.JOB=CST.JOB.MAINT"
+          - "menu:CST.WIP=CST.WIP.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-jobs/{jobRef}/forecast":
+    post:
+      operationId: "cst_forecastCostJob"
+      summary: "Estimate at completion and forecast variance (JOBCOST FORECAST)"
+      description: "Runs JOBCOST FORECAST: the ENQUIRE totals, then EAC = actual + accrued + committed + estimate to complete and forecast variance = EAC - approved budget; adverse Y with warning 'A positive forecast variance is adverse' when > 0; approved budget 0 -> warning 'No approved budget - the variance is the whole' (coded literal, right-trimmed) and RC 04. Element lines are not returned (the facade copies none). Legacy chain: frmJobCost.ForecastClicked -> CostingService.Forecast -> JOBCOST 5000 (CostingService.vb:302-309; JOBCOST.cob:758-786). Read-only. Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.JOB.MAINT or CST.WIP.VIEW) through core.usp_UiCheckAccess; either code admits; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate codes."
+      tags:
+        - "Job Cost Enquiry"
+      parameters:
+        - "$ref": "#/components/parameters/CstJobRef"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstJobCostRequest"
+            examples:
+              demo:
+                summary: "Sub-jobs included (page default INCLUDED)"
+                value:
+                  includeSubJobs: "Y"
+      responses:
+        "200":
+          description: "Forecast."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstJobForecastEnvelope"
+              examples:
+                demo:
+                  summary: "Demo workflow 2 step 9: EAC 38,365 and 18,135 favourable (docs/DEMO-WORKFLOWS.md:77)"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-014"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      jobRef: "CST27000"
+                      parentJob: ""
+                      jobLevel: 1
+                      description: "Ridgeway conveyor replacement, phase 2"
+                      operStatus: "OPEN"
+                      finStatus: "OPEN"
+                      originalBudget: 48000.0
+                      approvedBudget: 56500.0
+                      actualGbp: 32345.0
+                      accruedGbp: 1640.0
+                      committedGbp: 4380.0
+                      etcGbp: 0.0
+                      revenueGbp: 38000.0
+                      wipGbp: 0.0
+                      subjobCount: 2
+                      txnCount: 9
+                      disposition: ""
+                      warning: ""
+                      eacGbp: 38365.0
+                      fcstVarGbp: -18135.0
+                      fcstAdverse: "N"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-021"
+        - "FR-STERP-CST-033"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmJobCost"
+        facade:
+          - "CostingService.Forecast"
+        programs:
+          - "JOBCOST/FORECAST"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:302-309"
+          - "STERP-App/cobol/online/cst/JOBCOST.cob:83-166"
+          - "STERP-App/cobol/online/cst/JOBCOST.cob:571-786"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmJobCost.vb:75-88"
+      x-sterp-permission:
+        - "CST.JOB.MAINT"
+        - "CST.WIP.VIEW"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only; no transaction."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.JOB.MAINT"
+          - "CST.WIP.VIEW"
+        sources:
+          - "menu:CST.JOB=CST.JOB.MAINT"
+          - "menu:CST.WIP=CST.WIP.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/cost-jobs/{jobRef}/wip/calc":
+    post:
+      operationId: "cst_calculateCostJobWip"
+      summary: "Work in progress roll-forward for a period, never posted (WIPCALC CALC)"
+      description: "Runs WIPCALC CALC with WC-COMMIT N for the job and the requested fiscal year/period (default: the fin.Period row containing the business date, as LoginService.LoadPeriod; 0/0 when none -> 422 CST0903). Refusals CST0901/CST0902/CST0903. Opening = closing of the latest cst.WipBalance row strictly before the period; movements = approved ACTUAL and ACCRUED transactions of the job only (includeSubJobs is ignored, SME-818) in that period, bucketed by element code TRANSFER/MATRETURN/SCRAP/WRITEOFF then by element type; closing = opening + additions - deductions; residual = closing; balanced always Y. Writes nothing. Legacy chain: frmJobCost.WipClicked -> CostingService.Wip -> WIPCALC 1000-1300 (CostingService.vb:315-324; WIPCALC.cob:147-300). Gate (contracts 5.4, binding): before the handler runs, the API checks the menu permission of the calling screen (CST.JOB.MAINT or CST.WIP.VIEW) through core.usp_UiCheckAccess; either code admits; refusal is 403 PRM0006 '<user> does not hold <permission>'. The legacy flow has no business permission check, so no other check is added; x-sterp-permission repeats the gate codes."
+      tags:
+        - "Job Cost Enquiry"
+      parameters:
+        - "$ref": "#/components/parameters/CstJobRef"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstWipCalcRequest"
+            examples:
+              demo:
+                summary: "Period 2026/07, sub-jobs flag as the page sends it"
+                value:
+                  fiscalYear: 2026
+                  periodNo: 7
+                  includeSubJobs: "Y"
+      responses:
+        "200":
+          description: "Roll-forward."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/CstWipRollForwardEnvelope"
+              examples:
+                demo:
+                  summary: "CST27000 in 2026/07: opening from the 2026/03 balance, no movements, residual held"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: "CST-018"
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      jobRef: "CST27000"
+                      fiscalYear: 2026
+                      periodNo: 7
+                      openingGbp: 33985.0
+                      matIssuesGbp: 0.0
+                      matReturnsGbp: 0.0
+                      labourGbp: 0.0
+                      machineGbp: 0.0
+                      overheadGbp: 0.0
+                      subconGbp: 0.0
+                      adjustmentGbp: 0.0
+                      transfersGbp: 0.0
+                      scrapGbp: 0.0
+                      writeoffGbp: 0.0
+                      additionsGbp: 0.0
+                      deductionsGbp: 0.0
+                      closingGbp: 33985.0
+                      residualGbp: 33985.0
+                      hasResidual: "Y"
+                      txnCount: 0
+                      balanced: "Y"
+                      warning: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-022"
+        - "FR-STERP-CST-033"
+        - "FR-STERP-CST-060"
+      x-sterp-legacy:
+        forms:
+          - "frmJobCost"
+        facade:
+          - "CostingService.Wip"
+        programs:
+          - "WIPCALC/CALC"
+        citations:
+          - "STERP-App/dotnet/STERP.Business/Costing/CostingService.vb:315-324"
+          - "STERP-App/cobol/online/cst/WIPCALC.cob:70-300"
+          - "STERP-App/dotnet/STERP.Business/System/LoginService.vb:161-180"
+          - "STERP-App/dotnet/STERP.Desktop/Forms/Costing/frmJobCost.vb:92-108"
+      x-sterp-permission:
+        - "CST.JOB.MAINT"
+        - "CST.WIP.VIEW"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only (fin.Period lookup when no period is supplied); no transaction."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.JOB.MAINT"
+          - "CST.WIP.VIEW"
+        sources:
+          - "menu:CST.JOB=CST.JOB.MAINT"
+          - "menu:CST.WIP=CST.WIP.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/jobs/CSTINVAL/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "cst_submitCstinvalRun"
+      summary: "Run CSTINVAL - inventory valuation and GL reconciliation (CSTRP010)"
+      description: "Re-implements the batch program CSTINVAL: every current cst.ItemCost pool of the company (optional SITE/GROUP/METHOD filters) by valuation group, item and site with quantity, unit cost, gross, allowance and NRV line, group totals, DETAIL=LAYER open FIFO layers, MODE=EXCEPTION pools with an allowance only, and the reconciliation footing from EXEC cst.usp_ValuationRecon CO, ASAT, NULL (RECONCILED -> RC 0; NOT RECONCILED or NOT AVAILABLE -> RC 4). Spool run\\spool\\CSTINVAL-<CO>-<stamp>.lst (133 columns, FL-025); SYSOUT STERP-I-0100/0401, STERP-W-0402, STERP-I-SPOOL. Return codes 0, 4, > 4 (JOBLOG START refusal), 12 (spool failure). Also STEP030 of the FIN-owned MONTHEND stream (jobs/MONTHEND.cmd:43-46). Legacy: cobol/batch/cst/CSTINVAL.cob:236-678; catalogue db/seed/41-cst-menu.sql:56. Submission enforces the catalogue gate of contracts 5.4 (CSTRP010 PermissionCode CST.COST.VIEW through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>' before any core.JobRun row is written) and checks the effective company against the caller's access list (contracts 5.3, 8.3); USER defaults to the caller (contracts 8.2). Run status, SYSOUT, spool and result are the platform resources /api/jobs/v1/runs/{jobRunId}."
+      tags:
+        - "Costing Reports"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstCstinvalParameters"
+            examples:
+              demo:
+                summary: "Legacy KEY=VALUE parameters as JSON"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  DETAIL: "SUMMARY"
+                  MODE: "ALL"
+                  USER: "COSTACC"
+      responses:
+        "202":
+          description: "Run registered (core.usp_JobRunStart) and started in STERP.Jobs; poll the platform run resources (contracts 8.3, 8.5)."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs (contracts 8.3)"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              examples:
+                accepted:
+                  summary: "Run accepted"
+                  value:
+                    jobRunId: 1042
+                    jobName: "CSTINVAL"
+                    status: "RUNNING"
+                    startedAt: "2026-10-31T18:05:12.0000000"
+                    links:
+                      self: "/api/jobs/v1/runs/1042"
+                      sysout: "/api/jobs/v1/runs/1042/sysout"
+                      spool: "/api/jobs/v1/runs/1042/spool"
+                      result: "/api/jobs/v1/runs/1042/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-040"
+      x-sterp-legacy:
+        programs:
+          - "CSTINVAL"
+        reports:
+          - "CSTRP010"
+        files:
+          - "FL-025"
+        citations:
+          - "STERP-App/cobol/batch/cst/CSTINVAL.cob:236-678"
+          - "STERP-App/db/procs/cst/01-cst-enquiry.sql:185-257"
+          - "STERP-App/db/seed/41-cst-menu.sql:56"
+          - "STERP-App/jobs/MONTHEND.cmd:43-46"
+      x-sterp-permission:
+        - "CST.COST.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only listing; the run is registered in core.JobRun through the platform (contracts 8.3) and the program's own JOBLOG registration is reproduced; no business write."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.COST.VIEW"
+        sources:
+          - "menu:CST.RPT.VAL=CST.COST.VIEW"
+          - "report:CSTRP010=CST.COST.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/jobs/CSTJOBPR/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "cst_submitCstjobprRun"
+      summary: "Run CSTJOBPR - job profitability and work in progress (CSTRP020)"
+      description: "Re-implements CSTJOBPR: EXEC cst.usp_JobProfitability CO, JOB or NULL, 1 read positionally; per-row CUSTOMER/STATUS/MODE=OVERSPEND selection; one contract heading per root job, two lines per job with notes 'no approved budget' and '*** forecast over budget'; contract and report totals; overall margin percent ROUNDED 2 dp. Spool CSTJOBPR-<CO>-<stamp>.lst (FL-026). Return codes 0 or 12. The program's JOBLOG END carries run id 0 and is rejected (SME-009, reproduced). Legacy: cobol/batch/cst/CSTJOBPR.cob:219-561; catalogue db/seed/41-cst-menu.sql:61. Submission enforces the catalogue gate of contracts 5.4 (CSTRP020 PermissionCode CST.JOB.MAINT through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>' before any core.JobRun row is written) and checks the effective company against the caller's access list (contracts 5.3, 8.3); USER defaults to the caller (contracts 8.2). Run status, SYSOUT, spool and result are the platform resources /api/jobs/v1/runs/{jobRunId}."
+      tags:
+        - "Costing Reports"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstCstjobprParameters"
+            examples:
+              demo:
+                summary: "Legacy KEY=VALUE parameters as JSON"
+                value:
+                  CO: "STC"
+                  PERIOD: "202607"
+                  JOB: "CST27000"
+                  MODE: "ALL"
+                  USER: "COSTACC"
+      responses:
+        "202":
+          description: "Run registered (core.usp_JobRunStart) and started in STERP.Jobs; poll the platform run resources (contracts 8.3, 8.5)."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs (contracts 8.3)"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              examples:
+                accepted:
+                  summary: "Run accepted"
+                  value:
+                    jobRunId: 1043
+                    jobName: "CSTJOBPR"
+                    status: "RUNNING"
+                    startedAt: "2026-10-31T18:05:12.0000000"
+                    links:
+                      self: "/api/jobs/v1/runs/1043"
+                      sysout: "/api/jobs/v1/runs/1043/sysout"
+                      spool: "/api/jobs/v1/runs/1043/spool"
+                      result: "/api/jobs/v1/runs/1043/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-041"
+      x-sterp-legacy:
+        programs:
+          - "CSTJOBPR"
+        reports:
+          - "CSTRP020"
+        files:
+          - "FL-026"
+        citations:
+          - "STERP-App/cobol/batch/cst/CSTJOBPR.cob:219-561"
+          - "STERP-App/db/procs/cst/01-cst-enquiry.sql:118-179"
+          - "STERP-App/db/seed/41-cst-menu.sql:61"
+      x-sterp-permission:
+        - "CST.JOB.MAINT"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only listing; the run is registered in core.JobRun through the platform (contracts 8.3) and the program's own JOBLOG registration is reproduced; no business write."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.JOB.MAINT"
+        sources:
+          - "menu:CST.RPT.JOB=CST.JOB.MAINT"
+          - "report:CSTRP020=CST.JOB.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/jobs/CSTVARRP/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "cst_submitCstvarrpRun"
+      summary: "Run CSTVARRP - variance analysis by type and owner (CSTRP030)"
+      description: "Re-implements CSTVARRP: cst.Variance rows of the company filtered by TYPE, JOB, ITEM and PERIOD (yyyynn by position, blank = all), MODE=UNDISPOSED omits disposed rows; rows grouped by variance type with type totals; final adverse, favourable, net, rows and unexplained totals; rows without owner and disposal flagged UNEXPLAINED and RC 4. Spool CSTVARRP-<CO>-<stamp>.lst (FL-028). Return codes 0, 4 or 12. Legacy: cobol/batch/cst/CSTVARRP.cob:186-529; catalogue db/seed/41-cst-menu.sql:66. Submission enforces the catalogue gate of contracts 5.4 (CSTRP030 PermissionCode CST.VARIANCE.VIEW through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>' before any core.JobRun row is written) and checks the effective company against the caller's access list (contracts 5.3, 8.3); USER defaults to the caller (contracts 8.2). Run status, SYSOUT, spool and result are the platform resources /api/jobs/v1/runs/{jobRunId}."
+      tags:
+        - "Costing Reports"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstCstvarrpParameters"
+            examples:
+              demo:
+                summary: "Legacy KEY=VALUE parameters as JSON"
+                value:
+                  CO: "STC"
+                  MODE: "ALL"
+                  USER: "COSTACC"
+      responses:
+        "202":
+          description: "Run registered (core.usp_JobRunStart) and started in STERP.Jobs; poll the platform run resources (contracts 8.3, 8.5)."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs (contracts 8.3)"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              examples:
+                accepted:
+                  summary: "Run accepted"
+                  value:
+                    jobRunId: 1044
+                    jobName: "CSTVARRP"
+                    status: "RUNNING"
+                    startedAt: "2026-10-31T18:05:12.0000000"
+                    links:
+                      self: "/api/jobs/v1/runs/1044"
+                      sysout: "/api/jobs/v1/runs/1044/sysout"
+                      spool: "/api/jobs/v1/runs/1044/spool"
+                      result: "/api/jobs/v1/runs/1044/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-042"
+      x-sterp-legacy:
+        programs:
+          - "CSTVARRP"
+        reports:
+          - "CSTRP030"
+        files:
+          - "FL-028"
+        citations:
+          - "STERP-App/cobol/batch/cst/CSTVARRP.cob:186-529"
+          - "STERP-App/db/seed/41-cst-menu.sql:66"
+      x-sterp-permission:
+        - "CST.VARIANCE.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only listing; the run is registered in core.JobRun through the platform (contracts 8.3) and the program's own JOBLOG registration is reproduced; no business write."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.VARIANCE.VIEW"
+        sources:
+          - "menu:CST.VARIANCE=CST.VARIANCE.VIEW"
+          - "report:CSTRP030=CST.VARIANCE.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/jobs/CSTSETCM/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "cst_submitCstsetcmRun"
+      summary: "Run CSTSETCM - cost set comparison and revaluation impact (CSTRP040)"
+      description: "Re-implements CSTSETCM: COSTSET required and must exist (RC 12 STERP-E-0151/0152); comparison set COMPARETO, else ComparedToSetCode, else the latest ACTIVE STANDARD set (RC 12 STERP-E-0153/0154); FULL JOIN of the two sets on item and revision with NEW/DROPPED/BOTH and summed quantity on hand; change, percent ROUNDED 2 dp, impact ROUNDED; bands NEW, DROPPED, AT OR OVER THRESHOLD (default 5, also when 0) and UNDER (omitted by MODE=EXCEPTION). Spool CSTSETCM-<CO>-<stamp>.lst (FL-027). Return codes 0 or 12. Legacy: cobol/batch/cst/CSTSETCM.cob:195-584; catalogue db/seed/41-cst-menu.sql:71. Submission enforces the catalogue gate of contracts 5.4 (CSTRP040 PermissionCode CST.STANDARD.MAINT through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>' before any core.JobRun row is written) and checks the effective company against the caller's access list (contracts 5.3, 8.3); USER defaults to the caller (contracts 8.2). Run status, SYSOUT, spool and result are the platform resources /api/jobs/v1/runs/{jobRunId}."
+      tags:
+        - "Costing Reports"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstCstsetcmParameters"
+            examples:
+              demo:
+                summary: "Legacy KEY=VALUE parameters as JSON"
+                value:
+                  CO: "STC"
+                  COSTSET: "FY2027STD"
+                  MODE: "ALL"
+                  USER: "COSTACC"
+      responses:
+        "202":
+          description: "Run registered (core.usp_JobRunStart) and started in STERP.Jobs; poll the platform run resources (contracts 8.3, 8.5)."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs (contracts 8.3)"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              examples:
+                accepted:
+                  summary: "Run accepted"
+                  value:
+                    jobRunId: 1045
+                    jobName: "CSTSETCM"
+                    status: "RUNNING"
+                    startedAt: "2026-10-31T18:05:12.0000000"
+                    links:
+                      self: "/api/jobs/v1/runs/1045"
+                      sysout: "/api/jobs/v1/runs/1045/sysout"
+                      spool: "/api/jobs/v1/runs/1045/spool"
+                      result: "/api/jobs/v1/runs/1045/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-043"
+      x-sterp-legacy:
+        programs:
+          - "CSTSETCM"
+        reports:
+          - "CSTRP040"
+        files:
+          - "FL-027"
+        citations:
+          - "STERP-App/cobol/batch/cst/CSTSETCM.cob:195-584"
+          - "STERP-App/db/seed/41-cst-menu.sql:71"
+      x-sterp-permission:
+        - "CST.STANDARD.MAINT"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only listing; the run is registered in core.JobRun through the platform (contracts 8.3) and the program's own JOBLOG registration is reproduced; no business write."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.STANDARD.MAINT"
+        sources:
+          - "menu:CST.RPT.COMPARE=CST.STANDARD.MAINT"
+          - "report:CSTRP040=CST.STANDARD.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/cst/v1/jobs/CSTWIPRF/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "cst_submitCstwiprfRun"
+      summary: "Run CSTWIPRF - WIP roll-forward and period posting (CSTRP050)"
+      description: "Re-implements CSTWIPRF: jobs of the company not financially CLOSED (or the one JOB) ordered by FinancialStatus, JobRef; per job WIPCALC CALC (MODE=CALC, default) or POST (only the literal MODE=POST) with the reference cut to 14 characters; refused jobs omitted with STERP-W-1101; two lines per job, status bands and final footing. PERIOD blank reads core.FiscalPeriod (not defined by the repository) and continues with period 0 (STERP-W-0151). The job list ends after the first job whose WIPCALC call reached SQL (inferred legacy SQLIO slot reuse, U-CST-01; BC-CST-04). Spool CSTWIPRF-<CO>-<stamp>.lst (FL-029). Return codes 0 or 12. Legacy: cobol/batch/cst/CSTWIPRF.cob:222-582, cobol/online/cst/WIPCALC.cob:302-387; catalogue db/seed/43-cst-wiprf.sql:24. Submission enforces the catalogue gate of contracts 5.4 (CSTRP050 PermissionCode CST.JOB.MAINT through core.usp_UiCheckAccess; refusal is 403 PRM0006 '<user> does not hold <permission>' before any core.JobRun row is written) and checks the effective company against the caller's access list (contracts 5.3, 8.3); USER defaults to the caller (contracts 8.2). Run status, SYSOUT, spool and result are the platform resources /api/jobs/v1/runs/{jobRunId}."
+      tags:
+        - "Costing Reports"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/CstCstwiprfParameters"
+            examples:
+              demo:
+                summary: "Legacy KEY=VALUE parameters as JSON"
+                value:
+                  CO: "STC"
+                  PERIOD: "202607"
+                  JOB: "CST27000"
+                  MODE: "CALC"
+                  USER: "COSTACC"
+      responses:
+        "202":
+          description: "Run registered (core.usp_JobRunStart) and started in STERP.Jobs; poll the platform run resources (contracts 8.3, 8.5)."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs (contracts 8.3)"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              examples:
+                accepted:
+                  summary: "Run accepted"
+                  value:
+                    jobRunId: 1046
+                    jobName: "CSTWIPRF"
+                    status: "RUNNING"
+                    startedAt: "2026-10-31T18:05:12.0000000"
+                    links:
+                      self: "/api/jobs/v1/runs/1046"
+                      sysout: "/api/jobs/v1/runs/1046/sysout"
+                      spool: "/api/jobs/v1/runs/1046/spool"
+                      result: "/api/jobs/v1/runs/1046/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-CST-044"
+      x-sterp-legacy:
+        programs:
+          - "CSTWIPRF"
+        reports:
+          - "CSTRP050"
+        files:
+          - "FL-029"
+        citations:
+          - "STERP-App/cobol/batch/cst/CSTWIPRF.cob:222-582"
+          - "STERP-App/cobol/online/cst/WIPCALC.cob:302-387"
+          - "STERP-App/c/sterpsql.c:37"
+          - "STERP-App/db/seed/43-cst-wiprf.sql:24"
+      x-sterp-permission:
+        - "CST.JOB.MAINT"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "MODE=POST: per job WIPCALC POST - UPDATE cst.WipBalance, else INSERT - each statement in autocommit with no run-level unit of work (F-CSTWIPRF-29, contracts 6.4); MODE=CALC writes nothing; core.JobRun registration through the platform."
+      x-sterp-wave: "W10"
+      x-sterp-screen-gate:
+        anyOf:
+          - "CST.JOB.MAINT"
+        sources:
+          - "menu:CST.RPT.WIP=CST.JOB.MAINT"
+          - "report:CSTRP050=CST.JOB.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+components:
+  securitySchemes:
+    windows:
+      type: "http"
+      scheme: "negotiate"
+      description: "Windows integrated authentication (Kerberos/NTLM). Browsers send the signed-on Windows identity automatically; curl: add --negotiate -u : (contracts section 5.1)."
+  parameters:
+    XSterpCompany:
+      name: "X-STERP-Company"
+      in: "header"
+      required: true
+      description: "Company code of the session (legacy SterpSession.CompanyCode -> CA-COMPANY / @CompanyCode). Must be in the caller's access list (core.usp_GetUserContext result set 2); otherwise 403 API0002."
+      schema:
+        type: "string"
+        maxLength: 10
+        x-sterp-legacy-field: "CA-COMPANY PIC X(10)"
+      example: "STC"
+    XSterpSite:
+      name: "X-STERP-Site"
+      in: "header"
+      required: false
+      description: "Site code of the session (legacy SterpSession.SiteCode -> CA-SITE). Required by site-scoped operations; must pair with the company in the access list."
+      schema:
+        type: "string"
+        maxLength: 10
+        x-sterp-legacy-field: "CA-SITE PIC X(10)"
+      example: "RDG"
+    XSterpBusinessDate:
+      name: "X-STERP-Business-Date"
+      in: "header"
+      required: false
+      description: "Business date (legacy SterpSession.BusinessDate -> CA-BUSINESS-DATE yyyyMMdd). Default: server local date, as legacy DateTime.Today (CobolGateway.cs:77)."
+      schema:
+        type: "string"
+        format: "date"
+        x-sterp-legacy-field: "CA-BUSINESS-DATE PIC 9(8)"
+      example: "2026-10-07"
+    XSterpRunAs:
+      name: "X-STERP-Run-As"
+      in: "header"
+      required: false
+      description: "SYSADM 'Continue as' user code (LoginService.SignOnAs). Honoured only when the authenticated user resolves to SYSADM; otherwise 403 API0003."
+      schema:
+        type: "string"
+        maxLength: 20
+        x-sterp-legacy-field: "CA-USER PIC X(20)"
+      example: "SALESREP"
+    IdempotencyKey:
+      name: "Idempotency-Key"
+      in: "header"
+      required: false
+      description: "Legacy correlation id (CA-CORRELATION-ID X(36)); default a new GUID per request (CobolGateway.cs:78). Send one stable key per user instruction where the legacy reused a correlation id (COM-015)."
+      schema:
+        type: "string"
+        maxLength: 36
+        x-sterp-legacy-field: "CA-CORRELATION-ID PIC X(36)"
+      example: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+    CstItemCode:
+      name: "itemCode"
+      in: "path"
+      required: true
+      description: "Item code (upper-cased by the page; COSTROLL and WHATIF also upper-case it)."
+      schema:
+        type: "string"
+        maxLength: 40
+        x-sterp-length: 40
+        x-sterp-legacy-field: "CR-ITEM-CODE / WI-ITEM-CODE / @ItemCode PIC X(40)"
+      example: "BAR-AL6082-25MM"
+    CstCostSet:
+      name: "costSet"
+      in: "path"
+      required: true
+      description: "Cost set code (STDCOST upper-cases it)."
+      schema:
+        type: "string"
+        maxLength: 20
+        x-sterp-length: 20
+        x-sterp-legacy-field: "SC-COST-SET PIC X(20)"
+      example: "FY2027STD"
+    CstJobRef:
+      name: "jobRef"
+      in: "path"
+      required: true
+      description: "Job reference (JOBCOST and WIPCALC upper-case it)."
+      schema:
+        type: "string"
+        maxLength: 20
+        x-sterp-length: 20
+        x-sterp-legacy-field: "JC-JOB-REF / WC-JOB-REF PIC X(20)"
+      example: "CST27000"
+  schemas:
+    Outcome:
+      type: "object"
+      description: "Legacy STCAHDR result (STERP-App/cobol/copy/STCAHDR.cpy:12-32; CobolResult.cs:6-26). returnCode 0 OK, 4 WARNING, 6 HOLD (HTTP 202). Failures (8, 12, 16) are returned as ProblemDetails."
+      required:
+        - "returnCode"
+        - "severity"
+        - "reasonCode"
+        - "message"
+        - "messageCount"
+        - "correlationId"
+      properties:
+        returnCode:
+          type: "integer"
+          enum:
+            - 0
+            - 4
+            - 6
+          x-sterp-legacy-field: "CA-RETURN-CODE PIC 9(2)"
+        severity:
+          type: "string"
+          enum:
+            - "OK"
+            - "WARNING"
+            - "HOLD"
+        reasonCode:
+          type: "string"
+          maxLength: 8
+          x-sterp-legacy-field: "CA-REASON-CODE PIC X(8)"
+        message:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "CA-MESSAGE PIC X(200)"
+        messageCount:
+          type: "integer"
+          x-sterp-legacy-field: "CA-MSG-COUNT PIC 9(2)"
+        documentRef:
+          type:
+            - "string"
+            - "null"
+          maxLength: 10
+          x-sterp-legacy-field: "CA-REQ-REF PIC X(10)"
+        correlationId:
+          type: "string"
+          maxLength: 36
+          x-sterp-legacy-field: "CA-CORRELATION-ID PIC X(36)"
+    ProblemDetails:
+      type: "object"
+      description: "RFC 9457 problem (contracts 4.6-4.7). type = https://sterp.local/problems/{business-rule|severe|not-found|validation|forbidden|unauthenticated|not-implemented}; detail = legacy message; reasonCode = legacy reason (or API#### for target-only conditions)."
+      required:
+        - "type"
+        - "title"
+        - "status"
+      properties:
+        type:
+          type: "string"
+          format: "uri"
+        title:
+          type: "string"
+        status:
+          type: "integer"
+        detail:
+          type:
+            - "string"
+            - "null"
+        instance:
+          type:
+            - "string"
+            - "null"
+        returnCode:
+          type:
+            - "integer"
+            - "null"
+          description: "legacy CA-RETURN-CODE (8, 12, 16 or other)"
+        reasonCode:
+          type:
+            - "string"
+            - "null"
+        severity:
+          type:
+            - "string"
+            - "null"
+          enum:
+            - "ERROR"
+            - "SEVERE"
+            - "NOT FOUND"
+            - "E"
+            - "W"
+            - "I"
+            - null
+        messageCount:
+          type:
+            - "integer"
+            - "null"
+        correlationId:
+          type:
+            - "string"
+            - "null"
+        traceId:
+          type:
+            - "string"
+            - "null"
+        errors:
+          type:
+            - "object"
+            - "null"
+          additionalProperties:
+            type: "array"
+            items:
+              type: "string"
+        data:
+          description: "Optional (contracts 4.7): for COBOL-backed operations whose legacy screen reads the COMMAREA after a refusal, the same data object the success envelope would carry."
+      example:
+        type: "https://sterp.local/problems/business-rule"
+        title: "Business rule refused the request"
+        status: 422
+        detail: "Period 202602 is hard closed."
+        returnCode: 8
+        reasonCode: "PER0003"
+        severity: "ERROR"
+        messageCount: 1
+        correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+        traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+    JobRunAccepted:
+      type: "object"
+      description: "Returned with HTTP 202 by every job submission (contracts 8.3). Poll /api/jobs/v1/runs/{jobRunId} on STERP.Jobs."
+      required:
+        - "jobRunId"
+        - "jobName"
+        - "status"
+      properties:
+        jobRunId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "core.JobRun.JobRunId bigint"
+        jobName:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "core.JobRun.JobName varchar(40)"
+        status:
+          type: "string"
+          enum:
+            - "RUNNING"
+            - "OK"
+            - "WARNING"
+            - "FAILED"
+            - "ABENDED"
+        startedAt:
+          type: "string"
+          format: "x-sterp-local-date-time"
+        links:
+          type: "object"
+          properties:
+            self:
+              type: "string"
+            sysout:
+              type: "string"
+            spool:
+              type: "string"
+            result:
+              type: "string"
+    ListEnvelope:
+      type: "object"
+      description: "Complete legacy result set in legacy order (contracts 4.10). Use allOf with an 'items' array of your row schema."
+      required:
+        - "items"
+        - "count"
+      properties:
+        items:
+          type: "array"
+          items: {}
+        count:
+          type: "integer"
+    CstItemCostBasisRow:
+      type: "object"
+      description: "One cst.ItemCost valuation pool with every held cost basis (cst.usp_CostEnquiry, db/procs/cst/01-cst-enquiry.sql:69-113)."
+      properties:
+        itemCode:
+          type: "string"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column ItemCode varchar(40)"
+        revision:
+          type: "string"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column Revision varchar(4)"
+        siteCode:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column SiteCode varchar(10)"
+        costMethod:
+          type: "string"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column CostMethod varchar(4)"
+          description: "MWA, FIFO or STD (CK_ItmC_M)"
+        qtyOnHand:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column QtyOnHand decimal(19,6)"
+        averageUnitCost:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column AverageUnitCost decimal(19,6)"
+        carryingValueGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column CarryingValueGBP decimal(18,2)"
+        allowanceGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column AllowanceGBP decimal(18,2)"
+        netCarryingGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column NetCarryingGBP decimal(19,2)"
+          description: "CarryingValueGBP - AllowanceGBP"
+        nrvUnitValue:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column NrvUnitValue decimal(19,6)"
+        standardUnitCost:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column StandardUnitCost decimal(19,6)"
+        lastPurchaseCost:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column LastPurchaseCost decimal(19,6)"
+        fifoOldestUnit:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column FifoOldestUnit decimal(19,6)"
+          description: "unit cost of the oldest open layer (ReceiptDate, LayerSeq)"
+        fifoLayers:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column FifoLayers int"
+          description: "count of open layers"
+        standardSet:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column StandardSet varchar(20)"
+          description: "latest ACTIVE cost set (EffectiveFrom DESC, CostSetCode)"
+        standardFromSet:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column StandardFromSet decimal(19,6)"
+        isImpaired:
+          type: "string"
+          x-sterp-length: 1
+          x-sterp-legacy-field: "cst.usp_CostEnquiry result column IsImpaired varchar(1)"
+          description: "Y when AllowanceGBP > 0, else N"
+    CstCostSetRow:
+      type: "object"
+      description: "One cost set of the worklist (cst.usp_CostSetList, db/procs/cst/02-cst-lists.sql:11-41)."
+      properties:
+        costSet:
+          type: "string"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "cst.usp_CostSetList result column CostSet varchar(20)"
+        name:
+          type: "string"
+          x-sterp-length: 80
+          x-sterp-legacy-field: "cst.usp_CostSetList result column Name varchar(80)"
+        purpose:
+          type: "string"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "cst.usp_CostSetList result column Purpose varchar(12)"
+        status:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "cst.usp_CostSetList result column Status varchar(10)"
+        currency:
+          type: "string"
+          x-sterp-length: 3
+          x-sterp-legacy-field: "cst.usp_CostSetList result column Currency char(3)"
+        fiscalYear:
+          type:
+            - "integer"
+            - "null"
+          format: "int32"
+          x-sterp-legacy-field: "cst.usp_CostSetList result column FiscalYear smallint"
+        effectiveFrom:
+          type: "string"
+          format: "date"
+          x-sterp-legacy-field: "cst.usp_CostSetList result column EffectiveFrom date"
+        comparedTo:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "cst.usp_CostSetList result column ComparedTo varchar(20)"
+        preparedBy:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "cst.usp_CostSetList result column PreparedBy varchar(20)"
+        approvedBy:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "cst.usp_CostSetList result column ApprovedBy varchar(20)"
+        approvedAt:
+          type:
+            - "string"
+            - "null"
+          format: "x-sterp-local-date-time"
+          x-sterp-legacy-field: "cst.usp_CostSetList result column ApprovedAt datetime2(3)"
+        activatedAt:
+          type:
+            - "string"
+            - "null"
+          format: "x-sterp-local-date-time"
+          x-sterp-legacy-field: "cst.usp_CostSetList result column ActivatedAt datetime2(3)"
+        items:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "cst.usp_CostSetList result column Items int"
+          description: "count of cst.StandardCost rows of the set"
+        selfApproved:
+          type: "string"
+          x-sterp-length: 3
+          x-sterp-legacy-field: "cst.usp_CostSetList result column SelfApproved varchar(3)"
+          description: "YES when ApprovedBy equals PreparedBy, else empty"
+    CstCostJobRow:
+      type: "object"
+      description: "One job or sub-job of the worklist (cst.usp_JobList over cst.vw_JobSummary, db/procs/cst/02-cst-lists.sql:46-74)."
+      properties:
+        job:
+          type: "string"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "cst.usp_JobList result column Job varchar(20)"
+        parent:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "cst.usp_JobList result column Parent varchar(20)"
+        level:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "cst.usp_JobList result column Level tinyint"
+        description:
+          type: "string"
+          x-sterp-length: 150
+          x-sterp-legacy-field: "cst.usp_JobList result column Description varchar(150)"
+        customer:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "cst.usp_JobList result column Customer varchar(20)"
+        operational:
+          type: "string"
+          x-sterp-length: 14
+          x-sterp-legacy-field: "cst.usp_JobList result column Operational varchar(14)"
+        financial:
+          type: "string"
+          x-sterp-length: 14
+          x-sterp-legacy-field: "cst.usp_JobList result column Financial varchar(14)"
+        budget:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_JobList result column Budget decimal(18,2)"
+          description: "latest APPROVED budget version"
+        actual:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_JobList result column Actual decimal(18,2)"
+          description: "ACTUAL transactions except REVENUE, no approval filter"
+        committed:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_JobList result column Committed decimal(18,2)"
+        variance:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_JobList result column Variance decimal(18,2)"
+          description: "Budget - Actual - Committed"
+        wip:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "cst.usp_JobList result column Wip decimal(18,2)"
+          description: "closing value of the latest cst.WipBalance row, 0 when none"
+    CstItemCostBasisList:
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/CstItemCostBasisRow"
+      description: "Complete legacy result set in procedure order (contracts 4.10)."
+    CstCostSetList:
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/CstCostSetRow"
+      description: "Complete legacy result set in procedure order (contracts 4.10)."
+    CstCostJobList:
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/CstCostJobRow"
+      description: "Complete legacy result set in procedure order (contracts 4.10)."
+    CstCostSetActionResult:
+      type: "object"
+      properties:
+        costSet:
+          x-sterp-legacy-field: "SC-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        compareSet:
+          x-sterp-legacy-field: "SC-COMPARE-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        status:
+          x-sterp-legacy-field: "SC-STATUS PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        purpose:
+          x-sterp-legacy-field: "SC-PURPOSE PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        preparedBy:
+          x-sterp-legacy-field: "SC-PREPARED-BY PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        approvedBy:
+          x-sterp-legacy-field: "SC-APPROVED-BY PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+          description: "after a successful REVIEW or APPROVE write: the acting user (BR-STDCOST-020); after ACTIVATE or IMPACT: the stored approver (blank when none)"
+        itemCount:
+          x-sterp-legacy-field: "SC-ITEM-COUNT PIC S9(9)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        revalQty:
+          x-sterp-legacy-field: "SC-REVAL-QTY PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        revalGbp:
+          x-sterp-legacy-field: "SC-REVAL-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          description: "SUM(QtyOnHand x (TotalUnitCost - ISNULL(StandardUnitCost, AverageUnitCost))) truncated to 2 dp"
+        adverse:
+          x-sterp-legacy-field: "SC-ADVERSE PIC X"
+          type: "string"
+          x-sterp-length: 1
+          description: "Y when revalGbp < 0"
+        completeness:
+          x-sterp-legacy-field: "SC-COMPLETENESS PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        warning:
+          x-sterp-legacy-field: "SC-WARNING PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+          description: "IMPACT only: No stock has been revalued - this is a preview"
+      description: "STDCOST COMMAREA outputs after REVIEW, APPROVE, ACTIVATE or IMPACT (cobol/online/cst/STDCOST.cob:286-457)."
+    CstCompareRequest:
+      type: "object"
+      properties:
+        compareTo:
+          x-sterp-legacy-field: "SC-COMPARE-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+          description: "comparison cost set; blank uses the set's ComparedToSetCode (STDCOST does not upper-case it)"
+    CstCostSetComparison:
+      type: "object"
+      properties:
+        costSet:
+          x-sterp-legacy-field: "SC-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        compareSet:
+          x-sterp-legacy-field: "SC-COMPARE-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        status:
+          x-sterp-legacy-field: "SC-STATUS PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        purpose:
+          x-sterp-legacy-field: "SC-PURPOSE PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        preparedBy:
+          x-sterp-legacy-field: "SC-PREPARED-BY PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        approvedBy:
+          x-sterp-legacy-field: "SC-APPROVED-BY PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        itemCount:
+          x-sterp-legacy-field: "SC-ITEM-COUNT PIC S9(9)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+          description: "all joined rows, not only the window"
+        revalGbp:
+          x-sterp-legacy-field: "SC-REVAL-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          description: "sum of the window lines only"
+        lineCnt:
+          x-sterp-legacy-field: "SC-LINE-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        moreLines:
+          x-sterp-legacy-field: "SC-MORE-LINES PIC X"
+          type: "string"
+          x-sterp-length: 1
+        lines:
+          type: "array"
+          items:
+            type: "object"
+            x-sterp-legacy-field: "SC-LINES (group)"
+            properties:
+              item:
+                x-sterp-legacy-field: "SC-L-ITEM PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+              revision:
+                x-sterp-legacy-field: "SC-L-REV PIC X(4)"
+                type: "string"
+                x-sterp-length: 4
+              oldCost:
+                x-sterp-legacy-field: "SC-L-OLD-COST PIC S9(11)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 17
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              newCost:
+                x-sterp-legacy-field: "SC-L-NEW-COST PIC S9(11)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 17
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              difference:
+                x-sterp-legacy-field: "SC-L-DIFF PIC S9(11)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 17
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              differencePct:
+                x-sterp-legacy-field: "SC-L-PCT PIC S9(5)V9(4)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 9
+                x-sterp-scale: 4
+                x-sterp-signed: true
+              qtyHeld:
+                x-sterp-legacy-field: "SC-L-QTY-HELD PIC S9(13)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              revaluation:
+                x-sterp-legacy-field: "SC-L-REVAL PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              note:
+                x-sterp-legacy-field: "SC-L-NOTE PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+          x-sterp-legacy-field: "SC-LINES OCCURS 20"
+          maxItems: 20
+      description: "First 20-line comparison window of STDCOST COMPARE (cobol/online/cst/STDCOST.cob:538-626)."
+    CstRollupRequest:
+      type: "object"
+      properties:
+        revision:
+          x-sterp-legacy-field: "CR-REVISION PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        costSet:
+          x-sterp-legacy-field: "CR-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+          description: "cost set to price against, sent as supplied"
+        lotSize:
+          x-sterp-legacy-field: "CR-LOT-SIZE PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          description: "good output to cost for; 0 is treated as 1, negative is refused CST0602"
+        boundary:
+          x-sterp-legacy-field: "CR-BOUNDARY PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+          description: "EXPAND or STOP (upper-cased by COSTROLL); blank defaults to EXPAND; any other value is refused CST0606 (no schema enum, contracts 4.2/4.4)"
+    CstRollupResult:
+      type: "object"
+      properties:
+        itemCode:
+          x-sterp-legacy-field: "CR-ITEM-CODE PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        revision:
+          x-sterp-legacy-field: "CR-REVISION PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        costSet:
+          x-sterp-legacy-field: "CR-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        lotSize:
+          x-sterp-legacy-field: "CR-LOT-SIZE PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        boundary:
+          x-sterp-legacy-field: "CR-BOUNDARY PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        grossStarts:
+          x-sterp-legacy-field: "CR-GROSS-STARTS PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        goodOutput:
+          x-sterp-legacy-field: "CR-GOOD-OUTPUT PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        materialCost:
+          x-sterp-legacy-field: "CR-MATERIAL-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        labourCost:
+          x-sterp-legacy-field: "CR-LABOUR-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        machineCost:
+          x-sterp-legacy-field: "CR-MACHINE-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        setupCost:
+          x-sterp-legacy-field: "CR-SETUP-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        subconCost:
+          x-sterp-legacy-field: "CR-SUBCON-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        overheadCost:
+          x-sterp-legacy-field: "CR-OVERHEAD-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        otherCost:
+          x-sterp-legacy-field: "CR-OTHER-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        recoveryCredit:
+          x-sterp-legacy-field: "CR-RECOVERY-CREDIT PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        totalCost:
+          x-sterp-legacy-field: "CR-TOTAL-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        unitCost:
+          x-sterp-legacy-field: "CR-UNIT-COST PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        branchValue:
+          x-sterp-legacy-field: "CR-BRANCH-VALUE PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        occCount:
+          x-sterp-legacy-field: "CR-OCC-COUNT PIC S9(9)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        missingCount:
+          x-sterp-legacy-field: "CR-MISSING-COUNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        completeness:
+          x-sterp-legacy-field: "CR-COMPLETENESS PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        errorPath:
+          x-sterp-legacy-field: "CR-ERROR-PATH PIC X(200)"
+          type: "string"
+          x-sterp-length: 200
+        warning:
+          x-sterp-legacy-field: "CR-WARNING PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+        moreLines:
+          x-sterp-legacy-field: "CR-MORE-LINES PIC X"
+          type: "string"
+          x-sterp-length: 1
+        lines:
+          type: "array"
+          items:
+            type: "object"
+            x-sterp-legacy-field: "CR-LINES (group)"
+            properties:
+              seq:
+                x-sterp-legacy-field: "CR-L-SEQ PIC S9(9)"
+                type: "integer"
+                format: "int32"
+                x-sterp-digits: 9
+                x-sterp-signed: true
+              depth:
+                x-sterp-legacy-field: "CR-L-DEPTH PIC S9(4)"
+                type: "integer"
+                format: "int32"
+                x-sterp-digits: 4
+                x-sterp-signed: true
+              item:
+                x-sterp-legacy-field: "CR-L-ITEM PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+              revision:
+                x-sterp-legacy-field: "CR-L-REV PIC X(4)"
+                type: "string"
+                x-sterp-length: 4
+              description:
+                x-sterp-legacy-field: "CR-L-DESC PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+              element:
+                x-sterp-legacy-field: "CR-L-ELEMENT PIC X(10)"
+                type: "string"
+                x-sterp-length: 10
+              source:
+                x-sterp-legacy-field: "CR-L-SOURCE PIC X(12)"
+                type: "string"
+                x-sterp-length: 12
+              boundary:
+                x-sterp-legacy-field: "CR-L-BOUNDARY PIC X(8)"
+                type: "string"
+                x-sterp-length: 8
+              requiredQty:
+                x-sterp-legacy-field: "CR-L-REQ-QTY PIC S9(13)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              unitCost:
+                x-sterp-legacy-field: "CR-L-UNIT-COST PIC S9(11)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 17
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              extendedCost:
+                x-sterp-legacy-field: "CR-L-EXT-COST PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              contributes:
+                x-sterp-legacy-field: "CR-L-CONTRIB PIC X"
+                type: "string"
+                x-sterp-length: 1
+              warning:
+                x-sterp-legacy-field: "CR-L-WARNING PIC X(60)"
+                type: "string"
+                x-sterp-length: 60
+          x-sterp-legacy-field: "CR-LINES OCCURS 20"
+          maxItems: 500
+          description: "Windows of CR-LINES copied by the facade loop: at most 25 windows of 20 lines (CostingService.vb:228-241); empty when ROLLUP returned RC > 4."
+      description: "COSTROLL COMMAREA after the last engine call of the facade paging (zero totals and COMPLETE after any GETLINE - F-COSTROLL-01) and the copied tree lines."
+    CstWhatIfRequest:
+      type: "object"
+      properties:
+        revision:
+          x-sterp-legacy-field: "WI-REVISION PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        costSet:
+          x-sterp-legacy-field: "WI-BASE-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        lotSize:
+          x-sterp-legacy-field: "WI-BASE-LOT-SIZE PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        targetPrice:
+          x-sterp-legacy-field: "WI-TARGET-PRICE PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          description: "> 0 runs MARGINWI, otherwise SCENARIO"
+        materialFactor:
+          x-sterp-legacy-field: "WI-V-MAT-FACTOR PIC S9(5)V9(4)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 9
+          x-sterp-scale: 4
+          x-sterp-signed: true
+          default: 1
+          description: "material factor of variant 1 (variant 2 uses x 0.95); the legacy screen sends 1"
+        rateFactor:
+          x-sterp-legacy-field: "WI-V-RATE-FACTR PIC S9(5)V9(4)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 9
+          x-sterp-scale: 4
+          x-sterp-signed: true
+          default: 1
+          description: "rate factor of variants 1 and 2 (variant 3 uses x 1.1); the legacy screen sends 1"
+    CstWhatIfResult:
+      type: "object"
+      properties:
+        itemCode:
+          x-sterp-legacy-field: "WI-ITEM-CODE PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        revision:
+          x-sterp-legacy-field: "WI-REVISION PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        scenarioRef:
+          x-sterp-legacy-field: "WI-SCENARIO-REF PIC X(30)"
+          type: "string"
+          x-sterp-length: 30
+        effDate:
+          x-sterp-legacy-field: "WI-EFF-DATE PIC 9(8)"
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        baseCostSet:
+          x-sterp-legacy-field: "WI-BASE-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        baseLotSize:
+          x-sterp-legacy-field: "WI-BASE-LOT-SIZE PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        targetPrice:
+          x-sterp-legacy-field: "WI-TARGET-PRICE PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        sideEffects:
+          x-sterp-legacy-field: "WI-SIDE-EFFECTS PIC X"
+          type: "string"
+          x-sterp-length: 1
+          description: "always N"
+        baseTotal:
+          x-sterp-legacy-field: "WI-BASE-TOTAL PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        baseUnit:
+          x-sterp-legacy-field: "WI-BASE-UNIT PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        baseComplete:
+          x-sterp-legacy-field: "WI-BASE-COMPLETE PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        variantCnt:
+          x-sterp-legacy-field: "WI-VARIANT-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        bestVariant:
+          x-sterp-legacy-field: "WI-BEST-VARIANT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+          description: "MARGINWI only; 0 when no COMPLETE variant"
+        warning:
+          x-sterp-legacy-field: "WI-WARNING PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+        variants:
+          type: "array"
+          items:
+            type: "object"
+            x-sterp-legacy-field: "WI-VARIANTS (group)"
+            properties:
+              label:
+                x-sterp-legacy-field: "WI-V-LABEL PIC X(30)"
+                type: "string"
+                x-sterp-length: 30
+              costSet:
+                x-sterp-legacy-field: "WI-V-COST-SET PIC X(20)"
+                type: "string"
+                x-sterp-length: 20
+              lotSize:
+                x-sterp-legacy-field: "WI-V-LOT-SIZE PIC S9(13)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              material:
+                x-sterp-legacy-field: "WI-V-MATERIAL PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              conversion:
+                x-sterp-legacy-field: "WI-V-CONVERSION PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              overhead:
+                x-sterp-legacy-field: "WI-V-OVERHEAD PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              total:
+                x-sterp-legacy-field: "WI-V-TOTAL PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              unit:
+                x-sterp-legacy-field: "WI-V-UNIT PIC S9(11)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 17
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              difference:
+                x-sterp-legacy-field: "WI-V-DIFF PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              differencePct:
+                x-sterp-legacy-field: "WI-V-DIFF-PCT PIC S9(7)V9(4)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 11
+                x-sterp-scale: 4
+                x-sterp-signed: true
+              marginPct:
+                x-sterp-legacy-field: "WI-V-MARGIN-PCT PIC S9(7)V9(4)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 11
+                x-sterp-scale: 4
+                x-sterp-signed: true
+              completeness:
+                x-sterp-legacy-field: "WI-V-COMPLETE PIC X(12)"
+                type: "string"
+                x-sterp-length: 12
+              warning:
+                x-sterp-legacy-field: "WI-V-WARNING PIC X(60)"
+                type: "string"
+                x-sterp-length: 60
+          x-sterp-legacy-field: "WI-VARIANTS OCCURS 6"
+          maxItems: 6
+          description: "The variants the facade copies (WI-VARIANT-CNT = 3)."
+      description: "WHATIF COMMAREA outputs (cobol/online/cst/WHATIF.cob:137-366)."
+    CstJobCostRequest:
+      type: "object"
+      properties:
+        includeSubJobs:
+          x-sterp-legacy-field: "JC-INCLUDE-SUBJOBS PIC X"
+          type: "string"
+          x-sterp-length: 1
+          default: "Y"
+          description: "Y includes direct sub-jobs in the totals (page INCLUDED); any other value (the page sends N for THIS JOB ONLY) counts this job only"
+    CstJobCostEnquiry:
+      type: "object"
+      properties:
+        jobRef:
+          x-sterp-legacy-field: "JC-JOB-REF PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        parentJob:
+          x-sterp-legacy-field: "JC-PARENT-JOB PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        jobLevel:
+          x-sterp-legacy-field: "JC-JOB-LEVEL PIC 9(1)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 1
+          x-sterp-signed: false
+        description:
+          x-sterp-legacy-field: "JC-DESCRIPTION PIC X(150)"
+          type: "string"
+          x-sterp-length: 150
+        operStatus:
+          x-sterp-legacy-field: "JC-OPER-STATUS PIC X(14)"
+          type: "string"
+          x-sterp-length: 14
+        finStatus:
+          x-sterp-legacy-field: "JC-FIN-STATUS PIC X(14)"
+          type: "string"
+          x-sterp-length: 14
+        originalBudget:
+          x-sterp-legacy-field: "JC-ORIGINAL-BUDGET PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        approvedBudget:
+          x-sterp-legacy-field: "JC-APPROVED-BUDGET PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        actualGbp:
+          x-sterp-legacy-field: "JC-ACTUAL-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        accruedGbp:
+          x-sterp-legacy-field: "JC-ACCRUED-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        committedGbp:
+          x-sterp-legacy-field: "JC-COMMITTED-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        etcGbp:
+          x-sterp-legacy-field: "JC-ETC-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          description: "sum of ESTIMATE transactions (the request carries none)"
+        revenueGbp:
+          x-sterp-legacy-field: "JC-REVENUE-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        wipGbp:
+          x-sterp-legacy-field: "JC-WIP-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          description: "not computed by ENQUIRE/FORECAST; always 0.00 (legacy)"
+        subjobCount:
+          x-sterp-legacy-field: "JC-SUBJOB-COUNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        txnCount:
+          x-sterp-legacy-field: "JC-TXN-COUNT PIC S9(9)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        disposition:
+          x-sterp-legacy-field: "JC-DISPOSITION PIC X(60)"
+          type: "string"
+          x-sterp-length: 60
+        warning:
+          x-sterp-legacy-field: "JC-WARNING PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+        budgetTotal:
+          x-sterp-legacy-field: "JC-BUDGET-TOTAL PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        lineCnt:
+          x-sterp-legacy-field: "JC-LINE-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        moreLines:
+          x-sterp-legacy-field: "JC-MORE-LINES PIC X"
+          type: "string"
+          x-sterp-length: 1
+        lines:
+          type: "array"
+          items:
+            type: "object"
+            x-sterp-legacy-field: "JC-LINES (group)"
+            properties:
+              key:
+                x-sterp-legacy-field: "JC-L-KEY PIC X(20)"
+                type: "string"
+                x-sterp-length: 20
+              description:
+                x-sterp-legacy-field: "JC-L-DESC PIC X(60)"
+                type: "string"
+                x-sterp-length: 60
+              element:
+                x-sterp-legacy-field: "JC-L-ELEMENT PIC X(10)"
+                type: "string"
+                x-sterp-length: 10
+              budget:
+                x-sterp-legacy-field: "JC-L-BUDGET PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              actual:
+                x-sterp-legacy-field: "JC-L-ACTUAL PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              committed:
+                x-sterp-legacy-field: "JC-L-COMMITTED PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              etc:
+                x-sterp-legacy-field: "JC-L-ETC PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              eac:
+                x-sterp-legacy-field: "JC-L-EAC PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              variance:
+                x-sterp-legacy-field: "JC-L-VARIANCE PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              adverse:
+                x-sterp-legacy-field: "JC-L-ADVERSE PIC X"
+                type: "string"
+                x-sterp-length: 1
+          x-sterp-legacy-field: "JC-LINES OCCURS 20"
+          maxItems: 20
+          description: "The job's own approved transactions by element code (sub-jobs never included); line budget always 0."
+      description: "JOBCOST ENQUIRE outputs (cobol/online/cst/JOBCOST.cob:571-756)."
+    CstJobForecast:
+      type: "object"
+      properties:
+        jobRef:
+          x-sterp-legacy-field: "JC-JOB-REF PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        parentJob:
+          x-sterp-legacy-field: "JC-PARENT-JOB PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        jobLevel:
+          x-sterp-legacy-field: "JC-JOB-LEVEL PIC 9(1)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 1
+          x-sterp-signed: false
+        description:
+          x-sterp-legacy-field: "JC-DESCRIPTION PIC X(150)"
+          type: "string"
+          x-sterp-length: 150
+        operStatus:
+          x-sterp-legacy-field: "JC-OPER-STATUS PIC X(14)"
+          type: "string"
+          x-sterp-length: 14
+        finStatus:
+          x-sterp-legacy-field: "JC-FIN-STATUS PIC X(14)"
+          type: "string"
+          x-sterp-length: 14
+        originalBudget:
+          x-sterp-legacy-field: "JC-ORIGINAL-BUDGET PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        approvedBudget:
+          x-sterp-legacy-field: "JC-APPROVED-BUDGET PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        actualGbp:
+          x-sterp-legacy-field: "JC-ACTUAL-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        accruedGbp:
+          x-sterp-legacy-field: "JC-ACCRUED-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        committedGbp:
+          x-sterp-legacy-field: "JC-COMMITTED-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        etcGbp:
+          x-sterp-legacy-field: "JC-ETC-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          description: "sum of ESTIMATE transactions (the request carries none)"
+        revenueGbp:
+          x-sterp-legacy-field: "JC-REVENUE-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        wipGbp:
+          x-sterp-legacy-field: "JC-WIP-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          description: "not computed by ENQUIRE/FORECAST; always 0.00 (legacy)"
+        subjobCount:
+          x-sterp-legacy-field: "JC-SUBJOB-COUNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        txnCount:
+          x-sterp-legacy-field: "JC-TXN-COUNT PIC S9(9)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        disposition:
+          x-sterp-legacy-field: "JC-DISPOSITION PIC X(60)"
+          type: "string"
+          x-sterp-length: 60
+        warning:
+          x-sterp-legacy-field: "JC-WARNING PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+        eacGbp:
+          x-sterp-legacy-field: "JC-EAC-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        fcstVarGbp:
+          x-sterp-legacy-field: "JC-FCST-VAR-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        fcstAdverse:
+          x-sterp-legacy-field: "JC-FCST-ADVERSE PIC X"
+          type: "string"
+          x-sterp-length: 1
+          description: "Y when the forecast variance > 0"
+      description: "JOBCOST FORECAST outputs (cobol/online/cst/JOBCOST.cob:758-786); element lines are not returned."
+    CstWipCalcRequest:
+      type: "object"
+      properties:
+        fiscalYear:
+          x-sterp-legacy-field: "WC-FISCAL-YEAR PIC 9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: false
+          description: "default: the fin.Period containing the business date (LoginService.vb:161-180)"
+        periodNo:
+          x-sterp-legacy-field: "WC-PERIOD-NO PIC 9(2)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 2
+          x-sterp-signed: false
+          description: "default: the session period; 0 is refused CST0903"
+        includeSubJobs:
+          x-sterp-legacy-field: "WC-INCLUDE-SUBJOBS PIC X"
+          type: "string"
+          x-sterp-length: 1
+          default: "Y"
+          description: "sent as the legacy facade does (Y or N); ignored by WIPCALC (SME-818)"
+    CstWipRollForward:
+      type: "object"
+      properties:
+        jobRef:
+          x-sterp-legacy-field: "WC-JOB-REF PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        fiscalYear:
+          x-sterp-legacy-field: "WC-FISCAL-YEAR PIC 9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: false
+        periodNo:
+          x-sterp-legacy-field: "WC-PERIOD-NO PIC 9(2)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 2
+          x-sterp-signed: false
+        openingGbp:
+          x-sterp-legacy-field: "WC-OPENING-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        matIssuesGbp:
+          x-sterp-legacy-field: "WC-MAT-ISSUES-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        matReturnsGbp:
+          x-sterp-legacy-field: "WC-MAT-RETURNS-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        labourGbp:
+          x-sterp-legacy-field: "WC-LABOUR-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        machineGbp:
+          x-sterp-legacy-field: "WC-MACHINE-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        overheadGbp:
+          x-sterp-legacy-field: "WC-OVERHEAD-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        subconGbp:
+          x-sterp-legacy-field: "WC-SUBCON-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        adjustmentGbp:
+          x-sterp-legacy-field: "WC-ADJUSTMENT-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        transfersGbp:
+          x-sterp-legacy-field: "WC-TRANSFERS-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        scrapGbp:
+          x-sterp-legacy-field: "WC-SCRAP-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        writeoffGbp:
+          x-sterp-legacy-field: "WC-WRITEOFF-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        additionsGbp:
+          x-sterp-legacy-field: "WC-ADDITIONS-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        deductionsGbp:
+          x-sterp-legacy-field: "WC-DEDUCTIONS-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        closingGbp:
+          x-sterp-legacy-field: "WC-CLOSING-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        residualGbp:
+          x-sterp-legacy-field: "WC-RESIDUAL-GBP PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        hasResidual:
+          x-sterp-legacy-field: "WC-HAS-RESIDUAL PIC X"
+          type: "string"
+          x-sterp-length: 1
+        txnCount:
+          x-sterp-legacy-field: "WC-TXN-COUNT PIC S9(9)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        balanced:
+          x-sterp-legacy-field: "WC-BALANCED PIC X"
+          type: "string"
+          x-sterp-length: 1
+          description: "always Y (SME-822)"
+        warning:
+          x-sterp-legacy-field: "WC-WARNING PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+      description: "WIPCALC CALC roll-forward (cobol/online/cst/WIPCALC.cob:147-300)."
+    CstCostSetActionEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      description: "Outcome envelope (contracts 4.6) with the CstCostSetActionResult payload."
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/CstCostSetActionResult"
+    CstCostSetComparisonEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      description: "Outcome envelope (contracts 4.6) with the CstCostSetComparison payload."
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/CstCostSetComparison"
+    CstRollupEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      description: "Outcome envelope (contracts 4.6) with the CstRollupResult payload."
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/CstRollupResult"
+    CstWhatIfEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      description: "Outcome envelope (contracts 4.6) with the CstWhatIfResult payload."
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/CstWhatIfResult"
+    CstJobCostEnquiryEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      description: "Outcome envelope (contracts 4.6) with the CstJobCostEnquiry payload."
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/CstJobCostEnquiry"
+    CstJobForecastEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      description: "Outcome envelope (contracts 4.6) with the CstJobForecast payload."
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/CstJobForecast"
+    CstWipRollForwardEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      description: "Outcome envelope (contracts 4.6) with the CstWipRollForward payload."
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/CstWipRollForward"
+    CstCstinvalParameters:
+      type: "object"
+      description: "Parameters of CSTINVAL (catalogue CSTRP010 ParamSpec CO,ASAT,SITE,GROUP,METHOD,DETAIL,MODE,USER). Values are the legacy KEY=VALUE strings (contracts 8.2); USER defaults to the caller."
+      additionalProperties: false
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CSTINVAL argument CO -> WS-CO PIC X(10) (STERP-App/cobol/batch/cst/CSTINVAL.cob:54)"
+          description: "company code; absent -> the program default STC (SME-023); must be in the caller's access list"
+          maxLength: 10
+          x-sterp-length: 10
+        ASAT:
+          type: "string"
+          x-sterp-legacy-field: "CSTINVAL argument ASAT -> WS-ASAT PIC 9(8) (STERP-App/cobol/batch/cst/CSTINVAL.cob:61)"
+          description: "as-at date yyyymmdd; absent -> machine date"
+          pattern: "^[0-9]{8}$"
+        SITE:
+          type: "string"
+          x-sterp-legacy-field: "CSTINVAL argument SITE -> WS-SITE PIC X(10) (STERP-App/cobol/batch/cst/CSTINVAL.cob:55)"
+          description: "optional site filter"
+          maxLength: 10
+          x-sterp-length: 10
+        GROUP:
+          type: "string"
+          x-sterp-legacy-field: "CSTINVAL argument GROUP -> WS-GROUP PIC X(20) (STERP-App/cobol/batch/cst/CSTINVAL.cob:56)"
+          description: "optional valuation group filter"
+          maxLength: 20
+          x-sterp-length: 20
+        METHOD:
+          type: "string"
+          x-sterp-legacy-field: "CSTINVAL argument METHOD -> WS-METHOD PIC X(4) (STERP-App/cobol/batch/cst/CSTINVAL.cob:57)"
+          description: "optional MWA, FIFO or STD filter"
+          maxLength: 4
+          x-sterp-length: 4
+        DETAIL:
+          type: "string"
+          x-sterp-legacy-field: "CSTINVAL argument DETAIL -> WS-DETAIL PIC X(10) (STERP-App/cobol/batch/cst/CSTINVAL.cob:58)"
+          description: "SUMMARY (default) or LAYER (open FIFO layers)"
+          maxLength: 10
+          x-sterp-length: 10
+        MODE:
+          type: "string"
+          x-sterp-legacy-field: "CSTINVAL argument MODE -> WS-MODE PIC X(10) (STERP-App/cobol/batch/cst/CSTINVAL.cob:59)"
+          description: "ALL (default) or EXCEPTION; any other value (PREVIEW, COMMIT) behaves as ALL (SME-858)"
+          maxLength: 10
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          x-sterp-legacy-field: "CSTINVAL argument USER -> WS-USER PIC X(20) (STERP-App/cobol/batch/cst/CSTINVAL.cob:60)"
+          description: "STERP user recorded in the run; defaults to the caller"
+          maxLength: 20
+          x-sterp-length: 20
+    CstCstjobprParameters:
+      type: "object"
+      description: "Parameters of CSTJOBPR (catalogue CSTRP020 ParamSpec CO,PERIOD,JOB,STATUS,CUSTOMER,MODE,USER). Values are the legacy KEY=VALUE strings (contracts 8.2); USER defaults to the caller."
+      additionalProperties: false
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CSTJOBPR argument CO -> WS-CO PIC X(10) (STERP-App/cobol/batch/cst/CSTJOBPR.cob:53)"
+          description: "company code; absent -> the program default STC (SME-023); must be in the caller's access list"
+          maxLength: 10
+          x-sterp-length: 10
+        PERIOD:
+          type: "string"
+          x-sterp-legacy-field: "CSTJOBPR argument PERIOD -> WS-PERIOD PIC X(8) (STERP-App/cobol/batch/cst/CSTJOBPR.cob:59)"
+          description: "yyyynn; printed in the heading only (SME-823)"
+          maxLength: 8
+          x-sterp-length: 8
+        JOB:
+          type: "string"
+          x-sterp-legacy-field: "CSTJOBPR argument JOB -> WS-JOB PIC X(20) (STERP-App/cobol/batch/cst/CSTJOBPR.cob:54)"
+          description: "optional job (with its sub-jobs)"
+          maxLength: 20
+          x-sterp-length: 20
+        STATUS:
+          type: "string"
+          x-sterp-legacy-field: "CSTJOBPR argument STATUS -> WS-STATUS PIC X(12) (STERP-App/cobol/batch/cst/CSTJOBPR.cob:55)"
+          description: "optional operational status filter"
+          maxLength: 12
+          x-sterp-length: 12
+        CUSTOMER:
+          type: "string"
+          x-sterp-legacy-field: "CSTJOBPR argument CUSTOMER -> WS-CUST PIC X(20) (STERP-App/cobol/batch/cst/CSTJOBPR.cob:56)"
+          description: "optional customer filter (compared on 12 characters)"
+          maxLength: 20
+          x-sterp-length: 20
+        MODE:
+          type: "string"
+          x-sterp-legacy-field: "CSTJOBPR argument MODE -> WS-MODE PIC X(12) (STERP-App/cobol/batch/cst/CSTJOBPR.cob:57)"
+          description: "ALL (default) or OVERSPEND"
+          maxLength: 12
+          x-sterp-length: 12
+        USER:
+          type: "string"
+          x-sterp-legacy-field: "CSTJOBPR argument USER -> WS-USER PIC X(20) (STERP-App/cobol/batch/cst/CSTJOBPR.cob:58)"
+          description: "STERP user recorded in the run; defaults to the caller"
+          maxLength: 20
+          x-sterp-length: 20
+    CstCstvarrpParameters:
+      type: "object"
+      description: "Parameters of CSTVARRP (catalogue CSTRP030 ParamSpec CO,PERIOD,TYPE,JOB,ITEM,MODE,USER). Values are the legacy KEY=VALUE strings (contracts 8.2); USER defaults to the caller."
+      additionalProperties: false
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CSTVARRP argument CO -> WS-CO PIC X(10) (STERP-App/cobol/batch/cst/CSTVARRP.cob:52)"
+          description: "company code; absent -> the program default STC (SME-023); must be in the caller's access list"
+          maxLength: 10
+          x-sterp-length: 10
+        PERIOD:
+          type: "string"
+          x-sterp-legacy-field: "CSTVARRP argument PERIOD -> WS-PERIOD PIC X(8) (STERP-App/cobol/batch/cst/CSTVARRP.cob:58)"
+          description: "yyyynn split by position; blank = all periods (SME-758)"
+          maxLength: 8
+          x-sterp-length: 8
+        TYPE:
+          type: "string"
+          x-sterp-legacy-field: "CSTVARRP argument TYPE -> WS-TYPE PIC X(16) (STERP-App/cobol/batch/cst/CSTVARRP.cob:53)"
+          description: "optional variance type"
+          maxLength: 16
+          x-sterp-length: 16
+        JOB:
+          type: "string"
+          x-sterp-legacy-field: "CSTVARRP argument JOB -> WS-JOB PIC X(20) (STERP-App/cobol/batch/cst/CSTVARRP.cob:54)"
+          description: "optional job"
+          maxLength: 20
+          x-sterp-length: 20
+        ITEM:
+          type: "string"
+          x-sterp-legacy-field: "CSTVARRP argument ITEM -> WS-ITEM PIC X(40) (STERP-App/cobol/batch/cst/CSTVARRP.cob:55)"
+          description: "optional item"
+          maxLength: 40
+          x-sterp-length: 40
+        MODE:
+          type: "string"
+          x-sterp-legacy-field: "CSTVARRP argument MODE -> WS-MODE PIC X(12) (STERP-App/cobol/batch/cst/CSTVARRP.cob:56)"
+          description: "ALL (default) or UNDISPOSED"
+          maxLength: 12
+          x-sterp-length: 12
+        USER:
+          type: "string"
+          x-sterp-legacy-field: "CSTVARRP argument USER -> WS-USER PIC X(20) (STERP-App/cobol/batch/cst/CSTVARRP.cob:57)"
+          description: "STERP user recorded in the run; defaults to the caller"
+          maxLength: 20
+          x-sterp-length: 20
+    CstCstsetcmParameters:
+      type: "object"
+      description: "Parameters of CSTSETCM (catalogue CSTRP040 ParamSpec CO,COSTSET,COMPARETO,THRESHOLD,MODE,USER). Values are the legacy KEY=VALUE strings (contracts 8.2); USER defaults to the caller."
+      additionalProperties: false
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CSTSETCM argument CO -> WS-CO PIC X(10) (STERP-App/cobol/batch/cst/CSTSETCM.cob:55)"
+          description: "company code; absent -> the program default STC (SME-023); must be in the caller's access list"
+          maxLength: 10
+          x-sterp-length: 10
+        COSTSET:
+          type: "string"
+          x-sterp-legacy-field: "CSTSETCM argument COSTSET -> WS-SET PIC X(20) (STERP-App/cobol/batch/cst/CSTSETCM.cob:56)"
+          description: "proposed cost set; absent -> RC 12 STERP-E-0151"
+          maxLength: 20
+          x-sterp-length: 20
+        COMPARETO:
+          type: "string"
+          x-sterp-legacy-field: "CSTSETCM argument COMPARETO -> WS-BASE PIC X(20) (STERP-App/cobol/batch/cst/CSTSETCM.cob:57)"
+          description: "base set; absent -> ComparedToSetCode, else latest ACTIVE STANDARD set"
+          maxLength: 20
+          x-sterp-length: 20
+        THRESHOLD:
+          type: "string"
+          x-sterp-legacy-field: "CSTSETCM argument THRESHOLD -> WS-THRESH-TEXT PIC X(10) (STERP-App/cobol/batch/cst/CSTSETCM.cob:61)"
+          description: "materiality percent; absent or 0 -> 5"
+          maxLength: 10
+          x-sterp-length: 10
+        MODE:
+          type: "string"
+          x-sterp-legacy-field: "CSTSETCM argument MODE -> WS-MODE PIC X(12) (STERP-App/cobol/batch/cst/CSTSETCM.cob:58)"
+          description: "ALL (default) or EXCEPTION"
+          maxLength: 12
+          x-sterp-length: 12
+        USER:
+          type: "string"
+          x-sterp-legacy-field: "CSTSETCM argument USER -> WS-USER PIC X(20) (STERP-App/cobol/batch/cst/CSTSETCM.cob:59)"
+          description: "STERP user recorded in the run; defaults to the caller"
+          maxLength: 20
+          x-sterp-length: 20
+    CstCstwiprfParameters:
+      type: "object"
+      description: "Parameters of CSTWIPRF (catalogue CSTRP050 ParamSpec CO,PERIOD,JOB,MODE,USER). Values are the legacy KEY=VALUE strings (contracts 8.2); USER defaults to the caller."
+      additionalProperties: false
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CSTWIPRF argument CO -> WS-CO PIC X(10) (STERP-App/cobol/batch/cst/CSTWIPRF.cob:60)"
+          description: "company code; absent -> the program default STC (SME-023); must be in the caller's access list"
+          maxLength: 10
+          x-sterp-length: 10
+        PERIOD:
+          type: "string"
+          x-sterp-legacy-field: "CSTWIPRF argument PERIOD -> WS-PERIOD PIC X(8) (STERP-App/cobol/batch/cst/CSTWIPRF.cob:64)"
+          description: "yyyynn split without validation; blank -> core.FiscalPeriod lookup (absent object, SME-832)"
+          maxLength: 8
+          x-sterp-length: 8
+        JOB:
+          type: "string"
+          x-sterp-legacy-field: "CSTWIPRF argument JOB -> WS-JOB PIC X(20) (STERP-App/cobol/batch/cst/CSTWIPRF.cob:61)"
+          description: "optional single job"
+          maxLength: 20
+          x-sterp-length: 20
+        MODE:
+          type: "string"
+          x-sterp-legacy-field: "CSTWIPRF argument MODE -> WS-MODE PIC X(12) (STERP-App/cobol/batch/cst/CSTWIPRF.cob:62)"
+          description: "CALC (default); only the literal POST writes cst.WipBalance"
+          maxLength: 12
+          x-sterp-length: 12
+        USER:
+          type: "string"
+          x-sterp-legacy-field: "CSTWIPRF argument USER -> WS-USER PIC X(20) (STERP-App/cobol/batch/cst/CSTWIPRF.cob:63)"
+          description: "STERP user recorded in the run; defaults to the caller"
+          maxLength: 20
+          x-sterp-length: 20
+    CstEmptyRequest:
+      type: "object"
+      additionalProperties: false
+      description: "No body fields: the legacy facade sends only the cost set code (CostingService.SetArea, CostingService.vb:157-165)."
+  responses:
+    BadRequest:
+      description: "Malformed request or context header (API0001, API0004)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: "Not authenticated (API0401)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Forbidden:
+      description: "No STERP user (API0010), company/site not permitted (API0002), run-as refused (API0003), or a legacy permission refusal."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    NotFound:
+      description: "Legacy RC 16 (NOT FOUND)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    BusinessRule:
+      description: "Legacy RC 08 or procedure THROW 'STERP-<s>-<code>: text' - no business effect."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Severe:
+      description: "Legacy RC 12 (SQL0001 and other severe errors) or SYS0001."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    NotImplemented:
+      description: "API0501 - the operation belongs to a slice not yet delivered, or a job stream step is in an undelivered slice."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"

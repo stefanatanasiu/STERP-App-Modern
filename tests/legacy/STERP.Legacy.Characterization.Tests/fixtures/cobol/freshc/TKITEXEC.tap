@@ -1,0 +1,65 @@
+# suite TKITEXEC kit execution
+ok 1 - KITRESV refuses an unknown function with KIT0002
+ok 2 - KITISSUE refuses an unknown function
+ok 3 - KITISSUE issues nothing when it refuses
+ok 4 - KITCOMPL refuses an unknown function with KIT0002
+ok 5 - A refused completion receipts nothing
+ok 6 - The scenario kit was built
+ok 7 - The demonstration bill is found, not refused
+ok 8 - The trial reaches a verdict on the real bill
+ok 9 - One frame can be built from the demonstration bill
+ok 10 - The trial reaches a complete explosion
+ok 11 - The trial explodes the bill into components
+ok 12 - A trial commits nothing
+ok 13 - Future supply must say what kind of supply it is
+ok 14 - Future supply must name the order that covers the line
+ok 15 - Future supply cannot cover more than the line needs
+ok 16 - A purchase order due in time covers the line
+ok 17 - The commitment is kept as a record of its own
+ok 18 - Thirty of the forty pins are still uncovered
+ok 19 - A commitment reserves no stock
+ok 20 - Supply due after the need date is cover, but late
+ok 21 - The lateness is stated rather than assumed
+ok 22 - Fifteen pins are now covered by inbound orders
+ok 23 - A commitment issues nothing
+ok 24 - Five pins are picked
+ok 25 - The lot actually taken is remembered
+ok 26 - A pick is not an issue
+ok 27 - More than the line needs cannot be picked
+ok 28 - An unpick puts the box back on the shelf
+ok 29 - The unpick is kept in the trail, not erased
+ok 30 - A short pick without a reason is refused
+ok 31 - A reasoned short pick is accepted as a warning
+ok 32 - The shortfall stays visible on the line
+ok 33 - An issue of nothing is refused
+ok 34 - Issuing more than the kit needs is not waved through
+ok 35 - A check-only call issues nothing
+ok 36 - Backflush is refused unless the kit enables it
+ok 37 - Five are off the shelf for line three
+ok 38 - Four are issued against the picks
+ok 39 - The oldest pick is spent first
+ok 40 - Nothing picked is left on the trolley
+ok 41 - No pick is consumed beyond what was picked
+ok 42 - The box put back is settled, not counted twice
+ok 43 - An untouched line keeps its picks off the shelf
+ok 44 - Nothing issued means nothing to return
+ok 45 - Material that was never issued cannot be scrapped
+ok 46 - A completion of nothing is refused
+ok 47 - Ten frames are still to come before any completion
+ok 48 - A completion check receipts nothing
+ok 49 - The total good output counts the receipt being checked
+ok 50 - More output than was planned needs approval
+ok 51 - Six frames are received and the ledger entry is posted
+ok 52 - Seventy five pounds leaves work in progress
+ok 53 - Fifty pounds stays in work in progress
+ok 54 - The run stays open for the balance
+ok 55 - The completion posted one KIT.COMPLETE journal
+ok 56 - Stock is debited and work in progress credited
+ok 57 - The final completion is accepted
+ok 58 - The final completion takes the residual value out
+ok 59 - Nothing is stranded in work in progress
+ok 60 - Ten good frames in total
+ok 61 - Each completion posts its own journal, once
+1..61
+# TKITEXEC kit execution passed 00061 failed 00000
+# exit 0

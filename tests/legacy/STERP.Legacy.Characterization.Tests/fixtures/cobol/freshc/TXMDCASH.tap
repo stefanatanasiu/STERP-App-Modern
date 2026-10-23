@@ -1,0 +1,16 @@
+# suite TXMDCASH cash forecast
+ok 1 - the forecast ends with return code 0 for STC
+ok 2 - the run names its spool file
+ok 3 - the spool line points at a CASHFCST listing
+ok 4 - the run prints its counted once proof line
+ok 5 - the fixture leaves one payable under an instruction
+ok 6 - the forecast still ends with return code 0
+ok 7 - the superseded payable is reported as superseded
+ok 8 - the contractual payables exclude that open item
+ok 9 - the instruction is forecast as a confirmed payment
+ok 10 - the payables total counts each obligation once
+ok 11 - the superseded residual is not added a second time
+ok 12 - the fixture is handed back to the ledger
+1..12
+# TXMDCASH cash forecast passed 00012 failed 00000
+# exit 0

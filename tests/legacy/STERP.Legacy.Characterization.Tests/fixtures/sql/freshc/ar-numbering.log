@@ -1,0 +1,4 @@
+# ar-numbering
+ok 1 - every company has an active ARCASE, DDMAN and DDCOL series -- REQ: COM-005, AR-016
+ok 2 - a collection case number is issued (CCS00000001) so a dispute can be raised -- REQ: AR-016, AC-030
+ok 3 - a mandate and a collection instruction are both numbered -- REQ: AR-022, COM-005

@@ -1,0 +1,10 @@
+# so-pricing
+ok 1 - a price enquiry needs an item -- REQ: SO-004
+ok 2 - the customer price list wins over the group and standard lists -- REQ: SO-004
+ok 3 - a quantity break applies from its own quantity upwards (318.00 at 24, 299.00 at 25) -- REQ: SO-004
+ok 4 - a price per 100 is 29.8246 / 100 = 0.298246 a bolt -- REQ: SO-004
+ok 5 - an item missing from the contract list falls back to the standard list at 42.50 -- REQ: SO-004
+ok 6 - two customer lists at the same level and break are reported as ambiguous, not guessed -- REQ: SO-004
+ok 7 - a price list that starts in April quotes nothing in January -- REQ: SO-004
+ok 8 - 342.00 less a 10% line discount is 307.80 -- REQ: SO-005
+ok 9 - VAT on 307.80 at 20% is 61.56 and the gross is 369.36 -- REQ: SO-025

@@ -1,0 +1,66 @@
+@using System.Text
+@inject ShellService Shell
+@inject ApiClient Api
+@inject BrowserInterop Browser
+@* frmAbout (frmAbout.vb, frmAbout.Designer.vb): product, release and copyright lines and the session/service details. *@
+<div class="st-dialog st-raised" role="dialog" aria-modal="true" aria-labelledby="@($"{Dialog.Id}-t")" style="width:464px">
+    <div class="st-titlebar"><span class="st-title" id="@($"{Dialog.Id}-t")">About @Shell.Options.ProductName</span></div>
+    <div style="padding:10px 12px 4px">
+        <div style="font: bold 12pt var(--st-font); color:#000080; white-space:pre-wrap">@Shell.Options.ProductName  v@(Version)</div>
+        <div style="margin:4px 2px 0; white-space:pre-wrap">Release 2026/3   Serial STC-0001-4417   Web client (modernized)</div>
+        <div style="margin:2px 2px 8px; white-space:pre-wrap">(c) 1994-2026 Stellar Business Systems Limited.  All rights reserved.</div>
+        <pre class="st-pre st-sunken" style="height:226px; font-size:11px">@_detail</pre>
+    </div>
+    <div class="st-dialog-buttons" style="justify-content:flex-end">
+        <button type="button" class="st-button" id="@($"{Dialog.Id}-OK")" @onclick="() => Dialog.Close(null)"><u>O</u>K</button>
+    </div>
+</div>
+
+@code {
+    private string _detail = "";
+
+    [CascadingParameter] public DialogInstance Dialog { get; set; } = default!;
+
+    private string Version => Shell.Options.Version.Length > 0 ? Shell.Options.Version : "1.0.0";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Dialog.KeyHandler = key =>
+        {
+            if (key.Is("Escape") || (key.Is("Enter") && key.TargetTag != "button")) { Dialog.Close(null); return true; }
+            return key.Key.StartsWith('F');
+        };
+        var s = Shell.Session;
+        var sb = new StringBuilder();
+        var diag = await Api.GetAsync("/api/platform/v1/service-diagnostics");
+        var d = diag.IsSuccess ? diag.Json : null;
+        sb.AppendLine("Workstation      : browser   (" + (s?.WindowsLogin ?? "") + ")");
+        sb.AppendLine("Signed on as     : " + s?.Title + "   " + s?.DisplayName);
+        sb.AppendLine("Company / site   : " + s?.CompanyCode + " / " + s?.SiteCode + "   " + s?.CompanyName);
+        sb.AppendLine("Business date    : " + (s is null ? "" : UkFormat.Date(s.BusinessDate)) + "    Period " + s?.PeriodText);
+        sb.AppendLine();
+        sb.AppendLine("Online service     : " + (d is null ? "not available" : Json.Str(d["serviceName"]) + " " + Json.Str(d["serviceVersion"]) + "  " + Json.Str(d["status"])));
+        sb.AppendLine("Batch service      : " + Shell.Options.JobsBaseUrl);
+        sb.AppendLine("Database           : " + Json.Str(d?["database"]?["dbName"]) + "   " + Json.Str(d?["database"]?["dbServerTime"]));
+        sb.AppendLine("Database version   : " + Json.Str(d?["database"]?["dbVersion"]));
+        sb.AppendLine();
+        sb.AppendLine("Delivered slices:");
+        var line = "   ";
+        foreach (var slice in Shell.DeliveredSlices.OrderBy(x => x, StringComparer.Ordinal))
+        {
+            if (line.Length + slice.Length > 70)
+            {
+                sb.AppendLine(line);
+                line = "   ";
+            }
+            line += slice.PadRight(16);
+        }
+        sb.AppendLine(line);
+        _detail = sb.ToString();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.FocusAsync($"{Dialog.Id}-OK");
+    }
+}

@@ -1,0 +1,21 @@
+# suite TAPDEMO demonstration payment
+ok 1 - a payable is waiting to be paid
+ok 2 - the proposal was built and reserved
+ok 3 - at least one payable was selected
+ok 4 - approval of the exact content was requested
+ok 5 - the content hash was computed
+ok 6 - the preparer cannot approve the run
+ok 7 - one signature leaves the run unapproved
+ok 8 - the second authoriser approves the run
+ok 9 - the proposal is APPROVED
+ok 10 - payment instructions were created
+ok 11 - an instruction is not a payment
+ok 12 - the run is visible to the Bacs cut
+ok 13 - nothing has been sent to the bureau yet
+ok 14 - three different people built and signed it
+ok 15 - a released run answers APA0020
+ok 16 - the approved content still matches
+ok 17 - the suite leaves nothing behind
+1..17
+# TAPDEMO demonstration payment passed 00017 failed 00000
+# exit 0

@@ -1,0 +1,662 @@
+@inherits StPage
+@namespace Sterp.Web.Pages.Platform.Console
+@* STERPOPS operator console (page:platform/operator-console, FR-STERP-PLATFORM-050..055, cobol/tui/STERPOPS.cob): the 80 x 24
+   screens of the green-screen console - main menu, job catalogue and submission, job monitor, exception queue, period status
+   and engine health - with the legacy keys (F3/ESC, F7/PgUp/-/P, F8/PgDn/+/N, typed row numbers) and STERP-x-nnnn messages.
+   The console identity is the signed-on session (contracts 5.1-5.3), the session-start date the page-open date. *@
+<div class="st-console" id="@Uid("screen")" tabindex="-1">
+    @for (var i = 1; i <= 24; i++)
+    {
+        var n = i;
+        if (n == 23 && _screen is not Screen.Params and not Screen.Ended)
+        {
+            <div class="st-con-line"><span> </span><label for="@Uid("opt")">@("OPTION ===>")</label><span> </span><input id="@Uid("opt")" aria-label="OPTION ===>" maxlength="8" size="9"
+                       value="@_opt" autocomplete="off" spellcheck="false" @oninput="e => _opt = e.Value?.ToString() ?? string.Empty" /></div>
+        }
+        else if (_screen == Screen.Params && n >= 5 && n <= 12 && n - 4 <= _parms.Count)
+        {
+            var p = _parms[n - 5];
+            var index = n - 5;
+            <div class="st-con-line"><span>@("   " + Pad(p.Key, 14) + "  = ")</span><input id="@Uid("pv" + index)" aria-label="@($"Value {index + 1}")" maxlength="24" size="25"
+                       value="@p.Value" autocomplete="off" spellcheck="false" @oninput="e => p.Value = e.Value?.ToString() ?? string.Empty" /></div>
+        }
+        else
+        {
+            <div class="st-con-line @(n == 21 ? "st-con-msg" : n <= 2 ? "st-con-hi" : null)">@Line(n)</div>
+        }
+    }
+</div>
+@if (_screen == Screen.Monitor && _selectedPath.Length > 0)
+{
+    <div style="padding:3px 6px; background:var(--st-face)">
+        <button type="button" class="st-button" @onclick='() => OpenForm("frmSpoolViewer", _selectedPath)'>Open in the spool viewer</button>
+    </div>
+}
+
+@code {
+    private enum Screen
+    {
+        Menu,
+        Catalogue,
+        Params,
+        Running,
+        Completion,
+        Monitor,
+        Exceptions,
+        Periods,
+        Health,
+        Ended,
+    }
+
+    private sealed class ParmEntry
+    {
+        public string Key { get; init; } = "";
+        public string Value { get; set; } = "";
+    }
+
+    private sealed record Row(string Key, string Aux, string Text);
+
+    private const int PageSize = 15;
+    private static readonly string Rule = new('-', 78);
+
+    private Screen _screen = Screen.Menu;
+    private string _opt = "";
+    private string _msg = "";
+    private string _title = "OPERATIONS MAIN MENU";
+    private string _legend = "";
+    private string _pageText = "";
+    private readonly string[] _det = new string[16];
+    private List<Row> _rows = [];
+    private int _top = 1;
+    private List<ParmEntry> _parms = [];
+    private string _jobCode = "";
+    private string _jobProg = "";
+    private string _selectedPath = "";
+    private DateTime _started;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        _started = DateTime.Now;
+        Window.SetTitle("STERP Operator Console");
+        ClearDet();
+        _msg = Fit("STERP-I-1000 WELCOME " + Session.DisplayName.Trim(), 78);
+        ShowMenu();
+    }
+
+    private string SessionStart => DateOnly.FromDateTime(_started).ToString("yyyy-MM-dd", UkFormat.Culture);
+
+    private string HeaderDate => _started.ToString("dd/MM/yyyy  HH:mm", UkFormat.Culture);
+
+    // ------------------------------------------------------------------------------------------- rendering
+
+    private string Line(int n)
+    {
+        if (_screen == Screen.Ended)
+        {
+            return n == 1 ? " STERP-I-0099 OPERATOR CONSOLE ENDED" : " ";
+        }
+        if (_screen == Screen.Params)
+        {
+            return n switch
+            {
+                1 => Place(Place("", 2, "STERP  SUBMIT BATCH JOB"), 56, Fit(HeaderDate, 19)),
+                2 => Place("", 2, Fit(_det[1], 78)),
+                3 or 20 => Place("", 2, Rule),
+                21 => Place("", 2, Fit(_msg, 78)),
+                22 => Place("", 2, "ENTER=SUBMIT   F3=CANCEL (TYPE X IN THE FIRST VALUE)"),
+                _ => " ",
+            };
+        }
+        if (_screen == Screen.Running)
+        {
+            return n == 1 ? " " + _msg : " ";
+        }
+        return n switch
+        {
+            1 => Place(Place(Place("", 2, "STERP"), 9, Fit(_title, 44)), 56, Fit(HeaderDate, 19)),
+            2 => Place(Place(Place(Place(Place("", 2, "USER"), 7, Fit(Session.UserCode, 20)), 28, "CO"), 31, Fit(Session.CompanyCode, 10)), 44, Fit(_pageText, 24)),
+            3 or 20 => Place("", 2, Rule),
+            >= 5 and <= 19 => Place("", 2, Fit(_det[n - 4], 78)),
+            21 => Place("", 2, Fit(_msg, 78)),
+            22 => Place("", 2, Fit(_legend, 66)),
+            _ => " ",
+        };
+    }
+
+    /// <summary>Writes a value at a 1-based screen column of an 80-column line.</summary>
+    private static string Place(string line, int col, string text)
+    {
+        var chars = line.PadRight(80).ToCharArray();
+        for (var i = 0; i < text.Length && col - 1 + i < 80; i++) chars[col - 1 + i] = text[i];
+        return new string(chars).TrimEnd() is { Length: > 0 } s ? s : " ";
+    }
+
+    /// <summary>PIC X(n): space padded and cut at n characters.</summary>
+    private static string Fit(string? text, int n)
+    {
+        var t = text ?? "";
+        return t.Length >= n ? t[..n] : t.PadRight(n);
+    }
+
+    private static string Pad(string? text, int n) => Fit(text, n);
+
+    /// <summary>PIC ZZ9.</summary>
+    private static string Seq(int n) => (n % 1000).ToString(UkFormat.Culture).PadLeft(3);
+
+    private void ClearDet()
+    {
+        for (var i = 0; i < _det.Length; i++) _det[i] = "";
+    }
+
+    /// <summary>9400-PAGE-LINES: 15 rows from the top row and 'ROWS t-e OF n'.</summary>
+    private void PageLines()
+    {
+        ClearDet();
+        if (_top < 1 || _top > _rows.Count) _top = 1;
+        var j = 0;
+        for (var i = _top; i <= _rows.Count && j < PageSize; i++)
+        {
+            j++;
+            _det[j] = _rows[i - 1].Text;
+        }
+        _pageText = "ROWS " + _top + "-" + (_top + j - 1) + " OF " + _rows.Count;
+    }
+
+    private async Task FocusOptionAsync()
+    {
+        await Task.Yield();
+        if (_screen == Screen.Params) await Browser.FocusAsync(Uid("pv0"));
+        else await Browser.FocusAsync(Uid("opt"));
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await FocusOptionAsync();
+    }
+
+    // ------------------------------------------------------------------------------------------- screens
+
+    private void ShowMenu()
+    {
+        _screen = Screen.Menu;
+        ClearDet();
+        _det[2] = "   1   SUBMIT BATCH JOB / JOB STREAM";
+        _det[4] = "   2   JOB MONITOR          (core.JobRun)";
+        _det[6] = "   3   EXCEPTION QUEUE      (core.ExceptionItem)";
+        _det[8] = "   4   PERIOD STATUS        (fin.Period)";
+        _det[10] = "   5   ENGINE HEALTH        (PING)";
+        _det[12] = "   X   SIGN OFF";
+        _title = "OPERATIONS MAIN MENU";
+        _pageText = "";
+        _legend = "F3=SIGN OFF   ENTER OPTION AND PRESS ENTER";
+        _opt = "";
+        _selectedPath = "";
+    }
+
+    private void ShowList(Screen screen, string title, string legend)
+    {
+        _screen = screen;
+        _title = title;
+        _legend = legend;
+        _opt = "";
+        PageLines();
+    }
+
+    private void SignOff()
+    {
+        _screen = Screen.Ended;
+        _opt = "";
+    }
+
+    // ------------------------------------------------------------------------------------------- keys
+
+    protected override Task? OnKey(KeyInfo key)
+    {
+        if (key.Ctrl || key.Alt) return null;
+        if (_screen == Screen.Ended) return null;
+        switch (key.Key)
+        {
+            case "Enter":
+                return EnterAsync();
+            case "F3":
+            case "Escape":
+                return F3Async();
+            case "F7":
+            case "PageUp":
+                return Navigate(back: true);
+            case "F8":
+            case "PageDown":
+                return Navigate(back: false);
+        }
+        // the other function keys are consumed by the console screen
+        return key.Key.Length >= 2 && key.Key[0] == 'F' && char.IsDigit(key.Key[1]) ? Task.CompletedTask : null;
+    }
+
+    private async Task F3Async()
+    {
+        switch (_screen)
+        {
+            case Screen.Menu:
+                SignOff();
+                break;
+            case Screen.Params:
+                await ShowCatalogueAsync(reload: false);
+                break;
+            case Screen.Completion:
+            case Screen.Running:
+                await ShowCatalogueAsync(reload: false);
+                break;
+            default:
+                _msg = Fit(_msg, 78);
+                ShowMenu();
+                break;
+        }
+        StateHasChanged();
+        await FocusOptionAsync();
+    }
+
+    private Task Navigate(bool back)
+    {
+        if (_screen is not (Screen.Catalogue or Screen.Monitor or Screen.Exceptions or Screen.Periods)) return Task.CompletedTask;
+        if (back)
+        {
+            _top -= PageSize;
+            if (_top < 1) _top = 1;
+        }
+        else if (_top + PageSize <= _rows.Count)
+        {
+            _top += PageSize;
+        }
+        _opt = "";
+        PageLines();
+        StateHasChanged();
+        return FocusOptionAsync();
+    }
+
+    private async Task EnterAsync()
+    {
+        var opt = Fit(_opt, 8).ToUpperInvariant().TrimEnd();
+        _opt = "";
+        switch (_screen)
+        {
+            case Screen.Menu:
+                await MainMenuAsync(opt);
+                break;
+            case Screen.Params:
+                await SubmitAsync();
+                break;
+            case Screen.Completion:
+                await ShowCatalogueAsync(reload: false);
+                break;
+            case Screen.Running:
+                break;
+            case Screen.Health:
+                if (opt is "X" or "END") ShowMenu();
+                else await PingAsync();
+                break;
+            default:
+                await ListCommandAsync(opt);
+                break;
+        }
+        StateHasChanged();
+        await FocusOptionAsync();
+    }
+
+    /// <summary>2000-MAIN-MENU: 1/A .. 5/E, X/END sign off, blank redisplays, anything else STERP-W-2001.</summary>
+    private async Task MainMenuAsync(string opt)
+    {
+        if (opt is "X" or "END")
+        {
+            SignOff();
+            return;
+        }
+        var first = opt.Length > 0 ? opt[0] : ' ';
+        switch (first)
+        {
+            case '1' or 'A':
+                await ShowCatalogueAsync(reload: true);
+                break;
+            case '2' or 'B':
+                await LoadRunsAsync();
+                ShowList(Screen.Monitor, "JOB MONITOR - LATEST RUNS FIRST", "F3=MENU  F7=PREV(-)  F8=NEXT(+)  ENTER=REFRESH");
+                break;
+            case '3' or 'C':
+                await LoadExceptionsAsync();
+                ShowList(Screen.Exceptions, "EXCEPTION QUEUE - OPEN AND ACKNOWLEDGED", "F3=MENU  F7/F8=PAGE  NUMBER=ACKNOWLEDGE");
+                break;
+            case '4' or 'D':
+                await LoadPeriodsAsync();
+                ShowList(Screen.Periods, "LEDGER PERIOD STATUS BY COMPANY", "F3=MENU  F7/F8=PAGE  ENTER=REFRESH");
+                break;
+            case '5' or 'E':
+                await PingAsync();
+                break;
+            case ' ':
+                ShowMenu();
+                break;
+            default:
+                _msg = "STERP-W-2001 INVALID OPTION";
+                ShowMenu();
+                break;
+        }
+    }
+
+    /// <summary>9450-NAVIGATE for a list screen followed by the screen's own action.</summary>
+    private async Task ListCommandAsync(string opt)
+    {
+        var sel = 0;
+        var leave = false;
+        if (opt is "X" or "END")
+        {
+            leave = true;
+        }
+        else if (opt is "-" or "P")
+        {
+            _top -= PageSize;
+            if (_top < 1) _top = 1;
+        }
+        else if (opt is "+" or "N")
+        {
+            if (_top + PageSize <= _rows.Count) _top += PageSize;
+        }
+        else if (opt.Length == 0)
+        {
+            // ENTER: the monitor and the period list refresh and return to row 1
+        }
+        else if (TryNumval(opt, out var value))
+        {
+            sel = (int)Math.Truncate(value);
+            if (sel < 1 || sel > _rows.Count)
+            {
+                sel = 0;
+                _msg = "STERP-W-9001 NO SUCH LINE NUMBER";
+            }
+        }
+        else
+        {
+            _msg = "STERP-W-9002 INVALID COMMAND";
+        }
+        if (leave)
+        {
+            ShowMenu();
+            return;
+        }
+        switch (_screen)
+        {
+            case Screen.Catalogue:
+                if (sel > 0)
+                {
+                    PromptParameters(sel);
+                    return;
+                }
+                break;
+            case Screen.Monitor:
+                if (opt.Length == 0)
+                {
+                    await LoadRunsAsync();
+                }
+                if (sel > 0)
+                {
+                    _selectedPath = _rows[sel - 1].Aux.Trim();
+                    _msg = Fit("SPOOL/LOG: " + Fit(_rows[sel - 1].Aux, 66), 78);
+                }
+                break;
+            case Screen.Exceptions:
+                if (sel > 0) await AcknowledgeAsync(sel);
+                break;
+            case Screen.Periods:
+                if (opt.Length == 0) await LoadPeriodsAsync();
+                break;
+        }
+        PageLines();
+    }
+
+    /// <summary>FUNCTION TEST-NUMVAL / NUMVAL: optional sign, digits and a decimal point, surrounding spaces.</summary>
+    private static bool TryNumval(string text, out decimal value)
+    {
+        value = 0;
+        var t = text.Trim();
+        if (!System.Text.RegularExpressions.Regex.IsMatch(t, @"^([+-]\s*)?(\d+\.?\d*|\.\d+)(\s*[+-])?$")) return false;
+        var negative = t.StartsWith('-') || t.EndsWith('-');
+        var digits = t.Trim('+', '-', ' ');
+        if (!decimal.TryParse(digits, System.Globalization.NumberStyles.AllowDecimalPoint, UkFormat.Culture, out value)) return false;
+        if (negative) value = -value;
+        return true;
+    }
+
+    // ------------------------------------------------------------------------------------------- data
+
+    private async Task<ApiResponse?> ReadAsync(string path)
+    {
+        var r = await Api.GetAsync(path);
+        if (r.IsSuccess) return r;
+        _msg = Fit("STERP-E-9009 SQL " + Fit(r.Problem!.Detail, 50).TrimEnd(), 78);
+        return null;
+    }
+
+    /// <summary>3100-LOAD-JOBS (platform_listConsoleCatalogue).</summary>
+    private async Task ShowCatalogueAsync(bool reload)
+    {
+        if (reload || _rows.Count == 0 || _screen is not (Screen.Params or Screen.Completion or Screen.Running or Screen.Catalogue))
+        {
+            _rows = [];
+            _top = 1;
+            var r = await ReadAsync("/api/platform/v1/operator-console/catalogue" + Query.Build(("sessionStartDate", SessionStart)));
+            if (r is not null)
+            {
+                var i = 0;
+                foreach (var row in r.Items)
+                {
+                    i++;
+                    var code = Json.Str(row?["reportCode"]);
+                    var prog = Json.Str(row?["programName"]);
+                    var spec = Json.Str(row?["paramSpec"]);
+                    _rows.Add(new Row(code, Fit(prog, 8) + " " + spec, Fit(Seq(i) + " " + Fit(code, 20) + " " + Fit(Json.Str(row?["module"]), 4) + " " +
+                        Fit(prog, 8) + " " + Fit(Json.Str(row?["title"]), 38), 78)));
+                }
+                _msg = "STERP-I-3000 " + _rows.Count + " RUNNABLE DEFINITIONS IN THE CATALOGUE";
+            }
+        }
+        ShowList(Screen.Catalogue, "SUBMIT BATCH JOB - CATALOGUE", "F3=MENU  F7=PREV(-)  F8=NEXT(+)  NUMBER=SUBMIT");
+    }
+
+    /// <summary>3200-PROMPT-PARMS: up to eight KEY or KEY=DEFAULT entries; CO/USER always, SITE/ASAT/MODE when blank.</summary>
+    private void PromptParameters(int sel)
+    {
+        var row = _rows[sel - 1];
+        _jobCode = row.Key;
+        _jobProg = row.Aux.Length >= 8 ? row.Aux[..8].Trim() : row.Aux.Trim();
+        var spec = row.Aux.Length > 9 ? row.Aux[9..] : "";
+        var parts = spec.Split(',');
+        _parms = [];
+        foreach (var raw in parts.Take(8))
+        {
+            var entry = Fit(raw, 14).Trim().ToUpperInvariant();
+            var eq = entry.IndexOf('=');
+            var key = eq >= 0 ? entry[..eq] : entry;
+            var value = eq >= 0 ? entry[(eq + 1)..] : "";
+            key = Fit(key, 14).TrimEnd();
+            value = Fit(value, 24).TrimEnd();
+            switch (key)
+            {
+                case "CO":
+                    value = Session.CompanyCode;
+                    break;
+                case "USER":
+                    value = Session.UserCode;
+                    break;
+                case "SITE" when value.Length == 0:
+                    value = Session.SiteCode;
+                    break;
+                case "ASAT" when value.Length == 0:
+                    value = DateOnly.FromDateTime(_started).ToString("yyyyMMdd", UkFormat.Culture);
+                    break;
+                case "MODE" when value.Length == 0:
+                    value = "PREVIEW";
+                    break;
+            }
+            _parms.Add(new ParmEntry { Key = key, Value = value });
+        }
+        _det[1] = "JOB " + Fit(_jobCode, 20) + " PROGRAM " + Fit(_jobProg, 8) + " - AMEND THE VALUES AND PRESS ENTER";
+        _msg = "STERP-I-3200 ENTER=SUBMIT  X IN FIRST VALUE=CANCEL";
+        _screen = Screen.Params;
+    }
+
+    /// <summary>3300-RUN-JOB: submit, wait for the end of the run, completion read (3400-LAST-RUN) and panel.</summary>
+    private async Task SubmitAsync()
+    {
+        if (_parms.Count > 0 && _parms[0].Value.Trim().ToUpperInvariant() == "X")
+        {
+            _msg = "STERP-I-3201 SUBMISSION CANCELLED";
+            await ShowCatalogueAsync(reload: false);
+            return;
+        }
+        var body = new JsonObject
+        {
+            ["parameters"] = new JsonArray(_parms.Select(p => (JsonNode)new JsonObject { ["key"] = p.Key, ["value"] = p.Value.Trim() }).ToArray()),
+            ["sessionStartDate"] = SessionStart,
+        };
+        _screen = Screen.Running;
+        _msg = "STERP-I-3300 SUBMITTED: " + _jobCode;
+        StateHasChanged();
+        var outcome = await Jobs.RunAsync(() => Api.PostAsync(ApiHost.Jobs, $"/api/platform/v1/operator-console/jobs/{Query.Path(_jobCode)}/runs",
+            body, Instruction.New().Options()));
+        if (!outcome.Accepted)
+        {
+            _msg = Fit("STERP-E-9009 SQL " + Fit(outcome.Submit.Problem!.Detail, 50).TrimEnd(), 78);
+            await ShowCatalogueAsync(reload: false);
+            return;
+        }
+        var status = "UNKNOWN";
+        var spool = "";
+        var last = await Api.GetAsync("/api/platform/v1/operator-console/last-run" + Query.Build(("programName", _jobProg)));
+        if (last.IsSuccess)
+        {
+            status = Fit(Json.Str(last.Json?["status"]), 12).TrimEnd();
+            spool = Fit(Json.Str(last.Json?["spoolOrLog"]), 108).TrimEnd();
+        }
+        var rc = outcome.Run?["execution"]?["exitCode"] is JsonValue v && v.TryGetValue<int>(out var ec) ? ec : outcome.ReturnCode ?? 0;
+        var rcText = (rc < 0 ? "-" : "") + (Math.Abs(rc) % 1000).ToString(UkFormat.Culture);
+        _msg = Fit("STERP-I-3301 " + _jobCode.Trim() + " ENDED RC=" + rcText + " STATUS=" + status + " SPOOL=" + spool, 78);
+        _screen = Screen.Completion;
+        _title = "JOB COMPLETION";
+        _pageText = "";
+        ClearDet();
+        _det[1] = _msg;
+        _det[3] = "SPOOL / LOG:";
+        var padded = Fit(spool, 110);
+        _det[4] = padded[..78];
+        _det[5] = padded[78..];
+        _legend = "ENTER=RETURN TO THE CATALOGUE";
+        _selectedPath = spool;
+    }
+
+    /// <summary>4100-LOAD-RUNS (platform_listConsoleJobRuns): ReturnCode shown as its first four characters.</summary>
+    private async Task LoadRunsAsync()
+    {
+        _rows = [];
+        _top = 1;
+        _selectedPath = "";
+        var r = await ReadAsync("/api/platform/v1/operator-console/job-runs");
+        if (r is null) return;
+        var i = 0;
+        foreach (var row in r.Items)
+        {
+            i++;
+            var start = Json.Str(row?["startedAt"]);
+            _rows.Add(new Row(Json.Raw(row?["jobRunId"]), Json.Str(row?["spoolOrLog"]),
+                Fit(Seq(i) + " " + Fit(Json.Raw(row?["jobRunId"]), 7) + " " + Fit(Json.Str(row?["jobName"]), 20) + " " +
+                    Fit(Json.Str(row?["companyCode"]), 4) + " " + Fit(start, 16) + " " + Fit(Json.Str(row?["status"]), 9) + " " +
+                    Fit(Json.Raw(row?["returnCode"]), 4), 78)));
+        }
+        _msg = "STERP-I-4000 " + _rows.Count + " RUNS - NUM SHOWS THE SPOOL FILE";
+    }
+
+    /// <summary>5100-LOAD-EXC (platform_listConsoleExceptions).</summary>
+    private async Task LoadExceptionsAsync()
+    {
+        _rows = [];
+        _top = 1;
+        var r = await ReadAsync("/api/platform/v1/operator-console/exceptions");
+        if (r is null) return;
+        var i = 0;
+        foreach (var row in r.Items)
+        {
+            i++;
+            _rows.Add(new Row(Json.Raw(row?["exceptionId"]), Json.Str(row?["message"]),
+                Fit(Seq(i) + " " + Fit(Json.Raw(row?["exceptionId"]), 6) + " " + Fit(Json.Str(row?["companyCode"]), 4) + " " +
+                    Fit(Json.Str(row?["module"]), 4) + " " + Fit(Json.Str(row?["severity"]), 7) + " " + Fit(Json.Str(row?["category"]), 16) + " " +
+                    Fit(Json.Str(row?["message"]), 24) + " " + Fit(Json.Str(row?["status"]), 5), 78)));
+        }
+        _msg = "STERP-I-5000 " + _rows.Count + " OPEN EXCEPTIONS";
+    }
+
+    /// <summary>5200-ACKNOWLEDGE (platform_acknowledgeConsoleException), then the queue is reloaded.</summary>
+    private async Task AcknowledgeAsync(int sel)
+    {
+        var id = _rows[sel - 1].Key;
+        var r = await Api.PostAsync($"/api/platform/v1/operator-console/exceptions/{Query.Path(id)}/acknowledge", null, Instruction.New().Options());
+        if (!r.IsSuccess)
+        {
+            var p = r.Problem!;
+            _msg = p.ReasonCode.StartsWith("STERP-", StringComparison.Ordinal) || p.Detail.StartsWith("STERP-", StringComparison.Ordinal)
+                ? Fit(p.Detail, 78)
+                : Fit("STERP-E-9009 SQL " + Fit(p.Detail, 50).TrimEnd(), 78);
+            return;
+        }
+        var message = Json.Str(r.Json?["consoleMessage"]);
+        await LoadExceptionsAsync();
+        _msg = message.Length > 0 ? Fit(message, 78) : "STERP-I-5001 EXCEPTION " + id + " ACKNOWLEDGED BY " + Session.UserCode;
+    }
+
+    /// <summary>6100-LOAD-PERIODS (platform_listConsolePeriods).</summary>
+    private async Task LoadPeriodsAsync()
+    {
+        _rows = [];
+        _top = 1;
+        var r = await ReadAsync("/api/platform/v1/operator-console/periods");
+        if (r is null) return;
+        var i = 0;
+        foreach (var row in r.Items)
+        {
+            i++;
+            _rows.Add(new Row(Json.Str(row?["companyCode"]), "",
+                Fit(Seq(i) + " " + Fit(Json.Str(row?["companyCode"]), 5) + " " + Fit(Json.Raw(row?["fiscalYear"]), 4) + " P" +
+                    Fit(Json.Raw(row?["periodNo"]), 3) + " " + Fit(Json.Str(row?["name"]), 12) + " " + Fit(Json.Str(row?["status"]), 6) + " " +
+                    Fit(Json.Str(row?["startDate"]), 10) + " " + Fit(Json.Str(row?["endDate"]), 10) + " " + Fit(Json.Str(row?["closedBy"]), 12), 78)));
+        }
+        _msg = "STERP-I-6000 " + _rows.Count + " PERIODS - FUTURE/OPEN/SOFT/HARD";
+    }
+
+    /// <summary>7100-PING: the service diagnostics of the online service (FR-STERP-PLATFORM-055).</summary>
+    private async Task PingAsync()
+    {
+        _screen = Screen.Health;
+        _title = "ENGINE AND DATABASE HEALTH";
+        _pageText = "";
+        _legend = "F3=MENU  ENTER=PING AGAIN";
+        ClearDet();
+        var r = await Api.GetAsync("/api/platform/v1/service-diagnostics");
+        if (!r.IsSuccess)
+        {
+            _msg = Fit("STERP-E-7001 " + Fit(r.Problem!.Detail, 60).TrimEnd(), 78);
+            _det[8] = "SQLIO CONNECTION N";
+            return;
+        }
+        var d = r.Json!;
+        var db = d["database"];
+        _det[1] = "ENGINE VERSION . " + Json.Str(d["serviceVersion"]);
+        _det[2] = "DATABASE . . . . " + Json.Str(db?["dbName"]);
+        _det[3] = "SERVER TIME  . . " + Json.Str(db?["dbServerTime"]);
+        _det[4] = "DB VERSION . . . " + Fit(Json.Str(db?["dbVersion"]), 55).TrimEnd();
+        _det[5] = "PING RETURN CODE " + Json.Int(db?["returnCode"]) + "   REASON " + Json.Str(db?["reasonCode"]);
+        _det[8] = "SQLIO CONNECTION Y   CONSOLE HOME " + Shell.Options.ApiBaseUrl;
+        var health = Json.Str(d["healthText"]);
+        _msg = health.Length > 0 ? Fit(health, 78)
+            : Json.Int(db?["returnCode"]) == 0 ? "STERP-I-7000 ENGINE AND DATABASE HEALTHY"
+            : Fit("STERP-E-7001 " + Fit(Json.Str(db?["message"]), 60).TrimEnd(), 78);
+    }
+
+    [Inject] private JobRunner Jobs { get; set; } = default!;
+}

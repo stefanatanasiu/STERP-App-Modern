@@ -1,0 +1,38 @@
+# suite TSOGAP sales analysis margins
+ok 1 - the expected margin is measured on the order
+ok 2 - net 1,000.00 less cost 700.00 is 300.00
+ok 3 - the expected margin is 30.0000 per cent
+ok 4 - the mark up on the same line is 42.8571 per cent
+ok 5 - the expected margin keeps the quoted cost basis
+ok 6 - the late cost joins the cost of this sale
+ok 7 - the realised margin is 250.00, not 300.00
+ok 8 - the realised margin is 25.0000 per cent
+ok 9 - the realised mark up is 33.3333 per cent
+ok 10 - the sale itself is unchanged by the late cost
+ok 11 - expected and realised margin are not the same
+ok 12 - the difference in margin is the 50.00 late cost
+ok 13 - the late cost is visible on the cost side too
+ok 14 - the original basis still gives 30.0000 per cent
+ok 15 - and the original cost of 700.00 is untouched
+ok 16 - the expected margin meets the policy minimum
+ok 17 - so the order needed no margin approval
+ok 18 - the realised margin falls below the minimum
+ok 19 - the realised position is held for approval
+ok 20 - the policy rule is named
+ok 21 - the minimum that was applied is named
+ok 22 - a euro sale of the same shape is still 30 per cent
+ok 23 - the margin value is in the document currency
+ok 24 - the sterling amount is kept beside it
+ok 25 - the rate the sale was struck at is kept
+ok 26 - the explanation names the currency it measured
+ok 27 - a 40 per cent target would need 1,166.67 of net
+ok 28 - the accepted price is not touched
+ok 29 - a controlled amendment is required instead
+ok 30 - the amendment rule is named
+ok 31 - the margin actually earned is still reported
+ok 32 - a margin with no cost basis is labelled incomplete
+ok 33 - it is never reported as a 100 per cent margin
+ok 34 - the line is held until a cost basis exists
+1..34
+# TSOGAP sales analysis margins passed 00034 failed 00000
+# exit 0

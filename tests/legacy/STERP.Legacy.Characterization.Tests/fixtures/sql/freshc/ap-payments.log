@@ -1,0 +1,21 @@
+# ap-payments
+ok 1 - the two due invoices less the 150.00 credit leave 1150.00 of cash required -- REQ: AP-011  AC: AC-033
+ok 2 - only the 650.00 that is not already reserved elsewhere is eligible for this run -- REQ: AP-011, AP-014  AC: AC-033
+ok 3 - the invoice held by another instruction is flagged and only its free 400.00 is offered -- REQ: AP-011  AC: AC-033
+ok 4 - selecting reserves 800.00 against the ledger, leaving the invoices fully spoken for -- REQ: AP-011, AP-014
+ok 5 - running the selection again reserves the same residual once, not twice -- REQ: AP-011, AP-014  AC: AC-033
+ok 6 - a reselected proposal is proposed again and carries no earlier approval forward -- REQ: AP-011, AP-012
+ok 7 - both invoices are listed on the second proposal as reserved by another instruction -- REQ: AP-011, COM-005  AC: AC-033
+ok 8 - the second proposal asks for no cash because the residual is consumed once only -- REQ: AP-011, AP-014  AC: AC-033
+ok 9 - a released payment run cannot be reselected -- REQ: AP-011, AP-013
+ok 10 - a cancelled payment run cannot be reselected -- REQ: AP-011, AP-016
+ok 11 - the half year is filed as version 1 of period 201907-31 over four invoices -- REQ: AP-028  AC: AC-128
+ok 12 - average days to pay over the four invoices is 40 days -- REQ: AP-028  AC: AC-128
+ok 13 - the 30 day, 31 to 60 day and 61 day or more bands are 25, 50 and 25 and add to 100 per cent -- REQ: AP-028  AC: AC-128
+ok 14 - three of the four invoices missed the agreed 30 day terms, so 75 per cent were late -- REQ: AP-028  AC: AC-128
+ok 15 - one detail row per invoice at 10, 35, 70 and 45 days and 4000.00 of value backs the headline figures -- REQ: AP-028  AC: AC-128
+ok 16 - restating the period files version 2 and leaves version 1 exactly as reported -- REQ: AP-028  AC: AC-128
+ok 17 - a malformed reporting period reference is rejected -- REQ: AP-028
+ok 18 - a changed supplier bank invalidates the pending payment approval -- REQ: AP-002, AP-012  AC: AC-028
+ok 19 - the approved but unsent instruction is cancelled while the submitted one is left alone -- REQ: AP-013, AP-016  AC: AC-028
+ok 20 - the approved proposal falls back to draft and the reservations it held are released -- REQ: AP-002, AP-011  AC: AC-028

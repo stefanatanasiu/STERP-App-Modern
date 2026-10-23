@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>STERP.Testing</RootNamespace>
+    <Description>Agent 07 shared test infrastructure: binding-contract loading, isolated database access, scenario execution.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+</Project>

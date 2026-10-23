@@ -1,0 +1,64 @@
+@implements IDisposable
+@inject ShellService Shell
+@inject BrowserInterop Browser
+@* One MDI child window: title bar (caption, minimize, maximize, close), the page, and the BaseForm status line (cue + text). *@
+@{
+    var content = Shell.ContentOf(Window);
+    var active = ReferenceEquals(Shell.ActiveWindow, Window);
+    var min = Window.State == WindowState.Minimized;
+}
+<section class="st-window st-raised @(active ? "st-active" : null) @(min ? "st-min" : null)" data-sterp-window="@Window.Id" id="@Window.Id"
+         tabindex="-1" style="@($"left:{Window.X}px;top:{Window.Y}px;width:{Window.Width}px;height:{Window.Height}px;z-index:{Window.Z}")"
+         @onmousedown="Activate" @onfocusin="Activate">
+    <div class="st-titlebar" @ondblclick="() => Shell.ToggleMaximize(Window)">
+        <span class="st-title">@Window.Title</span>
+        <button type="button" class="st-capbtn st-raised" aria-label="Minimize window" title="Minimize" tabindex="-1" @onclick="() => Shell.Minimize(Window)" @onclick:stopPropagation="true">
+            <svg width="8" height="7" aria-hidden="true"><rect x="0" y="5" width="6" height="2" /></svg>
+        </button>
+        <button type="button" class="st-capbtn st-raised" aria-label="Maximize window" title="Maximize" tabindex="-1" @onclick="() => Shell.ToggleMaximize(Window)" @onclick:stopPropagation="true">
+            <svg width="9" height="9" aria-hidden="true"><rect x="0.5" y="0.5" width="8" height="8" fill="none" stroke="#000" /><rect x="0" y="0" width="9" height="2" /></svg>
+        </button>
+        <button type="button" class="st-capbtn st-raised" aria-label="Close window" title="Close" tabindex="-1" @onclick="CloseAsync" @onclick:stopPropagation="true">
+            <svg width="8" height="7" aria-hidden="true"><path d="M0 0L8 7M8 0L0 7" stroke="#000" stroke-width="1.6" /></svg>
+        </button>
+    </div>
+    <div class="st-wbody" id="@Window.BodyId">
+        <CascadingValue Value="Window" IsFixed="true">
+            <WindowErrorBoundary Window="Window">
+                @if (content.Placeholder || content.Component is null)
+                {
+                    <PlaceholderPage Route="content.Route" />
+                }
+                else
+                {
+                    <DynamicComponent Type="content.Component" />
+                }
+            </WindowErrorBoundary>
+        </CascadingValue>
+    </div>
+    <div class="st-wstatus"><span class="st-cue">@Window.StatusCue</span><span class="st-stext">@Window.StatusText</span></div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public WindowContext Window { get; set; } = default!;
+
+    protected override void OnInitialized() => Window.Changed += OnWindowChanged;
+
+    private void OnWindowChanged() => _ = InvokeAsync(StateHasChanged);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        Window.Opened = true;
+        if (ReferenceEquals(Shell.ActiveWindow, Window)) await Browser.FocusFirstAsync(Window.BodyId);
+    }
+
+    private void Activate()
+    {
+        if (!ReferenceEquals(Shell.ActiveWindow, Window) || Window.State == WindowState.Minimized) Shell.Activate(Window);
+    }
+
+    private Task CloseAsync() => Shell.Observe(Shell.CloseWindowAsync(Window));
+
+    public void Dispose() => Window.Changed -= OnWindowChanged;
+}

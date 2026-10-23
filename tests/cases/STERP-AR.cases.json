@@ -1,0 +1,5199 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-AR",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-AR-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-001-AC1",
+          "ac": 1,
+          "title": "Drift check clean for schema ar; a target CustomerCredit write yields one trigger audit row with legacy attribution",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "health",
+            "audit",
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "ready",
+              "call": "api_getReadiness"
+            },
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM ar.Customer WHERE CompanyCode = 'STC' AND CustomerCode = 'ZZA07AR1') INSERT ar.Customer (CompanyCode, CustomerCode, LegalName, LegalForm, VatLocation, CountryCode, CurrencyCode, AllowedCurrencies, Status, SanctionsStatus, CreatedBy) VALUES ('STC', 'ZZA07AR1', 'A07 Attribution Test Limited', 'LTD', 'GB', 'GB', 'GBP', 'GBP', 'ACTIVE', 'CLEAR', 'A07ARR'); IF NOT EXISTS (SELECT 1 FROM ar.CustomerCredit WHERE CompanyCode = 'STC' AND CustomerCode = 'ZZA07AR1') INSERT ar.CustomerCredit (CompanyCode, CustomerCode, CreditLimitGBP, OverdueThresholdGBP, OverdueDaysTrigger, CreatedBy) VALUES ('STC', 'ZZA07AR1', 5000.00, 0, 30, 'A07ARR');"
+            },
+            {
+              "save": "chk",
+              "call": "ar_checkCustomerCredit",
+              "path": {
+                "customerCode": "ZZA07AR1"
+              },
+              "body": {
+                "orderValue": 0.0,
+                "currency": "GBP",
+                "checkPoint": "ORDER",
+                "documentRef": ""
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ready",
+              "status": 200
+            },
+            {
+              "on": "ready",
+              "json": "$.driftDifferences",
+              "count": 0
+            },
+            {
+              "on": "chk",
+              "status": 200
+            },
+            {
+              "on": "chk",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'ar.CustomerCredit' AND EntityKey = 'ZZA07AR1' AND Action = 'UPDATE' AND Source = 'TRIGGER' AND UserCode = 'A07ARR'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.objects WHERE schema_id = SCHEMA_ID('ar') AND type IN ('U','V','P','TR','FN','IF','TF')",
+              "equals": 27
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.indexes WHERE name = 'IX_ArOpenItem_Customer' AND object_id = OBJECT_ID('ar.OpenItem')",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words with spec 3.1 object list (16 tables, 3 views, 5 procedures, 2 triggers, 1 function in sys.objects plus index IX_ArOpenItem_Customer), contracts 6.11 drift check, CREDCHK LastExposureGBP UPDATE without ModifiedBy so db/triggers/ar/tr_Customer.sql:16-25 attributes COALESCE(ModifiedBy, CreatedBy)=A07ARR; ar.Customer has no AR v1 writer and the source-level no-DDL clause is a static review, so the runtime pin is the unchanged object inventory.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-002-AC1",
+          "ac": 1,
+          "title": "Debtors menu rows per demo user, SALESREP request row only, report rows prime the launcher, F5 refreshes, two override windows",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "navigation",
+            "keys",
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "launch",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Debtors",
+                    "Debtors Reports",
+                    "Aged Debt..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "f5",
+              "gui": "/ar/receipt-entry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "C0001"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "two",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Debtors",
+                    "Credit Overrides..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Sales",
+                    "Request Credit Override..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "mS",
+              "call": "platform_getMenu",
+              "as": "SALESREP"
+            },
+            {
+              "save": "mA",
+              "call": "platform_getMenu",
+              "as": "ARCLERK"
+            },
+            {
+              "save": "mC",
+              "call": "platform_getMenu",
+              "as": "CREDMGR"
+            },
+            {
+              "save": "mT",
+              "call": "platform_getMenu",
+              "as": "TREASURY"
+            },
+            {
+              "save": "mF",
+              "call": "platform_getMenu",
+              "as": "FINCTRL"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "launch",
+              "text": "AGEDDEBT"
+            },
+            {
+              "on": "f5",
+              "text": "Receipt Entry and Allocation - Sales Ledger"
+            },
+            {
+              "on": "f5",
+              "text": "open item(s) in GBP"
+            },
+            {
+              "on": "f5",
+              "notText": "Customer Enquiry - Sales Ledger"
+            },
+            {
+              "on": "two",
+              "text": "Credit Overrides - scoped independent approval"
+            },
+            {
+              "on": "mS",
+              "json": "$.items[*].menuCode",
+              "contains": "AR.OVERRIDE.REQUEST"
+            },
+            {
+              "on": "mS",
+              "json": "$.items[*].caption",
+              "contains": "Request Credit &Override..."
+            },
+            {
+              "sql": "DECLARE @m TABLE (MenuCode varchar(40), ParentMenuCode varchar(40), Caption varchar(60), FormClass varchar(80), FormArgument varchar(60), PermissionCode varchar(60), SortOrder int, Shortcut varchar(20)); INSERT @m EXEC core.usp_UiMenuLoad @UserCode = 'SALESREP', @CompanyCode = 'STC', @SiteCode = 'RDG'; SELECT COUNT(*) FROM @m WHERE MenuCode IN ('AR', 'AR.OVERRIDE.MAINT')",
+              "equals": 0
+            },
+            {
+              "on": "mA",
+              "json": "$.items[*].caption",
+              "contains": "Customer &Enquiry..."
+            },
+            {
+              "on": "mA",
+              "json": "$.items[*].caption",
+              "contains": "&Receipt Entry..."
+            },
+            {
+              "on": "mA",
+              "json": "$.items[*].caption",
+              "contains": "Credit Control &Worklist..."
+            },
+            {
+              "on": "mA",
+              "json": "$.items[*].formArgument",
+              "contains": "AGEDDEBT"
+            },
+            {
+              "on": "mC",
+              "json": "$.items[*].caption",
+              "contains": "Credit &Overrides..."
+            },
+            {
+              "on": "mC",
+              "json": "$.items[*].caption",
+              "contains": "&Credit Limits and Holds..."
+            },
+            {
+              "on": "mT",
+              "json": "$.items[*].caption",
+              "contains": "&Direct Debit Mandates..."
+            },
+            {
+              "on": "mF",
+              "json": "$.items[*].caption",
+              "contains": "Debtors to Ledger &Reconciliation..."
+            }
+          ],
+          "derivation": "Spec FR-STERP-AR-002 menu table (db/seed/52-ar-menu.sql:66-93) with grants of 03-core-roles-users.sql and 52-ar-menu.sql:41-61, F5 shortcut shown as display text only (frmMain.vb:61-62), two frmCreditOverride rows with different arguments (frmMain.vb:86); the shell runs as SYSADM, who holds both override menu codes.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-010-AC1",
+          "ac": 1,
+          "title": "Customer enquiry: C0001 six buckets and SI-26-1001, refusal without AR.ENQUIRY, unknown customer, null DSO",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "e1",
+              "call": "ar_getCustomerEnquiry",
+              "path": {
+                "customerCode": "C0001"
+              }
+            },
+            {
+              "save": "e2",
+              "call": "ar_getCustomerEnquiry",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "as": "SALESREP"
+            },
+            {
+              "save": "e3",
+              "call": "ar_getCustomerEnquiry",
+              "path": {
+                "customerCode": "ZZNONE"
+              }
+            },
+            {
+              "save": "e4",
+              "call": "ar_getCustomerEnquiry",
+              "path": {
+                "customerCode": "C0013"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "e1",
+              "status": 200
+            },
+            {
+              "on": "e1",
+              "json": "$.agedProfile",
+              "count": 6
+            },
+            {
+              "on": "e1",
+              "json": "$.agedProfile[0].bucketNo",
+              "equals": 0
+            },
+            {
+              "on": "e1",
+              "json": "$.agedProfile[5].bucketNo",
+              "equals": 5
+            },
+            {
+              "on": "e1",
+              "json": "$.openItems[*].documentNumber",
+              "contains": "SI-26-1001"
+            },
+            {
+              "on": "e1",
+              "json": "$.balance.balanceGbp",
+              "equals": 8200.0
+            },
+            {
+              "on": "e2",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold AR.ENQUIRY"
+              }
+            },
+            {
+              "on": "e3",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-0302"
+              }
+            },
+            {
+              "on": "e4",
+              "status": 200
+            },
+            {
+              "on": "e4",
+              "json": "$.turnover.dsoDays",
+              "isNull": true
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-AR-010 (usp_CustomerEnquiry.sql:15-18; demo SI-26-1001 residual 14,400.00-1,200.00-5,000.00 = 8,200.00 from 91-ar-demo.sql; C0013 has no invoices); the AC's 422 E-0301 is unreachable through the API because the binding x-sterp-screen-gate of ar_getCustomerEnquiry is AR.ENQUIRY, checked first by core.usp_UiCheckAccess (contracts 5.4), so the binding 403 PRM0006 refusal is asserted instead.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-011-AC1",
+          "ac": 1,
+          "title": "Customer pick list: search C00 and empty/absent search return all 41 STC customers ordered by code",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "steps": [
+            {
+              "save": "l1",
+              "call": "ar_listCustomers",
+              "query": {
+                "search": "C00"
+              }
+            },
+            {
+              "save": "l2",
+              "call": "ar_listCustomers"
+            },
+            {
+              "save": "l3",
+              "call": "ar_listCustomers",
+              "query": {
+                "search": ""
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "l1",
+              "status": 200
+            },
+            {
+              "on": "l1",
+              "json": "$.count",
+              "equals": 41
+            },
+            {
+              "on": "l1",
+              "json": "$.items",
+              "count": 41
+            },
+            {
+              "on": "l1",
+              "json": "$.items[0].customerCode",
+              "equals": "C0001"
+            },
+            {
+              "on": "l1",
+              "json": "$.items[40].customerCode",
+              "equals": "C0090"
+            },
+            {
+              "on": "l2",
+              "json": "$.count",
+              "equals": 41
+            },
+            {
+              "on": "l2",
+              "json": "$.items[0].customerCode",
+              "equals": "C0001"
+            },
+            {
+              "on": "l3",
+              "json": "$.count",
+              "equals": 41
+            }
+          ],
+          "derivation": "AC words with the CustomerPickSql predicate (DebtorsService.vb:17-23, empty search -> NULL per SqlHelper.cs:33); STC customers C0001-C0040 (50-ar-customers.sql) and C0090 (93-so-demo.sql) all start with C00.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-012-AC1",
+          "ac": 1,
+          "title": "ARENQ METRICS: C0001 rebuilt balance, HOLD ENQ0004 without AR.CUSTOMER.ENQUIRE, 404 ENQ0010, undefined DSO ENQ0030",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "m1",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C0001"
+              }
+            },
+            {
+              "save": "m2",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "as": "FINCTRL"
+            },
+            {
+              "save": "m3",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "ZZNONE"
+              }
+            },
+            {
+              "save": "m4",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C0013"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "m1",
+              "status": 200
+            },
+            {
+              "on": "m1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "m1",
+              "json": "$.data.customer",
+              "equals": "C0001"
+            },
+            {
+              "on": "m1",
+              "json": "$.data.currency",
+              "equals": "GBP"
+            },
+            {
+              "on": "m1",
+              "json": "$.data.balance",
+              "equals": 8200.0
+            },
+            {
+              "on": "m2",
+              "status": 202
+            },
+            {
+              "on": "m2",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "ENQ0004"
+              }
+            },
+            {
+              "on": "m3",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "ENQ0010"
+              }
+            },
+            {
+              "on": "m4",
+              "status": 200
+            },
+            {
+              "on": "m4",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "ENQ0030"
+              }
+            },
+            {
+              "on": "m4",
+              "json": "$.data.dsoDefined",
+              "equals": "N"
+            },
+            {
+              "on": "m4",
+              "json": "$.data.dso",
+              "equals": 0.0
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-AR-012 (ARENQ.cob:262-311 PERMCHK RC 06, 677-705 DSO); as-at defaults to the business date because the seed dates are relative to the deploy date; FINCTRL holds AR.ENQUIRY (gate) but not AR.CUSTOMER.ENQUIRE (granted only to AR.CUSTOMER.VIEW roles, 52-ar-menu.sql:47); C0013 has no credit sales; full COMMAREA equality with the legacy oracle is left to the contracts 11 comparison.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-013-AC1",
+          "ac": 1,
+          "title": "Open-item statement lines for C0001 end at the header closing balance; style OTHER gives 422 E-0306",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "s1",
+              "call": "ar_getCustomerStatementLines",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "style": "OPENITEM"
+              }
+            },
+            {
+              "save": "s2",
+              "call": "ar_getCustomerStatementLines",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "style": "OTHER"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "s1",
+              "status": 200
+            },
+            {
+              "on": "s1",
+              "json": "$.lines",
+              "count": 1
+            },
+            {
+              "on": "s1",
+              "json": "$.lines[0].documentNumber",
+              "equals": "SI-26-1001"
+            },
+            {
+              "on": "s1",
+              "json": "$.lines[0].runningBalanceGbp",
+              "equals": 8200.0
+            },
+            {
+              "on": "s1",
+              "json": "$.header.closingGbp",
+              "equals": 8200.0
+            },
+            {
+              "on": "s2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-0306"
+              }
+            }
+          ],
+          "derivation": "AC words with usp_CustomerStatementLines.sql:11-72 (as-of = server date when absent, THROW 50306) and the demo ledger of C0001 where only SI-26-1001 (8,200.00) is outstanding (91-ar-demo.sql allocations).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-014-AC1",
+          "ac": 1,
+          "title": "Aged-debt summary: six buckets 0-5 and accounts; as of 2000-01-01 the rebuilt ledger has no accounts",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "steps": [
+            {
+              "save": "a1",
+              "call": "ar_getAgedDebtSummary"
+            },
+            {
+              "save": "a2",
+              "call": "ar_getAgedDebtSummary",
+              "query": {
+                "asOf": "2000-01-01"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "a1",
+              "status": 200
+            },
+            {
+              "on": "a1",
+              "json": "$.buckets",
+              "count": 6
+            },
+            {
+              "on": "a1",
+              "json": "$.buckets[0].bucketNo",
+              "equals": 0
+            },
+            {
+              "on": "a1",
+              "json": "$.buckets[5].bucketNo",
+              "equals": 5
+            },
+            {
+              "on": "a1",
+              "json": "$.accounts[*].customerCode",
+              "contains": "C0001"
+            },
+            {
+              "on": "a2",
+              "status": 200
+            },
+            {
+              "on": "a2",
+              "json": "$.buckets",
+              "count": 6
+            },
+            {
+              "on": "a2",
+              "json": "$.accounts",
+              "count": 0
+            }
+          ],
+          "derivation": "AC words with usp_AgedDebtSummary.sql:9-51 (six bucket rows, accounts with a non-zero item count) and legacy OrderToCashTests.cs:283 (asOf 2000-01-01 rebuilds a ledger with nothing posted).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-015",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-015-AC1",
+          "ac": 1,
+          "title": "Customer Enquiry page: c0001 + F5 status text, metrics HOLD keeps figures, held credit check dialog, DSO undefined",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "e1",
+              "gui": "/ar/customer-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "c0001"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "e2",
+              "gui": "/ar/customer-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "c0008"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Credit check"
+                }
+              ]
+            },
+            {
+              "save": "e3",
+              "gui": "/ar/customer-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "c0013"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "e1",
+              "text": "C0001"
+            },
+            {
+              "on": "e1",
+              "text": "1 open item(s) at 12/10/2026.  F2 account list, F5 refresh, F3 close."
+            },
+            {
+              "on": "e1",
+              "text": "8,200.00"
+            },
+            {
+              "on": "e1",
+              "notText": "Reason code: ENQ0004"
+            },
+            {
+              "on": "e2",
+              "text": "Reason code: CRD00"
+            },
+            {
+              "on": "e2",
+              "notText": "Decision HOLD"
+            },
+            {
+              "on": "e3",
+              "text": "undefined"
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-AR-015 (frmCustomerEnquiry.vb:12-163); FINCTRL lacks AR.CUSTOMER.ENQUIRE so ARENQ answers RC 06 without a dialog; C0008 is on hold (HoldFlag 1, 50-ar-customers.sql) so CREDCHK holds with a CRD003x reason; C0013 has no credit sales so DSO is null.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-020",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-020-AC1",
+          "ac": 1,
+          "title": "CREDCHK CHECK on the TARCRED fixture: HOLD CRD0034 figures, MATCH blocks CRD0020, active override releases CRD0040",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-15"
+          },
+          "covers": [
+            "audit",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM ar.Customer WHERE CompanyCode = 'STC' AND CustomerCode = 'ZZCRED1') BEGIN INSERT ar.Customer (CompanyCode, CustomerCode, LegalName, LegalForm, VatLocation, CountryCode, CurrencyCode, AllowedCurrencies, Status, SanctionsStatus, CreatedBy) VALUES ('STC','ZZCRED1','Zed Credit Test Limited','LTD','GB','GB','GBP','GBP','ACTIVE','CLEAR','ZZARTEST'); INSERT ar.CustomerCredit (CompanyCode, CustomerCode, CreditLimitGBP, OverdueThresholdGBP, OverdueDaysTrigger, CreatedBy) VALUES ('STC','ZZCRED1',1100.00,0,30,'ZZARTEST'); INSERT ar.OpenItem (CompanyCode, CustomerCode, ItemType, DocumentNumber, DocumentDate, DueDate, PostingDate, CurrencyCode, FxRate, OriginalAmount, OriginalAmountGBP, ResidualAmount, ResidualAmountGBP, SettlementStatus, CreatedBy) VALUES ('STC','ZZCRED1','INVOICE','ZZCR-INV-1','2026-10-01','2026-11-15','2026-10-01','GBP',1,800.00,800.00,800.00,800.00,'OPEN','ZZARTEST'), ('STC','ZZCRED1','CREDIT','ZZCR-CRD-1','2026-10-01','2026-10-01','2026-10-01','GBP',1,-100.00,-100.00,-100.00,-100.00,'OPEN','ZZARTEST'), ('STC','ZZCRED1','DEPOSIT','ZZCR-DEP-1','2026-10-01','2026-10-01','2026-10-01','GBP',1,-50.00,-50.00,-50.00,-50.00,'OPEN','ZZARTEST'); DECLARE @so bigint, @l2 bigint, @d bigint; INSERT so.SalesOrder (CompanyCode, SiteCode, OrderNumber, CustomerCode, OrderDate, CurrencyCode, FxRate, CommercialStatus, CreatedBy) VALUES ('STC','RDG','ZZCR-SO-1','ZZCRED1','2026-10-01','GBP',1,'ACCEPTED','ZZARTEST'); SET @so = SCOPE_IDENTITY(); INSERT so.SalesOrderLine (SalesOrderId, CompanyCode, OrderNumber, LineNum, LineRef, Description, LineType, AcceptedQty, CancelledQty, DespatchedQty, BilledQty, UnitPrice, NetAmount, VatAmount, Status) VALUES (@so,'STC','ZZCR-SO-1',1,'001','Unshipped frame kit','STOCK',10,0,0,0,30,300.00,50.00,'OPEN'); INSERT so.SalesOrderLine (SalesOrderId, CompanyCode, OrderNumber, LineNum, LineRef, Description, LineType, AcceptedQty, CancelledQty, DespatchedQty, BilledQty, UnitPrice, NetAmount, VatAmount, Status) VALUES (@so,'STC','ZZCR-SO-1',2,'002','Despatched frame kit','STOCK',10,0,10,0,12.5,125.00,25.00,'OPEN'); SET @l2 = SCOPE_IDENTITY(); INSERT so.Despatch (CompanyCode, SiteCode, DespatchRef, CustomerCode, OrderNumber, DespatchDate, PostingDate, Status, CreatedBy) VALUES ('STC','RDG','ZZCR-DSP-1','ZZCRED1','ZZCR-SO-1','2026-10-05','2026-10-05','CONFIRMED','ZZARTEST'); SET @d = SCOPE_IDENTITY(); INSERT so.DespatchLine (DespatchId, LineNum, SalesOrderLineId, OrderNumber, OrderLineNum, ItemCode, Description, PickedQty, DespatchedQty, StockQty, BilledQty) VALUES (@d,1,@l2,'ZZCR-SO-1',2,'ZZCR-ITEM','Despatched frame kit',10,10,10,0); END"
+            },
+            {
+              "save": "c1",
+              "call": "ar_checkCustomerCredit",
+              "path": {
+                "customerCode": "ZZCRED1"
+              },
+              "body": {
+                "orderValue": 0.0,
+                "currency": "GBP",
+                "checkPoint": "ORDER",
+                "documentRef": ""
+              }
+            },
+            {
+              "sql": "SET NOCOUNT ON; UPDATE ar.Customer SET SanctionsStatus = 'MATCH' WHERE CompanyCode = 'STC' AND CustomerCode = 'ZZCRED1'; INSERT ar.CreditOverride (CompanyCode, CustomerCode, Scope, DocumentRef, OverrideAmountGBP, ExcessGBP, Reason, RequestedBy, ApprovedBy, ApprovedAt, ValidFrom, ExpiresOn, Status) VALUES ('STC','ZZCRED1','ORDER','ZZCR-SO-1',50.00,50.00,'A07 approved order override','SALESREP','CREDMGR',SYSDATETIME(),'2026-10-15','2026-10-22','ACTIVE');"
+            },
+            {
+              "save": "c2",
+              "call": "ar_checkCustomerCredit",
+              "path": {
+                "customerCode": "ZZCRED1"
+              },
+              "body": {
+                "orderValue": 0.0,
+                "currency": "GBP",
+                "checkPoint": "ORDER",
+                "documentRef": "ZZCR-SO-1"
+              }
+            },
+            {
+              "sql": "SET NOCOUNT ON; UPDATE ar.Customer SET SanctionsStatus = 'CLEAR' WHERE CompanyCode = 'STC' AND CustomerCode = 'ZZCRED1';"
+            },
+            {
+              "save": "c3",
+              "call": "ar_checkCustomerCredit",
+              "path": {
+                "customerCode": "ZZCRED1"
+              },
+              "body": {
+                "orderValue": 0.0,
+                "currency": "GBP",
+                "checkPoint": "ORDER",
+                "documentRef": "ZZCR-SO-1"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "c1",
+              "status": 202
+            },
+            {
+              "on": "c1",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "CRD0034",
+                "messageContains": "Credit limit exceeded by GBP 50.00"
+              }
+            },
+            {
+              "on": "c1",
+              "json": "$.data.openDebt",
+              "equals": 800.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.openCredits",
+              "equals": 100.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.firmOrders",
+              "equals": 350.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.shippedUnbill",
+              "equals": 150.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.deposits",
+              "equals": 50.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.exposure",
+              "equals": 1150.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.headroom",
+              "equals": -50.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.excess",
+              "equals": 50.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.utilisedPct",
+              "equals": 104.55
+            },
+            {
+              "on": "c1",
+              "json": "$.data.decision",
+              "equals": "HOLD"
+            },
+            {
+              "on": "c2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CRD0020",
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "c3",
+              "status": 200
+            },
+            {
+              "on": "c3",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "CRD0040"
+              }
+            },
+            {
+              "on": "c3",
+              "json": "$.data.decision",
+              "equals": "RELEASE"
+            },
+            {
+              "on": "c3",
+              "json": "$.data.overrideScope",
+              "equals": ""
+            },
+            {
+              "on": "c3",
+              "json": "$.data.overrideExpiry",
+              "equals": 20261022
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'ar.CustomerCredit' AND EntityKey = 'ZZCRED1' AND Action = 'UPDATE' AND Source = 'TRIGGER' AND UserCode = 'ZZARTEST'",
+              "equals": 3
+            }
+          ],
+          "derivation": "AC words with the legacy characterization fixture cobol/tests/ar/TARCRED.cob:107-180 (legs 800/100/350/150/50, limit 1,100.00, eval 20261015, expected 1,150.00/-50.00/50.00/104.55 at 209-262, BLOCK CRD0020 at 358-379, RELEASE under an approved ORDER override CRD0040 at 572-586) and the OpenAPI 202 example 'hold'; three exposure writes give three tr_CustomerCredit_Audit rows attributed to CreatedBy. CHECK never moves anything to CK-OVERRIDE-SCOPE (only 3000-REQUEST-OVERRIDE, CREDCHK.cob:894-895, and 3600-READ-OVERRIDE, :1176, do; 2050-ACTIVE-OVERRIDE :639-689 does not) and DebtorsService.CreditCheck (DebtorsService.vb:76-88) leaves it as initialised spaces, so overrideScope is '' (contracts 4.3); every expected value, including the blank scope and the three audit rows, was observed on the legacy route DebtorsService.CreditCheck replaying this arrangement on freshc (amendment evidence p4/runs/rg013-ar020-legacy-route.txt). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-013: CHECK leaves CK-OVERRIDE-SCOPE blank, so overrideScope is '' instead of ORDER]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-AR-020-EDGE-NUMERIC-MAGNITUDE",
+          "ac": null,
+          "title": "Credit-check order value with 12 integer digits keeps the low-order 11 digits (100000000001.00 -> 1.00)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "numeric-magnitude"
+          ],
+          "steps": [
+            {
+              "save": "c1",
+              "call": "ar_checkCustomerCredit",
+              "path": {
+                "customerCode": "C0003"
+              },
+              "body": {
+                "orderValue": 100000000001.0,
+                "currency": "GBP",
+                "checkPoint": "ORDER",
+                "documentRef": ""
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "c1",
+              "json": "$.data.orderValue",
+              "equals": 1.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.orderValueGbp",
+              "equals": 1.0
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-too-large rule (high-order truncation, CobolCodec.cs:76-79 and packed equivalent) for CK-ORDER-VALUE PIC S9(11)V99 COMP-3 (x-sterp-digits 13, scale 2); C0003 is ACTIVE and CLEAR so CREDCHK answers with an envelope carrying the COMMAREA.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-021",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-021-AC1",
+          "ac": 1,
+          "title": "Override list: SALESREP request mode shows own requests newest first; CREDMGR sees every override of the company",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; INSERT ar.CreditOverride (CompanyCode, CustomerCode, Scope, DocumentRef, OverrideAmountGBP, ExcessGBP, Reason, RequestedBy, ApprovedBy, ApprovedAt, ValidFrom, ExpiresOn, Status) VALUES ('STC','C0009','ORDER','A07-021-SR-1',100.00,0,'A07 request one','SALESREP',NULL,NULL,'2026-10-12','2026-10-19','PENDING'), ('STC','C0004','ORDER','A07-021-CM-1',200.00,0,'A07 request by the credit manager','CREDMGR',NULL,NULL,'2026-10-12','2026-10-19','PENDING'), ('STC','C0009','ORDER','A07-021-SR-2',300.00,0,'A07 request two','SALESREP',NULL,NULL,'2026-10-12','2026-10-19','PENDING');"
+            },
+            {
+              "save": "l1",
+              "call": "ar_listCreditOverrides",
+              "query": {
+                "requestsOnly": true
+              },
+              "as": "SALESREP"
+            },
+            {
+              "save": "l2",
+              "call": "ar_listCreditOverrides",
+              "query": {
+                "requestsOnly": false
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "l1",
+              "status": 200
+            },
+            {
+              "on": "l1",
+              "json": "$.count",
+              "equals": 2
+            },
+            {
+              "on": "l1",
+              "json": "$.items[0].documentRef",
+              "equals": "A07-021-SR-2"
+            },
+            {
+              "on": "l1",
+              "json": "$.items[1].documentRef",
+              "equals": "A07-021-SR-1"
+            },
+            {
+              "on": "l2",
+              "status": 200
+            },
+            {
+              "on": "l2",
+              "json": "$.count",
+              "equals": 3
+            },
+            {
+              "on": "l2",
+              "json": "$.items[0].documentRef",
+              "equals": "A07-021-SR-2"
+            },
+            {
+              "on": "l2",
+              "json": "$.items[*].requestedBy",
+              "contains": "CREDMGR"
+            }
+          ],
+          "derivation": "AC words with the legacy query of DebtorsService.vb:90-96 (RequestedBy = @UserCode when @RequestsOnly, ORDER BY OverrideId DESC); the fresh database holds no other ar.CreditOverride rows.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-022",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-022-AC1",
+          "ac": 1,
+          "title": "Override request workflow 5 step 2: PENDING ORDER row for 5 ENG days CRD0052; blank reason CRD0050; 50,001 names FC",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "CAL",
+            "site": "LIV",
+            "businessDate": "2026-10-15",
+            "actor": "SALESREP"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r1",
+              "call": "ar_requestCreditOverride",
+              "body": {
+                "customer": "K0004",
+                "documentRef": "SOC900003",
+                "overrideAmt": 7128.0,
+                "overrideReason": "Livingston first-order scoped authority"
+              }
+            },
+            {
+              "save": "r2",
+              "call": "ar_requestCreditOverride",
+              "body": {
+                "customer": "K0004",
+                "documentRef": "A07-022-BLANK",
+                "overrideAmt": 100.0,
+                "overrideReason": ""
+              }
+            },
+            {
+              "save": "r3",
+              "call": "ar_requestCreditOverride",
+              "body": {
+                "customer": "K0004",
+                "documentRef": "A07-022-HIGH",
+                "overrideAmt": 50001.0,
+                "overrideReason": "Controller authority regression"
+              }
+            },
+            {
+              "save": "r4",
+              "call": "ar_requestCreditOverride",
+              "body": {
+                "customer": "K0004",
+                "documentRef": "A07-022-DENIED",
+                "overrideAmt": 100.0,
+                "overrideReason": "No request permission"
+              },
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "status": 200
+            },
+            {
+              "on": "r1",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "CRD0052",
+                "messageContains": "Override requested; approval by AR.CREDIT.OVERRIDE is required"
+              }
+            },
+            {
+              "on": "r1",
+              "json": "$.data.overrideStatus",
+              "equals": "PENDING"
+            },
+            {
+              "on": "r1",
+              "json": "$.data.overrideScope",
+              "equals": "ORDER"
+            },
+            {
+              "on": "r1",
+              "json": "$.data.overrideFrom",
+              "equals": 20261015
+            },
+            {
+              "on": "r1",
+              "json": "$.data.overrideExpiry",
+              "equals": 20261022
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE CompanyCode = 'CAL' AND CustomerCode = 'K0004' AND DocumentRef = 'SOC900003' AND Status = 'PENDING' AND Scope = 'ORDER' AND RequestedBy = 'SALESREP' AND ValidFrom = '2026-10-15' AND ExpiresOn = '2026-10-22' AND OverrideAmountGBP = 7128.00",
+              "equals": 1
+            },
+            {
+              "on": "r2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CRD0050"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE DocumentRef = 'A07-022-BLANK'",
+              "equals": 0
+            },
+            {
+              "on": "r3",
+              "status": 200
+            },
+            {
+              "on": "r3",
+              "outcome": {
+                "reasonCode": "CRD0052",
+                "messageContains": "FIN.CONTROL.OVERRIDE"
+              }
+            },
+            {
+              "on": "r4",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "WHSE does not hold AR.CREDIT.OVERRIDE"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE DocumentRef = 'A07-022-DENIED'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 5 step 2 and CreditOverrideTests.cs:28-36,73-77,87 (AR.OVERRIDE.MAX.WORKDAYS 5 and AR.OVERRIDE.FC.THRESHOLD 50000 in 04-core-parameters.sql:45-46; 15/10/2026 + 5 ENG business days = 22/10/2026 as TARCRED.cob:540); the AC's 202 for a requester holding neither permission is unreachable because the binding screen gate of ar_requestCreditOverride is exactly AR.CREDIT.OVERRIDE or SO.ORDER.ENTER (contracts 5.4), so the binding 403 PRM0006 with no row is asserted.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-023",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-023-AC1",
+          "ac": 1,
+          "title": "Override approval: requester refused CRD0054, other customer 404, CREDMGR approves to ACTIVE, repeat CRD0055",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "CAL",
+            "site": "LIV",
+            "businessDate": "2026-10-15",
+            "actor": "CREDMGR"
+          },
+          "covers": [
+            "permission",
+            "concurrency"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM ar.CreditOverride WHERE OverrideId = 9023) BEGIN SET IDENTITY_INSERT ar.CreditOverride ON; INSERT ar.CreditOverride (OverrideId, CompanyCode, CustomerCode, Scope, DocumentRef, OverrideAmountGBP, ExcessGBP, Reason, RequestedBy, ValidFrom, ExpiresOn, Status) VALUES (9023,'CAL','K0004','ORDER','SOC900003',7128.00,0,'Livingston first-order scoped authority','SALESREP','2026-10-15','2026-10-22','PENDING'); SET IDENTITY_INSERT ar.CreditOverride OFF; END"
+            },
+            {
+              "save": "a1",
+              "call": "ar_approveCreditOverride",
+              "path": {
+                "overrideId": 9023
+              },
+              "body": {
+                "customer": "K0004"
+              },
+              "as": "SALESREP"
+            },
+            {
+              "save": "a2",
+              "call": "ar_approveCreditOverride",
+              "path": {
+                "overrideId": 9023
+              },
+              "body": {
+                "customer": "K0003"
+              }
+            },
+            {
+              "save": "a3",
+              "call": "ar_approveCreditOverride",
+              "path": {
+                "overrideId": 9023
+              },
+              "body": {
+                "customer": "K0004"
+              }
+            },
+            {
+              "save": "a4",
+              "call": "ar_approveCreditOverride",
+              "path": {
+                "overrideId": 9023
+              },
+              "body": {
+                "customer": "K0004"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "a1",
+              "status": 202
+            },
+            {
+              "on": "a1",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "CRD0054"
+              }
+            },
+            {
+              "on": "a2",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "CRD0056"
+              }
+            },
+            {
+              "on": "a3",
+              "status": 200
+            },
+            {
+              "on": "a3",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK",
+                "messageContains": "Credit override approved to 22/10/2026"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE OverrideId = 9023 AND Status = 'ACTIVE' AND ApprovedBy = 'CREDMGR' AND RequestedBy = 'SALESREP' AND ApprovedAt IS NOT NULL",
+              "equals": 1
+            },
+            {
+              "on": "a4",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CRD0055"
+              }
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 5 step 3 and CreditOverrideTests.cs:37-63 (requester RC 6, other customer RC 16, approval RC 0 with ACTIVE/CREDMGR, repeat RC 8); the PENDING request row is arranged with a fixed OverrideId so the path parameter is known.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-024",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-024-AC1",
+          "ac": 1,
+          "title": "Credit Overrides page: request mode F10 requests, blank fields warn without a call, approval mode F10 approves row",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "keys",
+            "navigation"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; INSERT ar.CreditOverride (CompanyCode, CustomerCode, Scope, DocumentRef, OverrideAmountGBP, ExcessGBP, Reason, RequestedBy, ApprovedBy, ApprovedAt, ValidFrom, ExpiresOn, Status) VALUES ('STC','C0009','ORDER','A07-024-APPROVE',250.00,0,'A07 request awaiting approval','SALESREP',NULL,NULL,'2026-10-12','2026-10-19','PENDING');"
+            },
+            {
+              "save": "req",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Sales",
+                    "Request Credit Override..."
+                  ]
+                },
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "C0009"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Order reference (scope ORDER)",
+                    "value": "A07-024-REQ"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Override amount GBP",
+                    "value": "250.00"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason",
+                    "value": "A07 request from the Sales menu"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "OK"
+                }
+              ]
+            },
+            {
+              "save": "blank",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Sales",
+                    "Request Credit Override..."
+                  ]
+                },
+                {
+                  "fill": {
+                    "label": "Override amount GBP",
+                    "value": "100.00"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "appr",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Debtors",
+                    "Credit Overrides..."
+                  ]
+                },
+                {
+                  "click": "A07-024-APPROVE"
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "req",
+              "text": "PENDING"
+            },
+            {
+              "on": "req",
+              "text": "Switch user for independent approval."
+            },
+            {
+              "on": "blank",
+              "text": "Enter customer, order reference, GBP amount and reason."
+            },
+            {
+              "on": "appr",
+              "text": "Return to Sales Order Entry for normal accept/release."
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE CompanyCode = 'STC' AND DocumentRef = 'A07-024-REQ' AND Status = 'PENDING' AND RequestedBy = 'SYSADM'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE CompanyCode = 'STC' AND RequestedBy = 'SYSADM' AND OverrideAmountGBP = 100.00",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE CompanyCode = 'STC' AND DocumentRef = 'A07-024-APPROVE' AND Status = 'ACTIVE' AND ApprovedBy = 'SYSADM'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words and frmCreditOverride.vb:1-103 status texts; the GUI DSL has one session user and no enabled-state assertion, so SALESREP/CREDMGR are played by SYSADM (holds SO.ORDER.ENTER and AR.CREDIT.OVERRIDE, sees both menu rows) and the 'Approve disabled in request mode' clause is not directly assertable. CREDCHK OVERRIDE answers RC 04 CRD0052 'Override requested; approval by <permission> is required' (CREDCHK.cob:1023-1033), so ShowResult shows the modal warning first and the PENDING status follows after OK (frmCreditOverride.vb:80-87, BaseForm.vb:183-186,202-210); approval runs on the business date 12/10/2026, inside the arranged validity 12/10-19/10 (CREDCHK.cob:1059-1064). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-112: request answers RC 04: the warning dialog is acknowledged before the status is read]",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-025",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-025-AC1",
+          "ac": 1,
+          "title": "IC-AR-CREDCHK unit of work: CHECK HOLD writes commit in autocommit; failed OVERRIDE leaves no row",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "c1",
+              "call": "ar_checkCustomerCredit",
+              "path": {
+                "customerCode": "C0008"
+              },
+              "body": {
+                "orderValue": 0.0,
+                "currency": "GBP",
+                "checkPoint": "ORDER",
+                "documentRef": ""
+              }
+            },
+            {
+              "save": "x1",
+              "sql": "SELECT CASE WHEN LastExposureGBP IS NOT NULL THEN 1 ELSE 0 END AS n FROM ar.CustomerCredit WHERE CompanyCode = 'STC' AND CustomerCode = 'C0008'"
+            },
+            {
+              "save": "o1",
+              "call": "ar_requestCreditOverride",
+              "body": {
+                "customer": "C0008",
+                "documentRef": "A07-025-NOREASON",
+                "overrideAmt": 100.0,
+                "overrideReason": ""
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "c1",
+              "status": 202
+            },
+            {
+              "on": "c1",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD"
+              }
+            },
+            {
+              "on": "x1",
+              "json": "$[0].n",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem e JOIN ar.CustomerCredit c ON c.CompanyCode = e.CompanyCode AND c.CustomerCode = 'C0008' WHERE e.CompanyCode = 'STC' AND e.Category = 'CREDIT' AND e.OwnerUser = 'CREDMGR' AND e.Priority = 2 AND e.Status = 'OPEN' AND e.AmountGBP = c.LastExposureGBP",
+              "equals": 1
+            },
+            {
+              "on": "o1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CRD0050"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE DocumentRef = 'A07-025-NOREASON'",
+              "equals": 0
+            }
+          ],
+          "derivation": "Spec FR-STERP-AR-025 and 7.2.1: only the autocommit/own-unit branches are reachable through binding operations (CREDCHK.cob:1232-1295); the caller-transaction rollback, SAVE TRANSACTION CREDCHK and STERP-SO contract-test clauses run only in-process (SOACCEPT, DESPATCH, SOAMEND, SODEMO) and cannot be expressed in this DSL.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-030",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-030-AC1",
+          "ac": 1,
+          "title": "Allocatable items: C0001 GBP lists SI-26-1001 with the 5.00 write-off tolerance; currency XXX gives 422 E-0305",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "i1",
+              "call": "ar_getAllocatableItems",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "currency": "GBP"
+              }
+            },
+            {
+              "save": "i2",
+              "call": "ar_getAllocatableItems",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "currency": "XXX"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "i1",
+              "status": 200
+            },
+            {
+              "on": "i1",
+              "json": "$.debitItems[*].documentNumber",
+              "contains": "SI-26-1001"
+            },
+            {
+              "on": "i1",
+              "json": "$.debitItems[0].smallDifferenceToleranceGbp",
+              "equals": 5.0
+            },
+            {
+              "on": "i1",
+              "json": "$.totals.smallDifferenceToleranceGbp",
+              "equals": 5.0
+            },
+            {
+              "on": "i2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-0305"
+              }
+            }
+          ],
+          "derivation": "AC words with usp_OpenItemsForAllocation.sql:12-56 and AR.WRITEOFF.AUTO.GBP 5.00 seeded in 04-core-parameters.sql:155.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-031",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-031-AC1",
+          "ac": 1,
+          "title": "Receipt workflow 1 step 6: C0001 8,196.00 posted with item and journal; replay RCP0008; gross 0; RCP0006 still records",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "idempotency",
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM core.Role WHERE RoleCode = 'ZZA07RCV') INSERT core.Role (RoleCode, Name, CreatedBy) VALUES ('ZZA07RCV', 'A07 receipt entry without AR.RECEIPT.POST', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.RolePermission WHERE RoleCode = 'ZZA07RCV' AND PermissionCode = 'AR.RECEIPT.ENTER') INSERT core.RolePermission (RoleCode, PermissionCode, CreatedBy) VALUES ('ZZA07RCV', 'AR.RECEIPT.ENTER', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.AppUser WHERE UserCode = 'ZZA07RCV') INSERT core.AppUser (UserCode, DisplayName, DefaultCompanyCode, DefaultSiteCode, CreatedBy) VALUES ('ZZA07RCV', 'A07 receipt entry without AR.RECEIPT.POST', 'STC', 'RDG', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.UserRole WHERE UserCode = 'ZZA07RCV' AND RoleCode = 'ZZA07RCV') INSERT core.UserRole (UserCode, RoleCode, CompanyCode, SiteCode, ValidFrom, CreatedBy) VALUES ('ZZA07RCV', 'ZZA07RCV', 'STC', '*', '2024-04-01', 'A07');"
+            },
+            {
+              "save": "r1",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8196.0,
+                "bankRef": "PENNINE OCT 26",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-AR031-RCPT-01"
+            },
+            {
+              "save": "r2",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8196.0,
+                "bankRef": "PENNINE OCT 26",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-AR031-RCPT-01"
+            },
+            {
+              "save": "r3",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 0.0,
+                "bankRef": "",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-AR031-RCPT-02"
+            },
+            {
+              "save": "r4",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0005",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "",
+                "externalRef": ""
+              },
+              "as": "ZZA07RCV",
+              "idempotencyKey": "A07-AR031-RCPT-03"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "status": 200
+            },
+            {
+              "on": "r1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r1",
+              "json": "$.outcome.message",
+              "matches": "^Receipt \\S+ GBP 8,196\\.00 recorded \\(CONFIRMED\\)$"
+            },
+            {
+              "on": "r1",
+              "json": "$.data.unallocated",
+              "equals": 8196.0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CorrelationId = 'A07-AR031-RCPT-01' AND CompanyCode = 'STC' AND CustomerCode = 'C0001' AND Status = 'POSTED' AND ConfirmationState = 'CONFIRMED' AND GrossReceived = 8196.00 AND UnallocatedAmount = 8196.00",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem o JOIN ar.Receipt r ON r.CompanyCode = o.CompanyCode AND r.ReceiptNumber = o.DocumentNumber WHERE r.CorrelationId = 'A07-AR031-RCPT-01' AND o.ItemType = 'RECEIPT' AND o.OriginalAmount = -8196.00 AND o.ResidualAmount = -8196.00",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.Journal j JOIN ar.Receipt r ON r.JournalId = j.JournalId WHERE r.CorrelationId = 'A07-AR031-RCPT-01' AND j.CurrencyCode = 'GBP' AND j.TotalDebit = 8196.00 AND j.TotalCredit = 8196.00",
+              "equals": 1
+            },
+            {
+              "on": "r2",
+              "status": 200
+            },
+            {
+              "on": "r2",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "RCP0008"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CorrelationId = 'A07-AR031-RCPT-01'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.IdempotencyKey k JOIN ar.Receipt r ON r.CorrelationId = k.CorrelationId AND r.ReceiptNumber = k.ResultRef WHERE k.CorrelationId = 'A07-AR031-RCPT-01' AND k.Operation = 'ar.Receipt.Post' AND k.Status = 'COMPLETED'",
+              "equals": 1
+            },
+            {
+              "on": "r3",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "RCP0002",
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "r4",
+              "status": 202
+            },
+            {
+              "on": "r4",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "RCP0006"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CorrelationId = 'A07-AR031-RCPT-03' AND Status = 'POSTED' AND GrossReceived = 100.00",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 1 step 6 and OpenAPI examples 'demo'/'replay'/'hold' of ar_recordReceipt (RCPTALOC.cob:202-320: RCP0002, PERMCHK RC 06 not a stop per SME-038, IDEMPOT replay RCP0008 with the original number, ar.Receipt.CorrelationId = Idempotency-Key, journal DR BANK/CR DEBTOR 8,196.00); ZZA07RCV is an arranged user holding only the screen gate AR.RECEIPT.ENTER.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-AR-031-EDGE-NUMERIC-SCALE",
+          "ac": null,
+          "title": "Receipt gross 100.005 is rounded half away from zero to 100.01 before RCPTALOC",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r1",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0005",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 100.005,
+                "bankRef": "",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-AR031-EDGE-SCALE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "status": 200
+            },
+            {
+              "on": "r1",
+              "outcome": {
+                "returnCode": 0,
+                "messageContains": "GBP 100.01 recorded (CONFIRMED)"
+              }
+            },
+            {
+              "on": "r1",
+              "json": "$.data.gross",
+              "equals": 100.01
+            },
+            {
+              "sql": "SELECT GrossReceived FROM ar.Receipt WHERE CorrelationId = 'A07-AR031-EDGE-SCALE'",
+              "equals": 100.01
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-with-scale rule (round half away from zero to the field scale, CobolCodec.cs:24-29) for RA-GROSS PIC S9(11)V99 COMP-3 (x-sterp-scale 2 in the binding schema ArReceiptRequest).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-AR-031-EDGE-DEMO-JOURNEY",
+          "ac": null,
+          "title": "Demo journeys: workflow 1 steps 5-7 (enquiry, receipt with 4.00 write-off, RCP0029 hold, dispute, promise, dunning) and 5",
+          "layer": "e2e",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "journey",
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE core.NumberSeries SET NextNumber = 31901 WHERE CompanyCode = 'STC' AND SeriesCode = 'ARRC'; IF NOT EXISTS (SELECT 1 FROM ar.CreditOverride WHERE OverrideId = 9090) BEGIN SET IDENTITY_INSERT ar.CreditOverride ON; INSERT ar.CreditOverride (OverrideId, CompanyCode, CustomerCode, Scope, DocumentRef, OverrideAmountGBP, ExcessGBP, Reason, RequestedBy, ValidFrom, ExpiresOn, Status) VALUES (9090,'STC','C0040','ORDER','A07-DEMO-ANCHOR',1.00,0,'A07 identity anchor','SALESREP','2026-10-12','2026-10-12','REVOKED'); SET IDENTITY_INSERT ar.CreditOverride OFF; END"
+            },
+            {
+              "save": "e1",
+              "call": "ar_getCustomerEnquiry",
+              "path": {
+                "customerCode": "C0001"
+              }
+            },
+            {
+              "save": "pv1",
+              "call": "ar_previewAllocation",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8196.0,
+                "bankRef": "",
+                "externalRef": "",
+                "sourceItemId": 0,
+                "sourceDoc": "",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1001",
+                    "currency": "GBP",
+                    "apply": 8196.0,
+                    "writeOff": 4.0,
+                    "writeOffReason": "Short payment within the clerk tolerance"
+                  }
+                ]
+              }
+            },
+            {
+              "save": "rc",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8196.0,
+                "bankRef": "PENNINE OCT 26",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-DEMO-RCPT-01"
+            },
+            {
+              "save": "al",
+              "call": "ar_allocateReceipt",
+              "body": {
+                "sourceItemId": 0,
+                "sourceDoc": "RCS00031901",
+                "receiptDate": "2026-10-12",
+                "effectiveDate": "2026-10-12",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1001",
+                    "currency": "GBP",
+                    "apply": 8196.0,
+                    "writeOff": 4.0,
+                    "writeOffReason": "Short payment within the clerk tolerance"
+                  }
+                ]
+              },
+              "idempotencyKey": "A07-DEMO-ALLOC-01"
+            },
+            {
+              "save": "pv2",
+              "call": "ar_previewAllocation",
+              "body": {
+                "customer": "C0004",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 5081.0,
+                "bankRef": "",
+                "externalRef": "",
+                "sourceItemId": 0,
+                "sourceDoc": "",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1002",
+                    "currency": "GBP",
+                    "apply": 5081.0,
+                    "writeOff": 19.0,
+                    "writeOffReason": "Customer deducted a delivery charge"
+                  }
+                ]
+              }
+            },
+            {
+              "save": "ds",
+              "call": "ar_raiseDispute",
+              "body": {
+                "customer": "C0008",
+                "documentNo": "SI-26-1003",
+                "openItemId": 0,
+                "disputedAmt": 3600.0,
+                "reasonCode": "PRICE",
+                "reason": "Customer disputes the unit price charged on the brake assemblies"
+              },
+              "as": "CREDMGR"
+            },
+            {
+              "save": "pr",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "CASE-26-0001",
+                "promiseAmt": 3000.0,
+                "promiseDate": "2026-10-19",
+                "narrative": "Promise taken on the credit control worklist."
+              },
+              "as": "CREDMGR"
+            },
+            {
+              "save": "dn",
+              "job": "ar_runDunningJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261012"
+              },
+              "as": "CREDMGR"
+            },
+            {
+              "save": "ov",
+              "call": "ar_requestCreditOverride",
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "LIV",
+                "X-STERP-Business-Date": "2026-10-15"
+              },
+              "body": {
+                "customer": "K0004",
+                "documentRef": "SOC900003",
+                "overrideAmt": 7128.0,
+                "overrideReason": "Livingston first-order scoped authority"
+              },
+              "as": "SALESREP"
+            },
+            {
+              "save": "ap",
+              "call": "ar_approveCreditOverride",
+              "path": {
+                "overrideId": 9091
+              },
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "LIV",
+                "X-STERP-Business-Date": "2026-10-15"
+              },
+              "body": {
+                "customer": "K0004"
+              },
+              "as": "CREDMGR"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "e1",
+              "status": 200
+            },
+            {
+              "on": "e1",
+              "json": "$.balance.balanceGbp",
+              "equals": 8200.0
+            },
+            {
+              "on": "e1",
+              "json": "$.openItems[*].documentNumber",
+              "contains": "SI-26-1001"
+            },
+            {
+              "on": "pv1",
+              "outcome": {
+                "returnCode": 0,
+                "messageContains": "Preview only: 8,196.00 would be applied leaving 0.00 unapplied"
+              }
+            },
+            {
+              "on": "rc",
+              "outcome": {
+                "returnCode": 0,
+                "messageContains": "GBP 8,196.00 recorded (CONFIRMED)"
+              }
+            },
+            {
+              "on": "rc",
+              "json": "$.data.receiptNo",
+              "equals": "RCS00031901"
+            },
+            {
+              "on": "al",
+              "status": 200
+            },
+            {
+              "on": "al",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'STC' AND ItemType = 'INVOICE' AND DocumentNumber = 'SI-26-1001' AND ResidualAmount = 0 AND SettlementStatus = 'SETTLED'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.Journal WHERE CompanyCode = 'STC' AND CorrelationId = 'A07-DEMO-ALLOC-01-ALLOC' AND TotalDebit = 4.00 AND TotalCredit = 4.00",
+              "equals": 1
+            },
+            {
+              "on": "pv2",
+              "status": 202
+            },
+            {
+              "on": "pv2",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "RCP0029"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CompanyCode = 'STC' AND CustomerCode = 'C0004'",
+              "equals": 0
+            },
+            {
+              "on": "ds",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "pr",
+              "json": "$.data.promiseStatus",
+              "equals": "OPEN"
+            },
+            {
+              "on": "dn",
+              "spoolContains": "Whole balance disputed or settled"
+            },
+            {
+              "on": "dn",
+              "spoolContains": "Promise to pay open until"
+            },
+            {
+              "on": "ov",
+              "status": 200
+            },
+            {
+              "on": "ov",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "CRD0052"
+              }
+            },
+            {
+              "on": "ov",
+              "json": "$.data.overrideId",
+              "equals": 9091
+            },
+            {
+              "on": "ap",
+              "status": 200
+            },
+            {
+              "on": "ap",
+              "outcome": {
+                "returnCode": 0,
+                "messageContains": "Credit override approved to 22/10/2026"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CreditOverride WHERE OverrideId = 9091 AND CompanyCode = 'CAL' AND CustomerCode = 'K0004' AND Status = 'ACTIVE' AND RequestedBy = 'SALESREP' AND ApprovedBy = 'CREDMGR'",
+              "equals": 1
+            }
+          ],
+          "derivation": "Binding spec section 10 demo journeys (workflow 1 steps 5-7: C0001 enquiry 8,200.00, receipt 8,196.00 with 4.00 write-off posted, C0004 19.00 preview held RCP0029, dispute SI-26-1003/C0008, promise 3,000.00 on SI-26-1008/C0009, dunning as at 20261012 with both suppressed; workflow 5 steps 2-3: K0004/SOC900003 7,128.00 CRD0052 approved by CREDMGR) from docs/DEMO-WORKFLOWS.md; the receipt number and override id are fixed by arranging the ARRC series and an identity anchor row.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-032",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-032-AC1",
+          "ac": 1,
+          "title": "Residual preview: C0001 with 4.00 write-off previews; C0004 19.00 write-off held RCP0029 unchanged; no line RCP0004",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "p1",
+              "call": "ar_previewAllocation",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8196.0,
+                "bankRef": "",
+                "externalRef": "",
+                "sourceItemId": 0,
+                "sourceDoc": "",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1001",
+                    "currency": "GBP",
+                    "apply": 8196.0,
+                    "writeOff": 4.0,
+                    "writeOffReason": "Short payment within the clerk tolerance"
+                  }
+                ]
+              }
+            },
+            {
+              "save": "p2",
+              "call": "ar_previewAllocation",
+              "body": {
+                "customer": "C0004",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 5081.0,
+                "bankRef": "",
+                "externalRef": "",
+                "sourceItemId": 0,
+                "sourceDoc": "",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1002",
+                    "currency": "GBP",
+                    "apply": 5081.0,
+                    "writeOff": 19.0,
+                    "writeOffReason": "Customer deducted a delivery charge"
+                  }
+                ]
+              }
+            },
+            {
+              "save": "p3",
+              "call": "ar_previewAllocation",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8196.0,
+                "bankRef": "",
+                "externalRef": "",
+                "sourceItemId": 0,
+                "sourceDoc": "",
+                "lines": []
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "p1",
+              "status": 200
+            },
+            {
+              "on": "p1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK",
+                "messageContains": "Preview only: 8,196.00 would be applied leaving 0.00 unapplied"
+              }
+            },
+            {
+              "on": "p1",
+              "json": "$.data.totWriteoff",
+              "equals": 4.0
+            },
+            {
+              "on": "p1",
+              "json": "$.data.allocTab.allocs[0].aKind",
+              "equals": "WRITEOFF"
+            },
+            {
+              "on": "p2",
+              "status": 202
+            },
+            {
+              "on": "p2",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "RCP0029"
+              }
+            },
+            {
+              "sql": "SELECT ResidualAmount FROM ar.OpenItem WHERE CompanyCode = 'STC' AND ItemType = 'INVOICE' AND DocumentNumber = 'SI-26-1002'",
+              "equals": 5100.0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Allocation a JOIN ar.OpenItem t ON t.OpenItemId = a.TargetOpenItemId WHERE t.CompanyCode = 'STC' AND t.DocumentNumber = 'SI-26-1002'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CompanyCode = 'STC' AND CustomerCode = 'C0004'",
+              "equals": 0
+            },
+            {
+              "on": "p3",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "RCP0004"
+              }
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 1 step 6 and decision D-22 (RCPTALOC.cob:1228-1250: write-off strictly above AR.WRITEOFF.AUTO.GBP 5.00 needs AR.WRITEOFF.APPROVE, which ARCLERK lacks); SI-26-1002 residual 4,250.00 + 20% VAT = 5,100.00 in 91-ar-demo.sql.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-AR-032-EDGE-WRITEOFF-LIMIT",
+          "ac": null,
+          "title": "Write-off exactly 5.00 passes the AR.WRITEOFF.AUTO.GBP limit; 5.01 needs AR.WRITEOFF.APPROVE (RCP0029)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "edge-record",
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "p1",
+              "call": "ar_previewAllocation",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8195.0,
+                "bankRef": "",
+                "externalRef": "",
+                "sourceItemId": 0,
+                "sourceDoc": "",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1001",
+                    "currency": "GBP",
+                    "apply": 8195.0,
+                    "writeOff": 5.0,
+                    "writeOffReason": "Short payment at the tolerance"
+                  }
+                ]
+              }
+            },
+            {
+              "save": "p2",
+              "call": "ar_previewAllocation",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8194.99,
+                "bankRef": "",
+                "externalRef": "",
+                "sourceItemId": 0,
+                "sourceDoc": "",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1001",
+                    "currency": "GBP",
+                    "apply": 8194.99,
+                    "writeOff": 5.01,
+                    "writeOffReason": "Short payment above the tolerance"
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "p1",
+              "status": 200
+            },
+            {
+              "on": "p1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "p1",
+              "json": "$.data.totWriteoff",
+              "equals": 5.0
+            },
+            {
+              "on": "p2",
+              "status": 202
+            },
+            {
+              "on": "p2",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "RCP0029"
+              }
+            }
+          ],
+          "derivation": "Spec 10 edge 'write-off exactly 5.00 vs 5.01' and RCPTALOC.cob:1228-1250 (strictly above AR.WRITEOFF.AUTO.GBP 5.00, 04-core-parameters.sql:155); both lines clear the 8,200.00 residual of SI-26-1001.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-033",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-033-AC1",
+          "ac": 1,
+          "title": "Allocate C0001 receipt to SI-26-1001 with 4.00 write-off: settled, BADDEBT journal; 19.00 held RCP0029; no source 404",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE core.NumberSeries SET NextNumber = 33001 WHERE CompanyCode = 'STC' AND SeriesCode = 'ARRC';"
+            },
+            {
+              "save": "rc",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 8196.0,
+                "bankRef": "PENNINE OCT 26",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-AR033-RCPT-01"
+            },
+            {
+              "save": "a1",
+              "call": "ar_allocateReceipt",
+              "body": {
+                "sourceItemId": 0,
+                "sourceDoc": "RCS00033001",
+                "receiptDate": "2026-10-12",
+                "effectiveDate": "2026-10-12",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1001",
+                    "currency": "GBP",
+                    "apply": 8181.0,
+                    "writeOff": 19.0,
+                    "writeOffReason": "Customer short paid"
+                  }
+                ]
+              },
+              "idempotencyKey": "A07-AR033-ALLOC-00"
+            },
+            {
+              "save": "s1",
+              "sql": "SELECT ResidualAmount AS r FROM ar.OpenItem WHERE CompanyCode = 'STC' AND ItemType = 'INVOICE' AND DocumentNumber = 'SI-26-1001'"
+            },
+            {
+              "save": "a2",
+              "call": "ar_allocateReceipt",
+              "body": {
+                "sourceItemId": 0,
+                "sourceDoc": "RCS00033001",
+                "receiptDate": "2026-10-12",
+                "effectiveDate": "2026-10-12",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1001",
+                    "currency": "GBP",
+                    "apply": 8196.0,
+                    "writeOff": 4.0,
+                    "writeOffReason": "Short payment within the D-22 clerk tolerance"
+                  }
+                ]
+              },
+              "idempotencyKey": "A07-AR033-ALLOC-01"
+            },
+            {
+              "save": "a3",
+              "call": "ar_allocateReceipt",
+              "body": {
+                "sourceItemId": 0,
+                "sourceDoc": "",
+                "receiptDate": "2026-10-12",
+                "effectiveDate": "2026-10-12",
+                "lines": [
+                  {
+                    "openItemId": 0,
+                    "documentNumber": "SI-26-1001",
+                    "currency": "GBP",
+                    "apply": 1.0,
+                    "writeOff": 0.0,
+                    "writeOffReason": ""
+                  }
+                ]
+              },
+              "idempotencyKey": "A07-AR033-ALLOC-02"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rc",
+              "status": 200
+            },
+            {
+              "on": "rc",
+              "json": "$.data.receiptNo",
+              "equals": "RCS00033001"
+            },
+            {
+              "on": "a1",
+              "status": 202
+            },
+            {
+              "on": "a1",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "RCP0029"
+              }
+            },
+            {
+              "on": "s1",
+              "json": "$[0].r",
+              "equals": 8200.0
+            },
+            {
+              "on": "a2",
+              "status": 200
+            },
+            {
+              "on": "a2",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "a2",
+              "json": "$.data.allocTab.allocs[0].aKind",
+              "equals": "WRITEOFF"
+            },
+            {
+              "on": "a2",
+              "json": "$.data.unallocated",
+              "equals": 0.0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Allocation a JOIN ar.OpenItem t ON t.OpenItemId = a.TargetOpenItemId JOIN ar.OpenItem s ON s.OpenItemId = a.SourceOpenItemId WHERE t.DocumentNumber = 'SI-26-1001' AND s.DocumentNumber = 'RCS00033001' AND a.Status = 'ACTIVE' AND a.AppliedAmount = 8196.00 AND a.WriteOffAmountGBP = 4.00",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'STC' AND ItemType = 'INVOICE' AND DocumentNumber = 'SI-26-1001' AND ResidualAmount = 0 AND SettlementStatus = 'SETTLED'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.Journal WHERE CompanyCode = 'STC' AND CorrelationId = 'A07-AR033-ALLOC-01-ALLOC' AND EventCode = 'AR.WRITEOFF' AND TotalDebit = 4.00 AND TotalCredit = 4.00",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT AllocatedAmount FROM ar.Receipt WHERE CompanyCode = 'STC' AND ReceiptNumber = 'RCS00033001'",
+              "equals": 8196.0
+            },
+            {
+              "on": "a3",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "RCP0023"
+              }
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 1 step 6 and RCPTALOC.cob:893-1016,1228-1250,1457-1602 (adjustment journal correlation = first 30 characters of the key + '-ALLOC', event of the last component); the ARRC series is arranged to NextNumber 33001 so the receipt is RCS00033001 (prefix RC + company initial, 8 digits, 07-core-numbering-terms.sql:18,29).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-034",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-034-AC1",
+          "ac": 1,
+          "title": "UNALLOC of an ACTIVE 150.00 allocation: -150.00 contra, original REVERSED, residuals restored, no journal; repeats refused",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM ar.Allocation WHERE AllocationId = 90341) BEGIN DECLARE @rid bigint, @src bigint, @tgt bigint; INSERT ar.Receipt (CompanyCode, ReceiptNumber, CustomerCode, PayerCustomerCode, PaymentMethod, BankAccountCode, ReceiptDate, ValueDate, PostingDate, CurrencyCode, FxRate, GrossReceived, GrossReceivedGBP, BankFee, AllocatedAmount, UnallocatedAmount, ConfirmationState, Status, CorrelationId, CreatedBy) VALUES ('STC','A07-RC-0341','C0009','C0009','BACS','GBP1','2026-10-12','2026-10-12','2026-10-12','GBP',1,500.00,500.00,0,150.00,350.00,'CONFIRMED','POSTED','A07-AR034-ARRANGE','A07'); SET @rid = SCOPE_IDENTITY(); INSERT ar.OpenItem (CompanyCode, CustomerCode, ItemType, DocumentNumber, DocumentDate, DueDate, PostingDate, FiscalYear, PeriodNo, CurrencyCode, FxRate, OriginalAmount, OriginalAmountGBP, ResidualAmount, ResidualAmountGBP, SettlementStatus, SourceReceiptId, CreatedBy) VALUES ('STC','C0009','RECEIPT','A07-RC-0341','2026-10-12','2026-10-12','2026-10-12',2026,7,'GBP',1,-500.00,-500.00,-350.00,-350.00,'PARTIAL',@rid,'A07'); SET @src = SCOPE_IDENTITY(); SELECT @tgt = OpenItemId FROM ar.OpenItem WHERE CompanyCode = 'STC' AND ItemType = 'INVOICE' AND DocumentNumber = 'SI-26-1008'; SET IDENTITY_INSERT ar.Allocation ON; INSERT ar.Allocation (AllocationId, CompanyCode, CustomerCode, SourceType, SourceOpenItemId, TargetOpenItemId, EffectiveDate, CurrencyCode, AppliedAmount, AppliedAmountGBP, DiscountAmountGBP, WriteOffAmountGBP, RealisedFxGBP, IsCrossCurrency, Status, CreatedBy) VALUES (90341,'STC','C0009','RECEIPT',@src,@tgt,'2026-10-12','GBP',150.00,150.00,0,0,0,0,'ACTIVE','A07'); SET IDENTITY_INSERT ar.Allocation OFF; UPDATE ar.OpenItem SET ResidualAmount = ResidualAmount - 150.00, ResidualAmountGBP = ResidualAmountGBP - 150.00, SettlementStatus = 'PARTIAL' WHERE OpenItemId = @tgt; END"
+            },
+            {
+              "save": "u1",
+              "call": "ar_unallocateAllocation",
+              "path": {
+                "allocationId": 90341
+              },
+              "body": {
+                "correctReason": ""
+              }
+            },
+            {
+              "save": "u2",
+              "call": "ar_unallocateAllocation",
+              "path": {
+                "allocationId": 90341
+              },
+              "body": {
+                "correctReason": "Allocated to the wrong invoice"
+              }
+            },
+            {
+              "save": "u3",
+              "call": "ar_unallocateAllocation",
+              "path": {
+                "allocationId": 90341
+              },
+              "body": {
+                "correctReason": "Second attempt"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "u1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "RCP0041"
+              }
+            },
+            {
+              "on": "u2",
+              "status": 200
+            },
+            {
+              "on": "u2",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK",
+                "messageContains": "Allocation reversed;"
+              }
+            },
+            {
+              "on": "u2",
+              "json": "$.data.reversedCnt",
+              "equals": 1
+            },
+            {
+              "on": "u2",
+              "json": "$.data.journalNo",
+              "equals": ""
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Allocation WHERE ReversalOfAllocationId = 90341 AND AppliedAmount = -150.00 AND SourceType = 'ADJUST' AND Status = 'REVERSED'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT Status FROM ar.Allocation WHERE AllocationId = 90341",
+              "equals": "REVERSED"
+            },
+            {
+              "sql": "SELECT ResidualAmount FROM ar.OpenItem WHERE CompanyCode = 'STC' AND ItemType = 'INVOICE' AND DocumentNumber = 'SI-26-1008'",
+              "equals": 3000.0
+            },
+            {
+              "sql": "SELECT ResidualAmount FROM ar.OpenItem WHERE CompanyCode = 'STC' AND ItemType = 'RECEIPT' AND DocumentNumber = 'A07-RC-0341'",
+              "equals": -500.0
+            },
+            {
+              "on": "u3",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "RCP0043"
+              }
+            }
+          ],
+          "derivation": "AC words and spec 4.4 / RCPTALOC.cob:1618-1821 (contra SourceType ADJUST status REVERSED with ReversalOfAllocationId, residuals restored, no journal); the 150.00 allocation from receipt A07-RC-0341 to SI-26-1008 (residual 3,000.00 in 91-ar-demo.sql) is arranged with a fixed AllocationId for the path parameter.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-035",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-035-AC1",
+          "ac": 1,
+          "title": "Receipt Entry page: C0001 posted status, C0004 19.00 preview warning RCP0029, only 20 of 25 lines sent, abandon prompt",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "post",
+              "gui": "/ar/receipt-entry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "C0001"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "fill": {
+                    "label": "Bank account",
+                    "value": "GBP1"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Gross amount",
+                    "value": "8196.00"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "8196.00"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Write off GBP",
+                    "value": "4.00"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Write off reason",
+                    "value": "Short payment within tolerance"
+                  }
+                },
+                {
+                  "click": "Preview residual"
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            },
+            {
+              "save": "held",
+              "gui": "/ar/receipt-entry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "C0004"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "fill": {
+                    "label": "Bank account",
+                    "value": "GBP1"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Gross amount",
+                    "value": "5081.00"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "5081.00"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Write off GBP",
+                    "value": "19.00"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Write off reason",
+                    "value": "Customer deducted a delivery charge"
+                  }
+                },
+                {
+                  "click": "Preview residual"
+                }
+              ]
+            },
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM ar.Customer WHERE CompanyCode = 'STC' AND CustomerCode = 'ZZA07R25') INSERT ar.Customer (CompanyCode, CustomerCode, LegalName, LegalForm, VatLocation, CountryCode, CurrencyCode, AllowedCurrencies, Status, SanctionsStatus, CreatedBy) VALUES ('STC', 'ZZA07R25', 'A07 Twenty Five Lines Limited', 'LTD', 'GB', 'GB', 'GBP', 'GBP', 'ACTIVE', 'CLEAR', 'A07'); IF NOT EXISTS (SELECT 1 FROM ar.CustomerCredit WHERE CompanyCode = 'STC' AND CustomerCode = 'ZZA07R25') INSERT ar.CustomerCredit (CompanyCode, CustomerCode, CreditLimitGBP, OverdueThresholdGBP, OverdueDaysTrigger, CreatedBy) VALUES ('STC', 'ZZA07R25', 10000.00, 0, 30, 'A07'); IF NOT EXISTS (SELECT 1 FROM ar.OpenItem WHERE CompanyCode = 'STC' AND CustomerCode = 'ZZA07R25') BEGIN ;WITH n AS (SELECT TOP (25) ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS k FROM sys.all_objects) INSERT ar.OpenItem (CompanyCode, CustomerCode, ItemType, DocumentNumber, DocumentDate, DueDate, PostingDate, CurrencyCode, FxRate, OriginalAmount, OriginalAmountGBP, ResidualAmount, ResidualAmountGBP, SettlementStatus, CreatedBy) SELECT 'STC', 'ZZA07R25', 'INVOICE', 'ZZ25-INV-' + RIGHT('00' + CAST(k AS varchar(2)), 2), DATEADD(day, k, CAST('2026-09-01' AS date)), DATEADD(day, k, CAST('2026-10-01' AS date)), DATEADD(day, k, CAST('2026-09-01' AS date)), 'GBP', 1, 10.00, 10.00, 10.00, 10.00, 'OPEN', 'A07' FROM n; END"
+            },
+            {
+              "save": "twenty",
+              "gui": "/ar/receipt-entry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "ZZA07R25"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "fill": {
+                    "label": "Bank account",
+                    "value": "GBP1"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Gross amount",
+                    "value": "250.00"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "10.00"
+                  }
+                },
+                {
+                  "press": "ArrowDown"
+                },
+                {
+                  "click": "Preview residual"
+                }
+              ]
+            },
+            {
+              "save": "close",
+              "gui": "/ar/receipt-entry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Customer account",
+                    "value": "C0009"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "fill": {
+                    "label": "Allocate GBP",
+                    "value": "100.00"
+                  }
+                },
+                {
+                  "press": "F3"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "post",
+              "text": "posted; applied £8,196.00, unallocated cash £0.00."
+            },
+            {
+              "on": "post",
+              "text": "OK"
+            },
+            {
+              "on": "held",
+              "text": "Reason code: RCP0029"
+            },
+            {
+              "on": "held",
+              "text": "Preview only: nothing has been posted and no approval has been requested."
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CompanyCode = 'STC' AND CustomerCode = 'C0004'",
+              "equals": 0
+            },
+            {
+              "on": "twenty",
+              "text": "Preview only - nothing has been posted."
+            },
+            {
+              "on": "twenty",
+              "text": "200.00"
+            },
+            {
+              "on": "close",
+              "text": "Allocations have been keyed but not posted.  Abandon them?"
+            }
+          ],
+          "derivation": "AC words and spec 4.1 / frmReceiptEntry.vb:133-142,154-201,225-260 status texts (money with a pound sign for sterling, DebtorsService.vb:221-243); the 25-line clause uses an arranged customer with 25 invoices of 10.00 so the first 20 lines apply 200.00; the GUI DSL has no row-addressed grid input, so keying each row by column label and ArrowDown is an assumption of the runner.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-040",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-040-AC1",
+          "ac": 1,
+          "title": "Credit-control worklist for CREDMGR: unsuppressed items and accounts; ownerUser CREDMGR lists CREDMGR items",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "steps": [
+            {
+              "save": "w1",
+              "call": "ar_getCreditControlWorklist"
+            },
+            {
+              "save": "w2",
+              "call": "ar_getCreditControlWorklist",
+              "query": {
+                "ownerUser": "CREDMGR"
+              }
+            },
+            {
+              "save": "v",
+              "sql": "SELECT COUNT(*) AS n FROM ar.vw_CollectionWorklist WHERE CompanyCode = 'STC' AND IsSuppressed = 0"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "w1",
+              "status": 200
+            },
+            {
+              "on": "w1",
+              "json": "$.items[0].isSuppressed",
+              "equals": 0
+            },
+            {
+              "on": "w1",
+              "json": "$.accounts[*].customerCode",
+              "contains": "C0001"
+            },
+            {
+              "on": "w1",
+              "json": "$.items[*].documentNumber",
+              "contains": "SI-26-1001"
+            },
+            {
+              "on": "w2",
+              "status": 200
+            },
+            {
+              "on": "w2",
+              "json": "$.items[0].ownerUser",
+              "equals": "CREDMGR"
+            },
+            {
+              "on": "w2",
+              "json": "$.items[*].ownerUser",
+              "contains": "CREDMGR"
+            },
+            {
+              "on": "v",
+              "json": "$[0].n",
+              "gte": 1
+            }
+          ],
+          "derivation": "AC words with usp_CreditControlWorklist.sql:8-44 (@IncludeSuppressed 0, @OwnerUser filter on case owner, else controller, else account owner, else CREDMGR) and the demo ledger (SI-26-1001 case CASE-26-0003 owned by CREDMGR, 91-ar-demo.sql); row-for-row equality with the procedure is the contracts 11 comparison.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-041",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-041-AC1",
+          "ac": 1,
+          "title": "Dispute on SI-26-1003/C0008: DISPUTED item, OPEN case and NOTE action; over residual DSP0012; DSP0060 writes nothing",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM core.Role WHERE RoleCode = 'ZZA07DSP') INSERT core.Role (RoleCode, Name, CreatedBy) VALUES ('ZZA07DSP', 'A07 enquiry user without AR.DISPUTE.RAISE', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.RolePermission WHERE RoleCode = 'ZZA07DSP' AND PermissionCode = 'AR.ENQUIRY') INSERT core.RolePermission (RoleCode, PermissionCode, CreatedBy) VALUES ('ZZA07DSP', 'AR.ENQUIRY', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.AppUser WHERE UserCode = 'ZZA07DSP') INSERT core.AppUser (UserCode, DisplayName, DefaultCompanyCode, DefaultSiteCode, CreatedBy) VALUES ('ZZA07DSP', 'A07 enquiry user without AR.DISPUTE.RAISE', 'STC', 'RDG', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.UserRole WHERE UserCode = 'ZZA07DSP' AND RoleCode = 'ZZA07DSP') INSERT core.UserRole (UserCode, RoleCode, CompanyCode, SiteCode, ValidFrom, CreatedBy) VALUES ('ZZA07DSP', 'ZZA07DSP', 'STC', '*', '2024-04-01', 'A07');"
+            },
+            {
+              "save": "d1",
+              "call": "ar_raiseDispute",
+              "body": {
+                "customer": "C0008",
+                "documentNo": "SI-26-1003",
+                "openItemId": 0,
+                "disputedAmt": 3600.01,
+                "reasonCode": "PRICE",
+                "reason": "Customer disputes the unit price charged on the brake assemblies"
+              }
+            },
+            {
+              "save": "d2",
+              "call": "ar_raiseDispute",
+              "body": {
+                "customer": "C0008",
+                "documentNo": "SI-26-1003",
+                "openItemId": 0,
+                "disputedAmt": 3600.0,
+                "reasonCode": "PRICE",
+                "reason": "Customer disputes the unit price charged on the brake assemblies"
+              },
+              "as": "ZZA07DSP"
+            },
+            {
+              "save": "x1",
+              "sql": "SELECT (SELECT COUNT(*) FROM ar.CollectionCase WHERE CompanyCode = 'STC' AND CustomerCode = 'C0008') + (SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'STC' AND DocumentNumber = 'SI-26-1003' AND IsDisputed = 1) AS n"
+            },
+            {
+              "save": "d3",
+              "call": "ar_raiseDispute",
+              "body": {
+                "customer": "C0008",
+                "documentNo": "SI-26-1003",
+                "openItemId": 0,
+                "disputedAmt": 3600.0,
+                "reasonCode": "PRICE",
+                "reason": "Customer disputes the unit price charged on the brake assemblies"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "d1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "DSP0012"
+              }
+            },
+            {
+              "on": "d2",
+              "status": 202
+            },
+            {
+              "on": "d2",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "DSP0060"
+              }
+            },
+            {
+              "on": "x1",
+              "json": "$[0].n",
+              "equals": 0
+            },
+            {
+              "on": "d3",
+              "status": 200
+            },
+            {
+              "on": "d3",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "d3",
+              "json": "$.data.caseRef",
+              "matches": "\\S"
+            },
+            {
+              "on": "d3",
+              "json": "$.data.undisputedAmt",
+              "equals": 0.0
+            },
+            {
+              "on": "d3",
+              "json": "$.data.residual",
+              "equals": 3600.0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'STC' AND ItemType = 'INVOICE' AND DocumentNumber = 'SI-26-1003' AND IsDisputed = 1 AND CollectionStatus = 'DISPUTED' AND ResidualAmount = 3600.00",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CollectionCase WHERE CompanyCode = 'STC' AND CustomerCode = 'C0008' AND CaseType = 'DISPUTE' AND Status = 'OPEN' AND DocumentNumber = 'SI-26-1003' AND ReasonCode = 'PRICE' AND DisputedAmountGBP = 3600.00",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CollectionAction a JOIN ar.CollectionCase c ON c.CaseId = a.CaseId WHERE c.CompanyCode = 'STC' AND c.CustomerCode = 'C0008' AND c.CaseType = 'DISPUTE' AND a.ActionType = 'NOTE'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 1 step 7 and spec 4.7 (ARDISPUT.cob: residual + 0.004 limit DSP0012, PERMCHK AR.DISPUTE.RAISE RC 06 DSP0060 stops before any write); SI-26-1003 residual 3,000.00 + 20% VAT = 3,600.00 (91-ar-demo.sql); AR.DISPUTE.RAISE is granted with AR.ENQUIRY.VIEW, so ZZA07DSP is an arranged user holding only the gate code AR.ENQUIRY.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-AR-041-EDGE-TEXT-NORMALIZATION",
+          "ac": null,
+          "title": "Dispute reason: non-1252 character becomes '?', 320 characters cut to the field and to 256 on the way to SQL",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "d1",
+              "call": "ar_raiseDispute",
+              "body": {
+                "customer": "C0003",
+                "documentNo": "SI-26-1004",
+                "openItemId": 0,
+                "disputedAmt": 100.0,
+                "reasonCode": "QUALITY",
+                "reason": "ΩQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "d1",
+              "status": 200
+            },
+            {
+              "on": "d1",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CollectionCase WHERE CompanyCode = 'STC' AND CustomerCode = 'C0003' AND CaseType = 'DISPUTE' AND DocumentNumber = 'SI-26-1004' AND LEN(Reason) = 256 AND LEFT(Reason, 1) = '?' AND SUBSTRING(Reason, 2, 255) = REPLICATE('Q', 255)",
+              "equals": 1
+            }
+          ],
+          "derivation": "Contracts 4.4 alphanumeric rule (Windows-1252 encoding with '?' for unrepresentable characters, right truncation to DS-REASON PIC X(300), CobolCodec.cs:15,37-43) followed by BR-ARDISPUT-051 (free text cut to 256 characters on the way to SQL); SI-26-1004 residual 30,000.00 (91-ar-demo.sql).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-042",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-042-AC1",
+          "ac": 1,
+          "title": "Promise to pay 3,000.00 for 19/10/2026 on SI-26-1008/C0009: OPEN, follow-up 20/10/2026; DSP0020 and DSP0006 refusals",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "date-boundary",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "p1",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "CASE-26-0001",
+                "promiseAmt": 3000.0,
+                "promiseDate": "2026-10-19",
+                "narrative": "Promise taken on the credit control worklist."
+              }
+            },
+            {
+              "save": "p2",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "CASE-26-0001",
+                "promiseAmt": 3000.0,
+                "promiseDate": "2026-10-11",
+                "narrative": "Promise taken on the credit control worklist."
+              }
+            },
+            {
+              "save": "p3",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "CASE-26-0001",
+                "promiseAmt": 0.0,
+                "promiseDate": "2026-10-19",
+                "narrative": "Promise taken on the credit control worklist."
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "p1",
+              "status": 200
+            },
+            {
+              "on": "p1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "p1",
+              "json": "$.data.promiseStatus",
+              "equals": "OPEN"
+            },
+            {
+              "on": "p1",
+              "json": "$.data.nextActionDt",
+              "equals": "2026-10-20"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CollectionAction a JOIN ar.CollectionCase c ON c.CaseId = a.CaseId WHERE c.CompanyCode = 'STC' AND c.CustomerCode = 'C0009' AND a.ActionType = 'PROMISE' AND a.PromiseAmountGBP = 3000.00 AND a.PromiseDate = '2026-10-19' AND a.PromiseStatus = 'OPEN'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CollectionCase c WHERE c.CompanyCode = 'STC' AND c.CustomerCode = 'C0009' AND c.NextActionDate = '2026-10-20' AND EXISTS (SELECT 1 FROM ar.CollectionAction a WHERE a.CaseId = c.CaseId AND a.ActionType = 'PROMISE' AND a.PromiseDate = '2026-10-19')",
+              "equals": 1
+            },
+            {
+              "on": "p2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "DSP0020"
+              }
+            },
+            {
+              "on": "p3",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "DSP0006"
+              }
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 1 step 7 and spec 4.7 (DATECALC ADDBUS +1 ENG after Monday 19/10/2026 = Tuesday 20/10/2026; promise date before the business date 12/10/2026 DSP0020; amount 0 DSP0006); the page sends the worklist row's case reference CASE-26-0001 (91-ar-demo.sql).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-AR-042-EDGE-DATE-BOUNDARY",
+          "ac": null,
+          "title": "Promise dated on the business date (Friday 16/10/2026) is accepted; follow-up skips the weekend to 19/10/2026",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-16"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "p1",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0004",
+                "caseRef": "CASE-26-0002",
+                "promiseAmt": 5100.0,
+                "promiseDate": "2026-10-16",
+                "narrative": "Promise taken on the credit control worklist."
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "p1",
+              "status": 200
+            },
+            {
+              "on": "p1",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "p1",
+              "json": "$.data.promiseStatus",
+              "equals": "OPEN"
+            },
+            {
+              "on": "p1",
+              "json": "$.data.nextActionDt",
+              "equals": "2026-10-19"
+            }
+          ],
+          "derivation": "Spec 4.7 PROMISE (DSP0020 only for a date before the business date; follow-up DATECALC ADDBUS +1 ENG) and contracts 4.4 date marshalling yyyyMMdd; CASE-26-0002 is the C0004 collection case of 91-ar-demo.sql.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-043",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-043-AC1",
+          "ac": 1,
+          "title": "Credit Control page: REMINDER2 filter, reason price sent as PRICE, amount abc sent as 0 (DSP0006), report buttons",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "keys",
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "stage",
+              "gui": "/ar/credit-control",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Collection stage",
+                    "value": "REMINDER2"
+                  }
+                }
+              ]
+            },
+            {
+              "save": "disp",
+              "gui": "/ar/credit-control",
+              "actions": [
+                {
+                  "click": "SI-26-1003"
+                },
+                {
+                  "click": "Raise dispute"
+                },
+                {
+                  "fill": {
+                    "label": "Dispute reason code for SI-26-1003",
+                    "value": "price"
+                  }
+                },
+                {
+                  "click": "OK"
+                },
+                {
+                  "fill": {
+                    "label": "What is being disputed on SI-26-1003?",
+                    "value": "Unit price differs from the quotation"
+                  }
+                },
+                {
+                  "click": "OK"
+                }
+              ]
+            },
+            {
+              "save": "prom",
+              "gui": "/ar/credit-control",
+              "actions": [
+                {
+                  "click": "SI-26-1008"
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "fill": {
+                    "label": "Amount promised",
+                    "value": "abc"
+                  }
+                },
+                {
+                  "click": "OK"
+                },
+                {
+                  "fill": {
+                    "label": "Date promised (dd/MM/yyyy)",
+                    "value": "19/10/2026"
+                  }
+                },
+                {
+                  "click": "OK"
+                }
+              ]
+            },
+            {
+              "save": "aged",
+              "gui": "/ar/credit-control",
+              "actions": [
+                {
+                  "click": "Aged debt report"
+                }
+              ]
+            },
+            {
+              "save": "dunn",
+              "gui": "/ar/credit-control",
+              "actions": [
+                {
+                  "click": "Dunning letters"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "stage",
+              "text": "to work at reminder2"
+            },
+            {
+              "on": "stage",
+              "text": "account(s) behind them."
+            },
+            {
+              "on": "disp",
+              "json": "$.shown[*]",
+              "contains": "raised on SI-26-1003"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CollectionCase WHERE CompanyCode = 'STC' AND CustomerCode = 'C0008' AND CaseType = 'DISPUTE' AND ReasonCode = 'PRICE'",
+              "equals": 1
+            },
+            {
+              "on": "prom",
+              "text": "Reason code: DSP0006"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CollectionAction a JOIN ar.CollectionCase c ON c.CaseId = a.CaseId WHERE c.CustomerCode = 'C0009' AND a.ActionType = 'PROMISE' AND a.PromiseStatus = 'OPEN'",
+              "equals": 0
+            },
+            {
+              "on": "aged",
+              "text": "AGEDDEBT"
+            },
+            {
+              "on": "dunn",
+              "text": "DUNNING"
+            }
+          ],
+          "derivation": "AC words and frmCreditControl.vb:13-146 (client-side StageCode filter, reason code upper-cased, unparsable amount sent as 0 so ARDISPUT refuses DSP0006, launcher primed with AGEDDEBT/DUNNING); prompt labels follow the spec texts. Prompts are the legacy InputBox texts 'Dispute reason code for <doc> (PRICE, QUALITY, DELIVERY, PAPERWORK):', 'What is being disputed on <doc>?', 'Amount promised (£) by <name>:' and 'Date promised (dd/MM/yyyy):' (frmCreditControl.vb:65-69,93-97); the dispute message is written and then overwritten by the reload (frmCreditControl.vb:79-82, LoadData 34-50). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-112/RG-106: legacy prompt captions; dispute message overwritten by the reload]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-050",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-050-AC1",
+          "ac": 1,
+          "title": "IC-AR-ARDEPOS: deposit items are negative DEPOSIT credits consumed by AR (no v1 invoker reaches DEPOSIT)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "i1",
+              "call": "ar_getAllocatableItems",
+              "path": {
+                "customerCode": "C0011"
+              },
+              "query": {
+                "currency": "GBP"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "i1",
+              "status": 200
+            },
+            {
+              "on": "i1",
+              "json": "$.credits[*].itemType",
+              "contains": "DEPOSIT"
+            },
+            {
+              "on": "i1",
+              "json": "$.credits[*].documentNumber",
+              "contains": "RC-26-0007"
+            }
+          ],
+          "derivation": "Spec FR-STERP-AR-050 and STERP-SO table IC-AR-ARDEPOS ('not used: DEPOSIT is deferred'): no binding operation calls ARDEPOS in this release, so the 1,200.00 at 20% posting, the COMT that commits the caller and the RC 06 DEP0005 continuation need an in-process contract test; this scenario only pins how AR consumes a deposit item (RC-26-0007, C0011, 1,500.00 in 91-ar-demo.sql).",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-051",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-051-AC1",
+          "ac": 1,
+          "title": "IC-AR-ARINVPST through SOINVRUN COMMIT: one OPEN receivable, journal and VAT per posted invoice; replay adds none",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "idempotency",
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "so_submitSoinvrunRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "COMMIT"
+              }
+            },
+            {
+              "save": "j2",
+              "job": "so_submitSoinvrunRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.SalesInvoice si WHERE si.Status = 'POSTED' AND si.DocumentType = 'INVOICE' AND ISNULL(si.CreatedBy, '') NOT IN ('DEMO', 'SEED') AND (SELECT COUNT(*) FROM ar.OpenItem o WHERE o.SourceInvoiceId = si.InvoiceId AND o.ItemType = 'INVOICE' AND o.SettlementStatus = 'OPEN') <> 1",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.SalesInvoice si WHERE si.Status = 'POSTED' AND si.DocumentType = 'INVOICE' AND ISNULL(si.CreatedBy, '') NOT IN ('DEMO', 'SEED') AND NOT EXISTS (SELECT 1 FROM fin.Journal j WHERE j.CompanyCode = si.CompanyCode AND j.SourceRef = si.InvoiceNumber)",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.SalesInvoice si WHERE si.Status = 'POSTED' AND si.DocumentType = 'INVOICE' AND ISNULL(si.CreatedBy, '') NOT IN ('DEMO', 'SEED') AND si.VatAmountGBP <> ISNULL((SELECT SUM(v.VatAmountGBP) FROM fin.VatTransaction v WHERE v.CompanyCode = si.CompanyCode AND v.DocumentRef = si.InvoiceNumber), 0)",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM (SELECT o.SourceInvoiceId FROM ar.OpenItem o WHERE o.ItemType = 'INVOICE' AND o.SourceInvoiceId IS NOT NULL GROUP BY o.SourceInvoiceId HAVING COUNT(*) > 1) x",
+              "equals": 0
+            }
+          ],
+          "derivation": "Spec FR-STERP-AR-051 (ARINVPST POST: header, lines, VAT, journal, one INVOICE item, idempotency ar.SalesInvoice.Post): ARINVPST's only v1 invoker is the STERP-SO SOINVRUN job, so the TARINV VALIDATE values (gross 1,200.00, due 14/11/2026, ARI0031 on 260.00) and the RC 04 replay need an in-process contract test; this scenario pins the per-invoice posting invariants and that a second run creates no second receivable.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-052",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-052-AC1",
+          "ac": 1,
+          "title": "IC-AR-ARCRNOTE: credit-note items are consumed by AR as CREDIT credits (callers SOCREDIT and REBATE are deferred)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "i1",
+              "call": "ar_getAllocatableItems",
+              "path": {
+                "customerCode": "C0003"
+              },
+              "query": {
+                "currency": "GBP"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "i1",
+              "status": 200
+            },
+            {
+              "on": "i1",
+              "json": "$.credits[*].documentNumber",
+              "contains": "CN-26-0002"
+            },
+            {
+              "on": "i1",
+              "json": "$.credits[*].itemType",
+              "contains": "CREDIT"
+            }
+          ],
+          "derivation": "Spec FR-STERP-AR-052 and STERP-SO table IC-AR-ARCRNOTE ('not used: both callers deferred'): no binding operation reaches ARCRNOTE, so the TARGAP1 CHECK refusals (ARC0003/0005/0002/0006/0030) and the committed RC 06 ARC0040 POST need an in-process contract test; this scenario only pins the consumed credit item (CN-26-0002, 91-ar-demo.sql).",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-053",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-053-AC1",
+          "ac": 1,
+          "title": "ARPOSTGL via receipts: period 7 journal posted; a procedure refusal in soft-closed period 6 is GLP0011 with its text",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "p7",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0005",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-12",
+                "currency": "GBP",
+                "gross": 250.0,
+                "bankRef": "",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-AR053-P07"
+            },
+            {
+              "save": "p6",
+              "call": "ar_recordReceipt",
+              "headers": {
+                "X-STERP-Business-Date": "2026-09-30"
+              },
+              "body": {
+                "customer": "C0005",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-09-30",
+                "currency": "GBP",
+                "gross": 250.0,
+                "bankRef": "",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-AR053-P06"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "p7",
+              "status": 200
+            },
+            {
+              "on": "p7",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.Journal j JOIN ar.Receipt r ON r.JournalId = j.JournalId WHERE r.CorrelationId = 'A07-AR053-P07' AND j.FiscalYear = 2026 AND j.PeriodNo = 7 AND j.Status = 'POSTED' AND j.TotalDebit = 250.00 AND j.TotalCredit = 250.00",
+              "equals": 1
+            },
+            {
+              "on": "p6",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "GLP0011",
+                "returnCode": 8,
+                "detailContains": "soft closed"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CorrelationId = 'A07-AR053-P06'",
+              "equals": 0
+            }
+          ],
+          "derivation": "Spec FR-STERP-AR-053 and 4.9 (ARPOSTGL.cob:53-428: procedure error -> RC 08 GLP0011 with the driver text; fin.usp_PostJournal THROW 50009 for a SOFT period without FIN.PERIOD.SOFTPOST, 09-fin-period-vat.sql period 6 SOFT); RCPTALOC ignores ARPOSTGL RC 04 (RCPTALOC.cob 1500-POST-CASH) and always stages balanced legs, so the period-10 GLP0009 misreading and GLP0007 are not observable through any binding operation.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-054",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-054-AC1",
+          "ac": 1,
+          "title": "ARVATWRT through invoice posting: S-code rows at 20.00 with output boxes and calendar-quarter key; no zero rows",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "so_submitSoinvrunRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.VatTransaction v JOIN ar.SalesInvoice si ON si.CompanyCode = v.CompanyCode AND si.InvoiceNumber = v.DocumentRef WHERE ISNULL(si.CreatedBy, '') NOT IN ('DEMO', 'SEED') AND v.VatCode = 'S' AND (v.RatePct <> 20.00 OR v.Direction <> 'OUTPUT' OR v.VatBox <> 1 OR v.NetBox <> 6 OR v.VatPeriodKey <> CONCAT(YEAR(v.TaxPointDate), 'Q', DATEPART(quarter, v.TaxPointDate)))",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.VatTransaction v JOIN ar.SalesInvoice si ON si.CompanyCode = v.CompanyCode AND si.InvoiceNumber = v.DocumentRef WHERE ISNULL(si.CreatedBy, '') NOT IN ('DEMO', 'SEED') AND v.NetAmountGBP = 0 AND v.VatAmountGBP = 0",
+              "equals": 0
+            }
+          ],
+          "derivation": "Spec FR-STERP-AR-054 (ARVATWRT.cob:57-361; code S 20% and boxes 1/6 in 09-fin-period-vat.sql; period key = calendar quarter YYYYQn of the tax point when not supplied, SME-036); ARVATWRT has no direct binding surface, so the zero-amount RC 00 and unknown-code RC 16 VAT0003 outcomes need an in-process test and this scenario pins the row invariants of the VAT records written through STERP-SO SOINVRUN.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-060",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-060-AC1",
+          "ac": 1,
+          "title": "AGEDDEBT as at 20261007 runs with the legacy headings; ASAT 19891231 ends RC 8 with STERP-E-0101",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runAgedDebtJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261007"
+              }
+            },
+            {
+              "save": "j2",
+              "job": "ar_runAgedDebtJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "19891231"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "j1",
+              "spoolContains": "Aged receivables analysis"
+            },
+            {
+              "on": "j1",
+              "spoolContains": "As at 07/10/2026"
+            },
+            {
+              "on": "j2",
+              "run": {
+                "status": "FAILED",
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "j2",
+              "json": "$.sysout",
+              "contains": "STERP-E-0101"
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-AR-060 (AGEDDEBT.cob:166-222 ASAT range 1990-01-01..2099-12-31, heading texts); the run RC and the spool body lines must equal the legacy run on the same isolated database after contracts 11 normalization, which this DSL cannot express as literals.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-061",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-061-AC1",
+          "ac": 1,
+          "title": "STATEMNT: PREVIEW=Y writes no action; a run records one STATEMENT action per party; FROM after TO ends RC 8",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runStatementsJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "PREVIEW": "Y"
+              }
+            },
+            {
+              "save": "x1",
+              "sql": "SELECT COUNT(*) AS n FROM ar.CollectionAction a JOIN ar.CollectionCase c ON c.CaseId = a.CaseId WHERE c.CompanyCode = 'STC' AND a.ActionType = 'STATEMENT'"
+            },
+            {
+              "save": "j2",
+              "job": "ar_runStatementsJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031"
+              }
+            },
+            {
+              "save": "j3",
+              "job": "ar_runStatementsJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "FROM": "20261101",
+                "TO": "20261031"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "x1",
+              "json": "$[0].n",
+              "equals": 0
+            },
+            {
+              "on": "j2",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "sql": "SELECT CASE WHEN COUNT(*) > 0 AND MAX(n) = 1 THEN 1 ELSE 0 END FROM (SELECT c.CustomerCode, COUNT(*) AS n FROM ar.CollectionAction a JOIN ar.CollectionCase c ON c.CaseId = a.CaseId WHERE c.CompanyCode = 'STC' AND a.ActionType = 'STATEMENT' GROUP BY c.CustomerCode) x",
+              "equals": 1
+            },
+            {
+              "on": "j3",
+              "run": {
+                "returnCode": 8
+              }
+            }
+          ],
+          "derivation": "AC words and STATEMNT.cob:204-330 (FROM after TO STERP-E-0102 RC 8; style from AR.STMT.STYLE, not seeded, so OPEN; STATEMENT action per produced or suppressed party unless PREVIEW=Y); no STATEMENT action exists in the seed; the spool must equal the legacy listing, which is not expressible as a literal here.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-062",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-062-AC1",
+          "ac": 1,
+          "title": "DUNNING as at 20261012 after the dispute and promise: C0008/C0009 suppressed with reasons; MODE TEST RC 8; COMMIT",
+          "layer": "api-journey",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "report",
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "d1",
+              "call": "ar_raiseDispute",
+              "body": {
+                "customer": "C0008",
+                "documentNo": "SI-26-1003",
+                "openItemId": 0,
+                "disputedAmt": 3600.0,
+                "reasonCode": "PRICE",
+                "reason": "Customer disputes the unit price charged on the brake assemblies"
+              }
+            },
+            {
+              "save": "p1",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "CASE-26-0001",
+                "promiseAmt": 3000.0,
+                "promiseDate": "2026-10-19",
+                "narrative": "Promise taken on the credit control worklist."
+              }
+            },
+            {
+              "save": "j1",
+              "job": "ar_runDunningJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261012"
+              }
+            },
+            {
+              "save": "x1",
+              "sql": "SELECT COUNT(*) AS n FROM ar.CollectionAction a JOIN ar.CollectionCase c ON c.CaseId = a.CaseId WHERE c.CompanyCode = 'STC' AND c.CustomerCode IN ('C0008', 'C0009')"
+            },
+            {
+              "save": "j2",
+              "job": "ar_runDunningJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261012",
+                "MODE": "TEST"
+              }
+            },
+            {
+              "save": "j3",
+              "job": "ar_runDunningJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261012",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "d1",
+              "status": 200
+            },
+            {
+              "on": "p1",
+              "status": 200
+            },
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "j1",
+              "spoolContains": "C0008"
+            },
+            {
+              "on": "j1",
+              "spoolContains": "C0009"
+            },
+            {
+              "on": "j1",
+              "spoolContains": "Whole balance disputed or settled"
+            },
+            {
+              "on": "j1",
+              "spoolContains": "Promise to pay open until"
+            },
+            {
+              "on": "x1",
+              "json": "$[0].n",
+              "equals": 5
+            },
+            {
+              "on": "j2",
+              "run": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "j3",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.CollectionAction a JOIN ar.CollectionCase c ON c.CaseId = a.CaseId WHERE c.CompanyCode = 'STC' AND c.CustomerCode IN ('C0008', 'C0009')",
+              "equals": 5
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 1 step 7 and DUNNING.cob:513-586 (suppression texts 'Whole balance disputed or settled' and 'Promise to pay open until <date>', MODE other than PREVIEW/COMMIT STERP-E-0103); C0009 has 3 seeded actions plus the promise and C0008 the dispute NOTE, so suppressed parties keep 5 actions; COMMIT equality with the legacy run is not expressible as literals.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-063",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-063-AC1",
+          "ac": 1,
+          "title": "DDCOLL: PREVIEW for DUEDATE 20261030 writes no collection; COMMIT one SUBMITTED row per mandate; re-run collects nothing",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "file-format",
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runDirectDebitCollectionJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "PREVIEW",
+                "DUEDATE": "20261030"
+              }
+            },
+            {
+              "save": "x1",
+              "sql": "SELECT COUNT(*) AS n FROM ar.DirectDebitCollection WHERE CompanyCode = 'STC' AND DueDate = '2026-10-30'"
+            },
+            {
+              "save": "j2",
+              "job": "ar_runDirectDebitCollectionJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "COMMIT",
+                "DUEDATE": "20261030"
+              }
+            },
+            {
+              "save": "j3",
+              "job": "ar_runDirectDebitCollectionJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "COMMIT",
+                "DUEDATE": "20261030"
+              }
+            },
+            {
+              "save": "j4",
+              "job": "ar_runDirectDebitCollectionJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "PREVIEW",
+                "ASAT": "20261130"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "j1",
+              "json": "$.run.logFile",
+              "matches": "DDCOLL-STC-"
+            },
+            {
+              "on": "x1",
+              "json": "$[0].n",
+              "equals": 0
+            },
+            {
+              "on": "j2",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.DirectDebitCollection WHERE CompanyCode = 'STC' AND DueDate = '2026-10-30' AND Status <> 'SUBMITTED'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM (SELECT MandateId FROM ar.DirectDebitCollection WHERE CompanyCode = 'STC' AND DueDate = '2026-10-30' GROUP BY MandateId HAVING COUNT(*) > 1) x",
+              "equals": 0
+            },
+            {
+              "on": "j3",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "j4",
+              "json": "$.run.returnCode",
+              "lte": 4
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-AR-063 / 4.10 (DDCOLL.cob: no PLANNED/SUBMITTED/COLLECTED collection for mandate and due date, SUBMITTED rows only in COMMIT, JOBLOG logs the Bacs file); the byte-for-byte Bacs file and listing and the ASAT-ignored system-date due date compare against the legacy outputs, which this DSL cannot express.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-064",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-064-AC1",
+          "ac": 1,
+          "title": "ARRECON PERIOD 202610 proves at the period end; exception only above 0.005 difference; no PERIOD/ASAT ends RC 8",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runDebtorsReconciliationJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "PERIOD": "202610"
+              }
+            },
+            {
+              "save": "j2",
+              "job": "ar_runDebtorsReconciliationJob",
+              "path": {},
+              "body": {
+                "CO": "STC"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "sql": "SELECT CASE WHEN (SELECT COUNT(*) FROM core.ExceptionItem WHERE CompanyCode = 'STC' AND Module = 'AR' AND OwnerRole = 'FINCTRL' AND Priority = 1 AND Severity = 'WARNING') <= (SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'ARRECON' AND ReturnCode = 4) THEN 1 ELSE 0 END",
+              "equals": 1
+            },
+            {
+              "on": "j2",
+              "run": {
+                "returnCode": 8
+              }
+            }
+          ],
+          "derivation": "AC words and ARRECON.cob:160-250,607-718 (proof date = fin.Period end date of PERIOD, difference above 0.005 sets RC 4 and raises a priority-1 WARNING exception for FINCTRL, neither PERIOD nor ASAT RC 8); the printed difference must equal the legacy run, which is not expressible as a literal.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-065",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-065-AC1",
+          "ac": 1,
+          "title": "EINVUBL FROM 20261001 TO 20261031 exports the October documents; no INV, FROM or TO ends RC 8",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runEInvoiceExportJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "FROM": "20261001",
+                "TO": "20261031"
+              }
+            },
+            {
+              "save": "j2",
+              "job": "ar_runEInvoiceExportJob",
+              "path": {},
+              "body": {
+                "CO": "STC"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "j2",
+              "run": {
+                "returnCode": 8
+              }
+            }
+          ],
+          "derivation": "AC words and EINVUBL.cob:150-245 (selection by INV or FROM/TO, RC 8 without any of them, file STC-<number>.xml); which seeded documents fall in October depends on the deploy date (91-ar-demo.sql dates are relative to GETDATE()) and byte identity with the legacy files needs the legacy comparison.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-066",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-066-AC1",
+          "ac": 1,
+          "title": "Stream JOB.DDCOLL: STEP010/STEP020 SYSOUT with cond codes, STEP010 RC 8 abends, RESTART=STEP020, JobRun DDCOLL",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runDirectDebitStream",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "j2",
+              "job": "ar_runDirectDebitStream",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "TEST"
+              }
+            },
+            {
+              "save": "j3",
+              "job": "ar_runDirectDebitStream",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "PREVIEW",
+                "RESTART": "STEP020"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.sysout",
+              "contains": "//STEP010  EXEC PGM=DDCOLL"
+            },
+            {
+              "on": "j1",
+              "json": "$.sysout",
+              "contains": "STEP010 ENDED - COND CODE"
+            },
+            {
+              "on": "j1",
+              "json": "$.sysout",
+              "contains": "//STEP020  EXEC PGM=@SQL"
+            },
+            {
+              "on": "j1",
+              "json": "$.sysout",
+              "contains": "STEP020 ENDED - COND CODE"
+            },
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "sql": "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM core.JobRun WHERE JobName = 'DDCOLL' AND CompanyCode = 'STC'",
+              "equals": 1
+            },
+            {
+              "on": "j2",
+              "run": {
+                "status": "FAILED",
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "j2",
+              "json": "$.sysout",
+              "contains": "STREAM TERMINATED BY COND CODE 8"
+            },
+            {
+              "on": "j2",
+              "json": "$.sysout",
+              "matches": "^(?![\\s\\S]*//STEP020)"
+            },
+            {
+              "on": "j3",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "j3",
+              "json": "$.sysout",
+              "contains": "//STEP020  EXEC PGM=@SQL"
+            }
+          ],
+          "derivation": "AC words and jobs/DDCOLL.cmd:13-40 with jobs/RUNSTEP.cmd:21-49 (step and ENDED - COND CODE lines, STREAM TERMINATED BY COND CODE on cond >= 8) and JOBEND MAXCC status; DDCOLL ends RC 8 for a MODE other than PREVIEW/COMMIT (FR-STERP-AR-063), which forces STEP010 to fail.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-067",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-067-AC1",
+          "ac": 1,
+          "title": "Stream STMTS: STEP010-030 in order with legacy arguments incl. ignored STYLE/STAGE; MAXCC; STEP010 RC 8 stops",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runStatementsStream",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031"
+              }
+            },
+            {
+              "save": "j2",
+              "job": "ar_runStatementsStream",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261000"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.sysout",
+              "matches": "(?s)//STEP010  EXEC PGM=STATEMNT.*//STEP020  EXEC PGM=DUNNING.*//STEP030  EXEC PGM=@SQL"
+            },
+            {
+              "on": "j1",
+              "json": "$.sysout",
+              "contains": "STYLE=OPENITEM"
+            },
+            {
+              "on": "j1",
+              "json": "$.sysout",
+              "contains": "STAGE=ALL"
+            },
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "j2",
+              "run": {
+                "status": "FAILED",
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "j2",
+              "json": "$.sysout",
+              "contains": "STREAM TERMINATED BY COND CODE 8"
+            },
+            {
+              "on": "j2",
+              "json": "$.sysout",
+              "matches": "^(?![\\s\\S]*//STEP020)"
+            }
+          ],
+          "derivation": "AC words and jobs/STMTS.cmd:14-45 (STYLE default OPENITEM and STAGE default ALL passed although ignored, SME-363/357; cond >= 8 goes to ABEND) with jobs/RUNSTEP.cmd and jobs/JOBEND.cmd; STEP010 is forced to RC 8 by ASAT=20261000: STATEMNT takes TO from ASAT and defaults FROM to day 01 of that month, (20261000 / 100) * 100 + 1 = 20261001 > TO, so 0100-READ-ARGS ends RC 8 'STERP-E-0102 FROM is after TO' before any output (STATEMNT.cob:243-291); the legacy stream runs observed j1 MAXCC 0 with STEP010-030 in order and STYLE=OPENITEM/STAGE=ALL, and j2 STEP010 COND CODE 8, no STEP020/STEP030 and JOBEND MAXCC 8 FAILED (amendment evidence p4/runs/rg014-stmts-B1-j1-asat20261031.txt, rg014-stmts-B2-j2-asat20261000.txt), while an invalid date such as 20261399 ends STEP010 RC 12 STERP-E-1201 and the stream ABENDED (rg014-stmts-A2-j2-asat20261399.txt); the SYSOUT line 'STREAM TERMINATED BY COND CODE 8' is kept from binding BE-AR-03 (STERP-AR.md 4.11) although the legacy SYSOUT does not contain it: cmd parses 'COND CODE 8>> file' in STMTS.cmd:39 as a handle-8 redirection, so the line reaches only the console and without the code (binding-change-required, amendment register p4). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-014: ASAT 20261000 (day 00) produces the STEP010 RC 8 the criterion names; 20261399 gives RC 12]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-070",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-070-AC1",
+          "ac": 1,
+          "title": "Bacs Standard 18 file DDCOLL-STC-<stamp> is produced and registered as the run log file",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runDirectDebitCollectionJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "PREVIEW",
+                "DUEDATE": "20261030"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "j1",
+              "json": "$.run.logFile",
+              "matches": "DDCOLL-STC-\\d+"
+            }
+          ],
+          "derivation": "AC words and DDCOLL.cob:62-75,488-526,699-788,905-910 (102-byte records with CR LF, labels, contra and UTL1 totals); the byte comparison with the legacy file (creation/processing dates by format) needs the file content, which the DSL cannot read without a run-specific path.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-071",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-071-AC1",
+          "ac": 1,
+          "title": "UBL 2.1 export of one posted GBP invoice writes STC-SI-26-1004.xml",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runEInvoiceExportJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "INV": "SI-26-1004"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "j1",
+              "spoolContains": "SI-26-1004"
+            },
+            {
+              "on": "j1",
+              "spoolContains": "STC-SI-26-1004.xml"
+            }
+          ],
+          "derivation": "AC words and EINVUBL.cob:471-575,1172-1231 (one file <CO>-<document>.xml per document, '&' escaped as &amp;, 195 character cut); the seed has no EUR credit note and no '&' or 250-character text, and byte identity with the legacy files needs the file content, so only the export of SI-26-1004 (91-ar-demo.sql) is pinned.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-072",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-072-AC1",
+          "ac": 1,
+          "title": "Dunning letter file DUNNLTR-STC-<stamp>.lst is written to the spool folder by a PREVIEW run",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "ar_runDunningJob",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261012"
+              }
+            },
+            {
+              "save": "f1",
+              "call": "jobs_listSpoolFiles",
+              "query": {
+                "filter": "lst",
+                "folder": "spool"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "f1",
+              "status": 200
+            },
+            {
+              "on": "f1",
+              "json": "$.items[*].fileName",
+              "contains": "DUNNLTR-STC-"
+            }
+          ],
+          "derivation": "AC words and DUNNING.cob:48-55,275-301,607-693 (132-byte letter records, written in both modes, SOLETRADER FINAL DEMAND adds the Pre-Action Protocol paragraph); the seed has no SOLETRADER at step 4 and the letter content equality after run date/time normalization needs the legacy file, so only the file production is pinned.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-AR-080",
+      "scenarios": [
+        {
+          "id": "FR-STERP-AR-080-AC1",
+          "ac": 1,
+          "title": "AR.CREDIT columns equal the seed; a credit-limit save writes one trigger audit row; mandate list hides bank fields",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "audit"
+          ],
+          "steps": [
+            {
+              "save": "d1",
+              "call": "platform_getMaintenanceDefinition",
+              "path": {
+                "maintCode": "AR.CREDIT"
+              }
+            },
+            {
+              "save": "s1",
+              "call": "platform_saveMaintenanceRow",
+              "path": {
+                "maintCode": "AR.CREDIT"
+              },
+              "body": {
+                "mode": "CHANGE",
+                "values": {
+                  "CompanyCode": "STC",
+                  "CustomerCode": "C0009",
+                  "CreditLimitGBP": "20500.00"
+                }
+              }
+            },
+            {
+              "save": "l1",
+              "call": "platform_listMaintenanceRows",
+              "path": {
+                "maintCode": "AR.DDMANDATE"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "d1",
+              "status": 200
+            },
+            {
+              "on": "d1",
+              "json": "$.columns",
+              "count": 14
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[0].columnName",
+              "equals": "CompanyCode"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[0].caption",
+              "equals": "Company"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[0].width",
+              "equals": 80
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[2].caption",
+              "equals": "Credit limit"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[2].width",
+              "equals": 110
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[11].caption",
+              "equals": "Hold reason"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[11].width",
+              "equals": 240
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[13].caption",
+              "equals": "Pro forma only"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[13].width",
+              "equals": 70
+            },
+            {
+              "on": "s1",
+              "status": 200
+            },
+            {
+              "on": "s1",
+              "json": "$.rowsAffected",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'ar.CustomerCredit' AND EntityKey = 'C0009' AND Source = 'TRIGGER' AND Action = 'UPDATE' AND NewValue LIKE '20500.00|%'",
+              "equals": 1
+            },
+            {
+              "on": "l1",
+              "status": 200
+            },
+            {
+              "on": "l1",
+              "json": "$.items[0].SortCode",
+              "exists": false
+            },
+            {
+              "on": "l1",
+              "json": "$.items[0].AccountNumber",
+              "exists": false
+            },
+            {
+              "on": "l1",
+              "json": "$.columns[*].name",
+              "contains": "MandateReference"
+            }
+          ],
+          "derivation": "AC words and db/seed/52-ar-menu.sql:113-171 (14 AR.CREDIT columns in SortOrder with captions and widths; AR.DDMANDATE SortCode/AccountNumber not in list) with ar.tr_CustomerCredit_Audit (tr_Customer.sql:16-25) firing on the core.usp_UiMaintSave update.",
+          "confidence": "observed"
+        }
+      ]
+    }
+  ]
+}

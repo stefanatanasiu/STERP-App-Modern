@@ -1,0 +1,53 @@
+@inherits StListPage
+@* frmCostEnquiry (page:cst/item-cost-enquiry, FR-STERP-CST-030; frmCostEnquiry.vb): every basis held for the item side by
+   side - filters &Item: (200), &Rev: (50), &Site: (70), the argument pre-fills Item; Refresh (F5) and F10 load
+   cst_getItemCostBases; nothing here changes a cost. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Item:" Inline="true" Width="200" Field="ItemCode" @bind-Value="_item" Id="@Uid("item")" />
+        <StTextField Caption="&Rev:" Inline="true" Width="50" Field="Revision" @bind-Value="_rev" Id="@Uid("rev")" />
+        <StTextField Caption="&Site:" Inline="true" Width="70" Field="SiteCode" @bind-Value="_site" Id="@Uid("site")" />
+    </Filters>
+</StListLayout>
+
+@code {
+    private string _item = "";
+    private string _rev = "";
+    private string _site = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Item Cost Enquiry");
+        if (FormArgument != "") _item = FormArgument;
+    }
+
+    /// <summary>frmCostEnquiry.LoadData: a blank item only prompts; otherwise the bases with the stated-basis status.</summary>
+    protected override async Task LoadDataAsync()
+    {
+        if (_item.Trim() == "")
+        {
+            SetStatus("Enter an item code and press Refresh (F5).", "");
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/cst/v1/items/" + Query.Path(_item.Trim().ToUpperInvariant()) + "/cost-bases" +
+                                       Query.Build(("revision", _rev.Trim()), ("site", _site.Trim())));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            var data = GridData.FromItems(r.Json,
+                Fmt.Col("itemCode", "ItemCode"), Fmt.Col("revision", "Revision"), Fmt.Col("siteCode", "SiteCode"),
+                Fmt.Col("costMethod", "CostMethod"), Fmt.Col("qtyOnHand", "QtyOnHand", "QTY"),
+                Fmt.Col("averageUnitCost", "AverageUnitCost", "MONEY"), Fmt.Col("carryingValueGbp", "CarryingValueGBP", "MONEY"),
+                Fmt.Col("allowanceGbp", "AllowanceGBP", "MONEY"), Fmt.Col("netCarryingGbp", "NetCarryingGBP", "MONEY"),
+                Fmt.Col("nrvUnitValue", "NrvUnitValue", "MONEY"), Fmt.Col("standardUnitCost", "StandardUnitCost", "MONEY"),
+                Fmt.Col("lastPurchaseCost", "LastPurchaseCost", "MONEY"), Fmt.Col("fifoOldestUnit", "FifoOldestUnit", "MONEY"),
+                Fmt.Col("fifoLayers", "FifoLayers", "INT"), Fmt.Col("standardSet", "StandardSet"),
+                Fmt.Col("standardFromSet", "StandardFromSet", "MONEY"), Fmt.Col("isImpaired", "IsImpaired"));
+            Populate(data);
+            SetStatus(data.Count + " basis row(s).  A basis is stated, never substituted.", data.Count == 0 ? CueWarning : CueOk);
+        });
+    }
+
+    protected override Task OnConfirmAsync() => LoadDataAsync();
+}

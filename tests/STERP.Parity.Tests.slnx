@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/shared/">
+    <Project Path="STERP.Testing/STERP.Testing.csproj" />
+  </Folder>
+  <Folder Name="/legacy-characterization/">
+    <Project Path="legacy/STERP.Legacy.Characterization.Tests/STERP.Legacy.Characterization.Tests.csproj" />
+  </Folder>
+  <Folder Name="/target-parity/">
+    <Project Path="parity/STERP.Target.Parity.Tests/STERP.Target.Parity.Tests.csproj" />
+    <Project Path="parity/STERP.Target.Gui.Parity.Tests/STERP.Target.Gui.Parity.Tests.csproj" />
+  </Folder>
+</Solution>

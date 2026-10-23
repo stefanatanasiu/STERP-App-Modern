@@ -1,0 +1,30 @@
+# suite TRUNPATH
+ok 1 - RUNPATH BUILD accepts a spool request
+ok 2 - RUNPATH names the file <REPORT>-<CO>-<stamp>.lst
+ok 3 - RUNPATH puts a report under the spool directory
+ok 4 - RUNPATH defaults a spool file to extension lst
+ok 5 - RUNPATH reports ENV as the source of the directory
+ok 6 - RUNPATH BACS payments go to run\bacs as .txt
+ok 7 - RUNPATH Making Tax Digital goes to run\mtd as .json
+ok 8 - RUNPATH e-invoices go to run\einvoice as .xml
+ok 9 - RUNPATH extracts go to run\extracts as .csv
+ok 10 - RUNPATH job logs go to run\logs as .log
+ok 11 - RUNPATH scratch files go to run\work as .tmp
+ok 12 - RUNPATH omits the stamp when it is not wanted
+ok 13 - RUNPATH clears the timestamp it did not use
+ok 14 - RUNPATH drops the company when there is none
+ok 15 - RUNPATH honours an extension the caller insists on
+ok 16 - RUNPATH accepts a folder given in lower case
+ok 17 - RUNPATH stamps from the clock when none is given
+ok 18 - RUNPATH BASE reports the directory from STERP_RUN
+ok 19 - RUNPATH strips a trailing separator
+ok 20 - RUNPATH falls back to run when STERP_RUN is unset
+ok 21 - RUNPATH reports DEFAULT when it used the fallback
+ok 22 - RUNPATH rejects a folder it does not know
+ok 23 - RUNPATH lists the folders it does know
+ok 24 - RUNPATH rejects a file with no identifier
+ok 25 - RUNPATH rejects a function it does not support
+ok 26 - RUNPATH builds no path when it refused the request
+1..26
+# TRUNPATH passed 00026 failed 00000
+# exit 0

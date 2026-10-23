@@ -1,0 +1,140 @@
+@inherits StListPage
+@* frmCostRollup (page:cst/cost-rollup, FR-STERP-CST-032; frmCostRollup.vb): COSTROLL prices the item for the stated good
+   output through BOMCOST and the costed tree is shown with the element summary on the status line; WHATIF prices the
+   variants beside the base case. Nothing is written by this screen. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Item:" Inline="true" Width="180" Field="ItemCode" @bind-Value="_item" Id="@Uid("item")" />
+        <StTextField Caption="&Rev:" Inline="true" Width="50" Field="Revision" @bind-Value="_rev" Id="@Uid("rev")" />
+        <StTextField Caption="Cost &set:" Inline="true" Width="130" Field="CostSet" @bind-Value="_set" Id="@Uid("set")" />
+        <StTextField Caption="&Lot size:" Inline="true" Width="70" Field="LotSize" @bind-Value="_lot" Id="@Uid("lot")" />
+        <StTextField Caption="Target &price:" Inline="true" Width="80" Field="TargetPrice" @bind-Value="_price" Id="@Uid("price")" />
+        <StSelectField Caption="&Boundary:" Inline="true" Width="170" Items="Boundaries" @bind-Value="_boundary" Id="@Uid("boundary")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Roll-up (F10)" Glyph="ENGINE" OnClick="RollupAsync" />
+        <StToolButton Text="What-if" Glyph="RUN" OnClick="WhatIfAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private const string Expand = "EXPAND SUBASSEMBLY";
+    private static readonly IReadOnlyList<(string Value, string Text)> Boundaries = StSelectField.Of("STOP AT SUBASSEMBLY", Expand);
+    private string _item = "";
+    private string _rev = "";
+    private string _set = "";
+    private string _lot = "1";
+    private string _price = "";
+    private string _boundary = "STOP AT SUBASSEMBLY";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Cost Roll-up and What-if");
+        if (FormArgument != "") _item = FormArgument;
+    }
+
+    /// <summary>frmCostRollup.LoadData: Refresh (F5) only restates the prompt.</summary>
+    protected override Task LoadDataAsync()
+    {
+        SetStatus("Enter an item and press Roll-up (F10).  Nothing is written by this screen.", "");
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnConfirmAsync() => RollupAsync();
+
+    /// <summary>One valuation boundary per branch, stated on every line (CST-010); the lines are bound before the outcome.</summary>
+    private async Task RollupAsync()
+    {
+        if (!Asked()) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/cst/v1/items/" + Query.Path(Item()) + "/rollup", new JsonObject
+            {
+                ["revision"] = _rev.Trim(),
+                ["costSet"] = CostSet(),
+                ["lotSize"] = Lot(),
+                ["boundary"] = _boundary == Expand ? "EXPAND" : "STOP",
+            });
+            Populate(GridData.FromItems(r.IsSuccess ? r.Data?["lines"] : null,
+                Fmt.Col("seq", "Seq", "INT"), Fmt.Col("depth", "Depth", "INT"), Fmt.Col("item", "Item"), Fmt.Col("revision", "Revision"),
+                Fmt.Col("description", "Description"), Fmt.Col("element", "Element"), Fmt.Col("source", "Source"),
+                Fmt.Col("boundary", "Boundary"), Fmt.Col("requiredQty", "Required", "MONEY"), Fmt.Col("unitCost", "UnitCost", "MONEY"),
+                Fmt.Col("extendedCost", "Extended", "MONEY"), Fmt.Col("contributes", "Contributes"), Fmt.Col("warning", "Warning")));
+            if (!await ShowResultAsync(r)) return;
+            var d = r.Data;
+            var missing = (int)Fmt.Dec(d?["missingCount"]);
+            var completeness = Fmt.Text(d?["completeness"]);
+            var warning = Fmt.Text(d?["warning"]);
+            SetStatus("Material " + Fmt.Money(d?["materialCost"]) +
+                      " | conversion " + Fmt.Money(Fmt.Dec(d?["labourCost"]) + Fmt.Dec(d?["machineCost"]) + Fmt.Dec(d?["setupCost"]) + Fmt.Dec(d?["subconCost"])) +
+                      " | overhead " + Fmt.Money(d?["overheadCost"]) +
+                      " | recovery " + Fmt.Money(d?["recoveryCredit"]) +
+                      " | total " + Fmt.Money(d?["totalCost"]) +
+                      " | unit " + Fmt.Money(d?["unitCost"]) +
+                      " | " + completeness +
+                      (missing > 0 ? ", " + missing + " missing cost(s) or rate(s)" : "") +
+                      (warning != "" ? " | " + warning : ""),
+                      completeness == "COMPLETE" && missing == 0 ? CueOk : CueWarning);
+        });
+    }
+
+    /// <summary>Base case and variants priced side by side, material and rate factors 1.  Nothing is saved (CST-023).</summary>
+    private async Task WhatIfAsync()
+    {
+        if (!Asked()) return;
+        await GuardAsync(async () =>
+        {
+            var price = Price();
+            var r = await Api.PostAsync("/api/cst/v1/items/" + Query.Path(Item()) + "/what-if", new JsonObject
+            {
+                ["revision"] = _rev.Trim(),
+                ["costSet"] = CostSet(),
+                ["lotSize"] = Lot(),
+                ["targetPrice"] = price,
+                ["materialFactor"] = 1m,
+                ["rateFactor"] = 1m,
+            });
+            Populate(GridData.FromItems(r.IsSuccess ? r.Data?["variants"] : null,
+                Fmt.Col("label", "Scenario"), Fmt.Col("costSet", "CostSet"), Fmt.Col("lotSize", "LotSize", "MONEY"),
+                Fmt.Col("material", "Material", "MONEY"), Fmt.Col("conversion", "Conversion", "MONEY"), Fmt.Col("overhead", "Overhead", "MONEY"),
+                Fmt.Col("total", "Total", "MONEY"), Fmt.Col("unit", "UnitCost", "MONEY"), Fmt.Col("difference", "Difference", "MONEY"),
+                Fmt.Col("differencePct", "DiffPct", "MONEY"), Fmt.Col("marginPct", "MarginPct", "MONEY"),
+                Fmt.Col("completeness", "Completeness"), Fmt.Col("warning", "Warning")));
+            if (!await ShowResultAsync(r)) return;
+            var d = r.Data;
+            var best = (int)Fmt.Dec(d?["bestVariant"]);
+            var baseComplete = Fmt.Text(d?["baseComplete"]);
+            var warning = Fmt.Text(d?["warning"]);
+            SetStatus("Base " + Fmt.Money(d?["baseTotal"]) + ", unit " + Fmt.Money(d?["baseUnit"]) + " (" + baseComplete + ")" +
+                      (best > 0 ? " | best variant " + best : "") +
+                      (price > 0m ? " | priced against " + Fmt.Money(price) : "") +
+                      " | simulation only, nothing written" +
+                      (warning != "" ? " | " + warning : ""),
+                      baseComplete == "COMPLETE" ? CueOk : CueWarning);
+        });
+    }
+
+    private bool Asked()
+    {
+        if (Item() != "") return true;
+        SetStatus("Enter an item code first.", CueWarning);
+        return false;
+    }
+
+    private string Item() => _item.Trim().ToUpperInvariant();
+
+    private string CostSet() => _set.Trim().ToUpperInvariant();
+
+    /// <summary>frmCostRollup.Lot: the lot size, 1 when it does not parse or is not positive.</summary>
+    private decimal Lot()
+    {
+        var q = Fmt.ParseDecimal(_lot.Trim());
+        return q is { } v && v > 0m ? v : 1m;
+    }
+
+    /// <summary>frmCostRollup.Price: the target price, 0 when it does not parse.</summary>
+    private decimal Price() => Fmt.ParseDecimal(_price.Trim()) ?? 0m;
+}

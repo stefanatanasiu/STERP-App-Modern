@@ -1,0 +1,3 @@
+ok - ar: Livingston held order resumes through normal sales acceptance after scoped approval  # REQ: AR-008,SO-007,D-06
+ok - ar: credit override native lifecycle enforces independent scoped authority and audit  # REQ: AR-008,D-06,COM-002
+ok - ar: credit override native menus preserve sales request and credit approval separation  # REQ: AR-008,COM-002,COM-024

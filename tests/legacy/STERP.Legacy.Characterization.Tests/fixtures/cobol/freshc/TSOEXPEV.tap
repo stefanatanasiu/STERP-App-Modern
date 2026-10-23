@@ -1,0 +1,28 @@
+# suite TSOEXPEV export evidence and V
+ok 1 - an unknown function is refused, not obeyed
+ok 2 - a despatch reference is required
+ok 3 - a domestic VAT code is refused on an export
+ok 4 - the United States is rest of world
+ok 5 - no commodity code blocks the customs hand-off
+ok 6 - the blocked line is named
+ok 7 - the proof deadline is three months from supply
+ok 8 - the evidence is pending until proof arrives
+ok 9 - the default permitted period is three months
+ok 10 - three months with no proof becomes OVERDUE
+ok 11 - the VAT that falls due is reported
+ok 12 - an exception is raised for the VAT owner
+ok 13 - the despatch is left marked OVERDUE
+ok 14 - a GB to NI movement is a UK domestic supply
+ok 15 - a GB to NI movement is not an export
+ok 16 - a UK domestic supply needs no proof of export
+ok 17 - proof of export needs both a type and a date
+ok 18 - proof obtained after the permitted period fails
+ok 19 - late proof is reported as EXP0008
+ok 20 - late proof leaves the VAT due at 20 per cent
+ok 21 - proof inside the period evidences the zero rate
+ok 22 - evidenced export carries no VAT
+ok 23 - an evidenced export is no longer overdue
+ok 24 - the proof is written to the despatch itself
+1..24
+# TSOEXPEV export evidence and V passed 00024 failed 00000
+# exit 0

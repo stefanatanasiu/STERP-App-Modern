@@ -1,0 +1,21 @@
+@implements IDisposable
+@* Renders the modal dialog stack; only the top-most dialog is exposed to assistive technology. *@
+@foreach (var d in Dialogs.Open)
+{
+    var top = ReferenceEquals(d, Dialogs.Top);
+    <div class="st-modal-layer" @key="d.Id" aria-hidden="@(top ? null : "true")" inert="@(top ? null : true)">
+        <CascadingValue Value="d" IsFixed="true">
+            <DynamicComponent Type="d.Component" Parameters="d.Parameters" />
+        </CascadingValue>
+    </div>
+}
+
+@code {
+    [Inject] private DialogService Dialogs { get; set; } = default!;
+
+    protected override void OnInitialized() => Dialogs.Changed += OnChanged;
+
+    private void OnChanged() => StateHasChanged();
+
+    public void Dispose() => Dialogs.Changed -= OnChanged;
+}

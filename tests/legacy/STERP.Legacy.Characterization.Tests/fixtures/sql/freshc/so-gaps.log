@@ -1,0 +1,16 @@
+# so-gaps
+ok 1 - quoted 12,000.00, ordered 8,550.00, despatched 3,420.00, invoiced 3,420.00 and credited 855.00 stay apart -- REQ: SO-023
+ok 2 - the credit note is a credited value in its own column, not a quieter invoice -- REQ: SO-023
+ok 3 - 1,450.00 of discount is reported beside the 8,550.00 that was ordered -- REQ: SO-023
+ok 4 - 855.00 of returns is reported and the order still owes 60, not 70 -- REQ: SO-023, D-12
+ok 5 - expected cost 2,000.00 and realised cost 2,120.00 are both kept, so the 120.00 late cost is visible -- REQ: SO-023, AC-049
+ok 6 - expected margin 1,420.00 (41.52%) and realised margin 1,300.00 (38.01%) are reported side by side -- REQ: SO-023, AC-049
+ok 7 - the quoted value is reported as it was issued and is never rewritten -- REQ: SO-023, AC-049
+ok 8 - the euro backlog of 5,130.00 is also reported as 4,422.41 at the order rate of 1.16 -- REQ: SO-023, RPT-008
+ok 9 - the sales backlog reports document value and sterling value as separate figures -- REQ: SO-023, RPT-008
+ok 10 - the 8,550.00 ordered splits into 3,420.00 despatched and 5,130.00 still owed -- REQ: SO-023, RPT-008
+ok 11 - quoted estimate, accepted cost basis and actual cost of sales are each kept in their own place -- REQ: SO-023, AC-049
+ok 12 - the realised cost names its method and its cut off date -- REQ: SO-023, AC-049
+ok 13 - sales analysis groups only by the dimensions it defines -- REQ: SO-023, RPT-008
+ok 14 - the suite left no documents behind -- REQ: SO-023
+# so-gaps done

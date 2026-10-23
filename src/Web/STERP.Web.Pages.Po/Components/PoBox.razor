@@ -1,0 +1,18 @@
+@* UiStyle.Box (UiStyle.vb): a group box frame with its caption at the legacy position; the controls drawn over it belong to
+   the form, as in the legacy layout (the box is sent to the back). *@
+<fieldset class="st-group"
+          style="@($"position:absolute;left:{X}px;top:{Y}px;width:{Width}px;height:{Height}px;margin:0;padding:0;box-sizing:border-box;pointer-events:none")">
+    <legend style="margin-left:6px">@Text</legend>
+</fieldset>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+
+    [Parameter] public int X { get; set; }
+
+    [Parameter] public int Y { get; set; }
+
+    [Parameter] public int Width { get; set; }
+
+    [Parameter] public int Height { get; set; }
+}

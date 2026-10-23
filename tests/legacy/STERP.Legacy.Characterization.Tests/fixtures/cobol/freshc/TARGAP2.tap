@@ -1,0 +1,34 @@
+# suite TARGAP2 dishonoured receipts a
+ok 1 - An unknown dishonour function is refused
+ok 2 - A dishonour must name the receipt (DIS0002)
+ok 3 - An unknown receipt is reported as not found
+ok 4 - A dishonour without a reason is refused
+ok 5 - The receipt amount is read from the ledger
+ok 6 - The debt reinstated is exactly the receipt amount
+ok 7 - Every allocation the receipt made is reversed
+ok 8 - Assessing a dishonour changes no receipt
+ok 9 - The item is left owing what the receipt paid
+ok 10 - A reinstated item reports an open amount
+ok 11 - Assessing leaves the item exactly as it was
+ok 12 - A bank fee is not netted off the reinstated debt
+ok 13 - The bank fee is carried separately
+ok 14 - An unknown insolvency function is refused
+ok 15 - Only the recognised insolvency events are accepted
+ok 16 - An insolvency event must name the office holder
+ok 17 - An insolvency event cannot be dated in the future
+ok 18 - A hand-off must name the agency or solicitor
+ok 19 - An individual debtor is not handed over
+ok 20 - The blocked hand-off is held for authority,
+ok 21 - The protocol reply period is never under 30 days
+ok 22 - Handing the debt over never removes it from
+ok 23 - A retention of title list is produced
+ok 24 - The claim value is the sum of the goods listed
+ok 25 - Listing goods under retention of title
+ok 26 - No dividend means nothing is reported
+ok 27 - A sterling dividend is reported as it stands
+ok 28 - A foreign dividend is converted at the rate
+ok 29 - A negative dividend is refused
+ok 30 - A dividend writes nothing off the ledger
+1..30
+# TARGAP2 dishonoured receipts a passed 00030 failed 00000
+# exit 0

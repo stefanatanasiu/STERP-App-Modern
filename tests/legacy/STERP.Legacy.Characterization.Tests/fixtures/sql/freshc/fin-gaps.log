@@ -1,0 +1,11 @@
+# fin-gaps
+ok 1 - the trial balance balances at 2726682.50 -- REQ: FIN-023
+ok 2 - the period debits reconcile to the posted journal lines (5219584.64) -- REQ: FIN-023
+ok 3 - every trial balance line names its company, statement and statutory caption -- REQ: FIN-023, FIN-030
+ok 4 - every posting account maps to exactly one statutory format line -- REQ: FIN-023, FIN-030
+ok 5 - the statutory format is held once per framework and line -- REQ: FIN-023
+ok 6 - account 1060 drills through to the entries behind it (-33250.00) -- REQ: FIN-023
+ok 7 - every company holds a framework and an accounting reference date -- REQ: FIN-030
+ok 8 - a reference date change records an approved period of up to 18 months -- REQ: FIN-030, AC-119
+ok 9 - every tax analysis flag sits on a mapped posting account -- REQ: FIN-030
+ok 10 - every budget variance is actual less budget and carries its sense -- REQ: FIN-023

@@ -1,0 +1,13 @@
+# so-orderbook
+ok 1 - the backlog groups only by ORDER, CUSTOMER, ITEM, SITE or PERIOD -- REQ: RPT-008
+ok 2 - outstanding is accepted less cancelled less despatched, valued at the net price -- REQ: SO-015, RPT-008
+ok 3 - despatched less billed is 10, counted once and not as backlog -- REQ: SO-014, D-03
+ok 4 - the original promise survives a re-promise and the slip is 8 days -- REQ: SO-008
+ok 5 - an order on credit hold reports its blocker to the enquiry -- REQ: SO-003, SO-007
+ok 6 - a cancelled order is out of the order book -- REQ: SO-016, RPT-008
+ok 7 - a confirmed, unbilled despatch is in the invoice run queue -- REQ: SO-014
+ok 8 - a fully billed despatch leaves the queue, so it cannot be billed twice -- REQ: SO-014, COM-015
+ok 9 - an unconfirmed despatch is not offered to the invoice run -- REQ: SO-013, D-03
+ok 10 - 1,200.00 accrued less 500.00 settled leaves 700.00 owed, threshold met -- REQ: SO-027, D-12
+ok 11 - the demonstration orders cover draft, accepted, amended and cancelled -- REQ: SO-002
+ok 12 - every release state (awaiting, credit, commercial, supply, released) is seeded -- REQ: SO-003

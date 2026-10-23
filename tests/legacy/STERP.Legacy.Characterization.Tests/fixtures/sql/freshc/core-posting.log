@@ -1,0 +1,9 @@
+# core-posting
+ok 1 - an unbalanced journal is refused -- REQ: FIN-006, COM-006
+ok 2 - a missing mandatory dimension is refused -- REQ: FIN-013, FIN-005
+ok 3 - a closed period refuses the posting -- REQ: FIN-010, D-15
+ok 4 - an unmapped business event is blocked -- REQ: FIN-014, XMD-005
+ok 5 - a balanced journal posts and is numbered JNS00000068 -- REQ: FIN-006, FIN-011
+ok 6 - negative stock is refused -- REQ: ITM-013, D-09
+ok 7 - a receipt increases the stock balance -- REQ: ITM-013, ITM-014
+ok 8 - a lot reference is required on every movement -- REQ: ITM-010, D-09

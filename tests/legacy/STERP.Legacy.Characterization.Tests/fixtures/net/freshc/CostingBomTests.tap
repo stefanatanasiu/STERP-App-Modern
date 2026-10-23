@@ -1,0 +1,5 @@
+ok - acc: FIFO layers and the moving average never value stock at less than nothing  # REQ: CST-005,CST-006,CST-008,CST-009,CST-025,CST-026 AC: AC-060,AC-062,AC-131
+ok - acc: a B-structure explodes to the same components, levels and quantities every time  # REQ: BOM-006,BOM-007,BOM-008,CST-023 AC: AC-063,AC-086
+ok - acc: a cost has a source, a unit and a tax basis, and the cost set is activated under control  # REQ: CST-001,CST-002,CST-003,CST-004,CST-007,CST-012 AC: AC-059,AC-061
+ok - acc: a costed roll-up is quantity sensitive and never silently complete when a rate is missing  # REQ: CST-010,CST-011,CST-013,CST-023,CST-024,BOM-011 AC: AC-063,AC-064
+ok - acc: a job carries a budget, a forecast, its WIP and its variances, and they reconcile  # REQ: CST-014,CST-015,CST-016,CST-017,CST-018,CST-019,CST-020,CST-021,CST-022 AC: AC-065,AC-066,AC-067

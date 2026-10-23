@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Modules.Ap</RootNamespace>
+    <Description>STERP-AP slice (wave W7): Creditors: suppliers, verification, invoice register, matching, payment runs, Bacs.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Platform\STERP.Platform.Hosting\STERP.Platform.Hosting.csproj" />
+
+  </ItemGroup>
+</Project>

@@ -1,0 +1,7 @@
+ok - so: PRICING EXPLAIN ranks the candidates and says why each was or was not chosen  # REQ: SO-004 AC: AC-039
+ok - so: PRICING SELECT answers with a unit price and the source it came from  # REQ: SO-004 AC: AC-039
+ok - so: SOACCEPT VALIDATE refuses an incomplete draft and names every blocker  # REQ: SO-002,SO-003 AC: AC-040
+ok - so: SOAVAIL keeps free stock, reservations and expected receipts apart  # REQ: SO-010 AC: AC-042
+ok - so: SODISC DOCUMENT reproduces the spec line - net 307.80, VAT 61.56, gross 369.36  # REQ: SO-005 AC: AC-041
+ok - so: the Sales menu, its permissions and the SO batch reports are registered  # REQ: SO-014,RPT-008,COM-019,COM-024
+ok - so: the three Sales screens are base forms and a foreign price keeps its currency  # REQ: COM-024

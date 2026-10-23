@@ -1,0 +1,21 @@
+@inherits ShellComponentBase
+@* frmMain.BuildToolbar (frmMain.vb:183-205): each button opens its page with an empty argument (no permission check). *@
+<div class="st-toolbar" role="toolbar" @onclick:stopPropagation="true">
+    <span class="st-grip" aria-hidden="true"></span>
+    <StToolButton Text="Approvals" Glyph="POST" OnClick='() => Open("frmApprovals")' />
+    <StToolButton Text="Exceptions" Glyph="RETIRE" OnClick='() => Open("frmExceptions")' />
+    <StToolButton Text="Audit" Glyph="FIND" OnClick='() => Open("frmAudit")' />
+    <span class="st-toolsep" role="separator"></span>
+    <StToolButton Text="Reports" Glyph="PRINT" OnClick='() => Open("frmReportLauncher")' />
+    <StToolButton Text="Spool" Glyph="NEW" OnClick='() => Open("frmSpoolViewer")' />
+    <StToolButton Text="Jobs" Glyph="RUN" OnClick='() => Open("frmJobMonitor")' />
+    <span class="st-toolsep" role="separator"></span>
+    <StToolButton Text="File maintenance" Glyph="SAVE" OnClick='() => Open("frmMaintLauncher")' />
+    <StToolButton Text="Engine" Glyph="ENGINE" OnClick='() => Open("frmEngineDiag")' />
+    <span class="st-toolsep" role="separator"></span>
+    <span class="st-legend">F1 Help   F2 Lookup   F3 Close   F5 Refresh   F10 Post</span>
+</div>
+
+@code {
+    private void Open(string formClass) => Shell.OpenForm(formClass, "");
+}

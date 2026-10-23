@@ -1,0 +1,433 @@
+@inherits SoPageBase
+@* frmDespatchConfirm (page:so/despatch-confirmation, route /so/despatch-confirm, FR-STERP-SO-021; frmDespatchConfirm.vb:14-244,
+   .Designer.vb:38-109): the pick list says what was found, this page says what is actually going out. The lines of the pick
+   (so_getPickListLines, an order resolved to its pick through so_listDespatchablePickLists) offer the picked quantity as the
+   despatch quantity, the only editable column; F10 sends DESPATCH CONFIRM (so_confirmDespatch), the only thing that issues the
+   stock, values the cost of sales and raises the journal. A confirmation that comes back 04 or better shows the reference, the
+   COGS value and the journal; anything else leaves them blank - a failed confirmation is never displayed as shipped. *@
+<div class="st-page" style="overflow:auto">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Load pick (F5)" Glyph="REFRESH" OnClick="LoadPickAsync" />
+        <StToolButton Text="Confirm despatch (F10)" Glyph="POST" OnClick="OnConfirmAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <fieldset class="st-group" style="flex:0 0 auto; margin:4px 4px 2px; padding:2px 6px 4px">
+        <legend>Despatch header</legend>
+        <div style="@RowStyle">
+            <StTextField Caption="&Pick list reference:" Inline="true" LabelWidth="116" Width="124" MaxLength="30" Field="PickRef" @bind-Value="_pickRef" Id="@Uid("pick")" />
+            <StTextField Caption="&Order number:" Inline="true" LabelWidth="116" Width="124" MaxLength="30" Field="Order" @bind-Value="_order" Id="@Uid("order")" />
+            <span class="st-filter"><span style="@(CapStyle)width:116px">Customer:</span><span style="@(ValStyle)width:240px">@_customer</span></span>
+        </div>
+        <div style="@RowStyle">
+            <StTextField Caption="&Despatch date:" Inline="true" LabelWidth="116" Width="124" MaxLength="10" Field="DespatchDate" @bind-Value="_despatchDate" Id="@Uid("date")" />
+            <StTextField Caption="C&arrier:" Inline="true" LabelWidth="116" Width="124" MaxLength="20" Field="Carrier" @bind-Value="_carrier" Id="@Uid("carrier")" />
+            <StTextField Caption="Carrier &reference:" Inline="true" LabelWidth="116" Width="234" MaxLength="60" Field="CarrierRef" @bind-Value="_carrierRef" Id="@Uid("carrierref")" />
+        </div>
+        <div style="@RowStyle">
+            <StTextField Caption="Pac&ks:" Inline="true" LabelWidth="116" Width="124" MaxLength="6" Field="Packs" @bind-Value="_packs" Id="@Uid("packs")" />
+            <StTextField Caption="&Gross weight (kg):" Inline="true" LabelWidth="116" Width="124" MaxLength="14" Field="Weight" @bind-Value="_weight" Id="@Uid("weight")" />
+            <StTextField Caption="&Incoterms rule:" Inline="true" LabelWidth="116" Width="54" MaxLength="3" Field="Incoterms" @bind-Value="_incoterms" Id="@Uid("inco")" />
+        </div>
+        <div style="@RowStyle">
+            <span style="display:inline-block; width:254px"><StCheckField Caption="E&xport consignment" Inline="true" Field="Export" @bind-Value="_export" Id="@Uid("export")" /></span>
+            <StTextField Caption="Destination countr&y:" Inline="true" LabelWidth="116" Width="124" MaxLength="2" Field="Destination" @bind-Value="_destination" Id="@Uid("dest")" />
+            <StTextField Caption="Named p&lace:" Inline="true" LabelWidth="116" Width="234" MaxLength="60" Field="IncoPlace" @bind-Value="_incoPlace" Id="@Uid("place")" />
+        </div>
+        <div style="@RowStyle">
+            <StTextField Caption="Customer &EORI:" Inline="true" LabelWidth="116" Width="124" MaxLength="17" Field="Eori" @bind-Value="_eori" Id="@Uid("eori")" />
+            <StTextField Caption="Export declaration re&f:" Inline="true" LabelWidth="116" Width="124" MaxLength="40" Field="DeclRef" @bind-Value="_declRef" Id="@Uid("decl")" />
+        </div>
+    </fieldset>
+    <div style="padding:2px 6px">Despatch lines - key the quantity actually going out in the "Despatch qty" column:</div>
+    <div class="st-gridbox st-sunken" id="@Uid("lines")" data-sterp-field="Lines" style="margin:0 4px; min-height:80px">
+        <table class="st-grid" role="grid" aria-rowcount="@(RowCount + 1)" tabindex="0">
+            <thead>
+                <tr role="row">
+                    <th class="st-rowhead" role="columnheader"><span class="st-sr">Row</span></th>
+                    @if (_lines is not null)
+                    {
+                        @foreach (var col in PickColumns.Where(c => c.Visible))
+                        {
+                            <th role="columnheader" style="min-width:@(col.Width)px;width:@(col.Width)px">@col.Caption</th>
+                        }
+                        <th role="columnheader" class="st-fill">Despatch qty</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (var r = 0; r < RowCount; r++)
+                {
+                    var index = r;
+                    var row = _lines![r];
+                    var selected = index == _selected;
+                    <tr role="row" @key="index" class="@(selected ? "st-sel" : null)" aria-selected="@(selected ? "true" : "false")" id="@Uid($"lines-r{index}")"
+                        @onclick="() => SelectRow(index)">
+                        <td class="st-rowhead" role="rowheader"></td>
+                        @foreach (var col in PickColumns.Where(c => c.Visible))
+                        {
+                            <td role="gridcell" class="@UkFormat.Alignment(col.Kind)">@UkFormat.Cell(SoFmt.Col(row, col.Legacy), col.Kind)</td>
+                        }
+                        @if (selected)
+                        {
+                            <td role="gridcell" class="st-r st-fill"><input id="@QtyId(index)" class="st-input st-right" style="width:100%; box-sizing:border-box" aria-label="Despatch qty"
+                                                                       value="@_despatch[index]" autocomplete="off" spellcheck="false" @oninput="e => _despatch[index] = e.Value?.ToString() ?? string.Empty" /></td>
+                        }
+                        else
+                        {
+                            <td role="gridcell" class="st-r st-fill">@QtyText(_despatch[index])</td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (RowCount == 0)
+        {
+            <div class="st-empty">(no records - press F5 to refresh)</div>
+        }
+    </div>
+    <fieldset class="st-group" style="flex:0 0 auto; margin:4px 4px 2px; padding:2px 6px 4px">
+        <legend>Confirmation result - shown only when DESPATCH CONFIRM succeeded</legend>
+        <div style="@RowStyle">
+            <span class="st-filter"><span style="@(CapStyle)width:124px">Despatch reference:</span><span style="@(ValStyle)width:160px">@_despatchRef</span></span>
+            <span class="st-filter"><span style="@(CapStyle)width:100px">COGS value (£):</span><span style="@(ValStyle)width:120px">@_cogs</span></span>
+            <span class="st-filter"><span style="@(CapStyle)width:70px">Journal id:</span><span style="@(ValStyle)width:274px">@_journal</span></span>
+        </div>
+        <div style="@RowStyle">
+            <span class="st-filter"><span style="@(CapStyle)width:124px">Outcome:</span><span style="@(ValStyle)width:752px">@_outcome</span></span>
+        </div>
+        <div style="padding:3px 0">A confirmation that fails is never shown as shipped: the reference, the COGS value and the journal stay blank.</div>
+    </fieldset>
+</div>
+
+@code {
+    private const string RowStyle = "display:flex; flex-wrap:nowrap; align-items:center; gap:2px 10px; padding:1px 0";
+    private const string CapStyle = "display:inline-block; white-space:nowrap; overflow:hidden; ";
+    private const string ValStyle = "display:inline-block; white-space:pre; overflow:hidden; text-overflow:ellipsis; ";
+
+    private const string NotYet = "NOT CONFIRMED - nothing has been despatched yet.";
+
+    /// <summary>
+    /// PickLineSql columns in result-set order (SalesOrderService.vb:62-68) with frmDespatchConfirm.DecorateLines captions, types
+    /// and widths; ScheduleNo, OrderNumber and CustomerCode are hidden. The added DespatchQty column comes last.
+    /// </summary>
+    private static readonly (string Legacy, string Caption, string Kind, int Width, bool Visible)[] PickColumns =
+    [
+        ("LineNum", "Line", "INT", 44, true),
+        ("ItemCode", "Item", "TEXT", 140, true),
+        ("RequiredQty", "Required qty", "QTY", 100, true),
+        ("PickedQty", "Picked qty", "QTY", 100, true),
+        ("ShortQty", "Short qty", "QTY", 94, true),
+        ("WarehouseCode", "Warehouse", "TEXT", 80, true),
+        ("LocationCode", "Location", "TEXT", 80, true),
+        ("LotCode", "Lot", "TEXT", 90, true),
+        ("SerialNo", "Serial", "TEXT", 100, true),
+        ("ScheduleNo", "Schedule No", "INT", 0, false),
+        ("Status", "Pick status", "TEXT", 80, true),
+        ("OrderNumber", "Order Number", "TEXT", 0, false),
+        ("CustomerCode", "Customer Code", "TEXT", 0, false),
+        ("OrderLineNum", "Order line", "INT", 70, true),
+    ];
+
+    /// <summary>SalesOrderService.MaxLines: the lines DESPATCH carries in one link.</summary>
+    private const int MaxLines = 30;
+
+    private string _pickRef = "";
+    private string _order = "";
+    private string _customer = "-";
+    private string _despatchDate = "";
+    private string _carrier = "";
+    private string _carrierRef = "";
+    private string _packs = "";
+    private string _weight = "";
+    private string _incoterms = "";
+    private bool _export;
+    private string _destination = "";
+    private string _incoPlace = "";
+    private string _eori = "";
+    private string _declRef = "";
+
+    private string _despatchRef = "-";
+    private string _cogs = "-";
+    private string _journal = "-";
+    private string _outcome = "NOT CONFIRMED - nothing has been despatched.";
+
+    /// <summary>The pick lines (null = nothing loaded, legacy _lines Is Nothing) and the despatch quantity keyed for each.</summary>
+    private List<JsonObject>? _lines;
+    private string[] _despatch = [];
+    private int _selected = -1;
+    private string? _pendingFocus;
+    private bool _confirmed;
+
+    /// <summary>The pick list and order on the screen; F10 acts on these, not on what is keyed since.</summary>
+    private string _loadedPick = "";
+    private string _loadedOrder = "";
+
+    private int RowCount => _lines?.Count ?? 0;
+
+    private string QtyId(int row) => Uid($"dq-{row}");
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        SoWindow.Size(Window, Browser, 920, 512);
+    }
+
+    /// <summary>frmDespatchConfirm.OnLoad: despatch date = business date, packs 1, weight 0, the form argument is the pick list.</summary>
+    protected override Task OnInitializedAsync()
+    {
+        _despatchDate = SoFmt.Date(Session.BusinessDate);
+        _packs = "1";
+        _weight = "0";
+        if (FormArgument != "") _pickRef = FormArgument;
+        SetStatus("Key the pick list (F2 for the list) or the order number and press F5, then F10 to confirm the despatch.");
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadPickAsync();
+
+    public override async Task<bool> CanCloseAsync()
+    {
+        if (_lines is null || _confirmed) return true;
+        return await ConfirmAsync("Despatch quantities have been keyed but not confirmed.  Abandon them?");
+    }
+
+    private DateOnly? DespatchDate() => SoFmt.ParseDate(_despatchDate);
+
+    private static string QtyText(string text) => SoFmt.QtyCell(SoFmt.Dec(text));
+
+    /// <summary>
+    /// Reads the pick list and offers the picked quantity as the despatch quantity - the operator may reduce it, and the engine
+    /// decides whether the result is allowed. With no pick list keyed, the order number is resolved to its pick list.
+    /// </summary>
+    private async Task LoadPickAsync()
+    {
+        var pick = _pickRef.Trim().ToUpperInvariant();
+        var keyedOrder = _order.Trim().ToUpperInvariant();
+        // a different order keyed over a loaded pick means "find that order's pick"
+        if (pick != "" && pick == _loadedPick && keyedOrder != "" && keyedOrder != _loadedOrder) pick = "";
+        if (pick == "")
+        {
+            var order = keyedOrder;
+            if (order == "")
+            {
+                SetStatus("Key a pick list reference or an order number, or press F2 for the pick lists waiting to go out.", CueWarning);
+                return;
+            }
+            pick = await PickForOrderAsync(order);
+            if (pick == "") return;
+        }
+        _pickRef = pick;
+        ClearPick(false);
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/so/v1/pick-lists/" + Query.Path(pick) + "/lines");
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            var lines = r.Items.OfType<JsonObject>().ToList();
+            if (lines.Count == 0)
+            {
+                _lines = null;
+                SetStatus("Pick list " + pick + " has no lines in " + Session.CompanyCode + ".", CueError);
+                return;
+            }
+            _order = SoFmt.Str(SoFmt.Col(lines[0], "OrderNumber"));
+            _customer = SoFmt.Str(SoFmt.Col(lines[0], "CustomerCode"));
+            _loadedPick = pick;
+            _loadedOrder = _order.Trim().ToUpperInvariant();
+            _despatch = lines.Select(l => SoFmt.QtyCell(SoFmt.Dec(SoFmt.Col(l, "PickedQty")))).ToArray();
+            _lines = lines;
+            _selected = 0;
+            Outcome("", 0m, 0m, NotYet);
+            _confirmed = false;
+            SetStatus(lines.Count + " pick line(s) for order " + _order + ".  Adjust the despatch quantities, then press F10.", "");
+        });
+    }
+
+    /// <summary>The pick list of an order: the only one is taken, several are offered, none is explained - an order must be picked before it can be despatched.</summary>
+    private async Task<string> PickForOrderAsync(string order)
+    {
+        List<JsonObject>? picks = null;
+        var ok = await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/so/v1/pick-lists" + Query.Build(("orderNumber", order)));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            picks = r.Items.OfType<JsonObject>().ToList();
+        });
+        if (!ok || picks is null) return "";
+        if (picks.Count == 1) return SoFmt.Str(SoFmt.Col(picks[0], "PickListRef"));
+        if (picks.Count > 1) return await Dialogs.LookupAsync("named", "SO.PICKLIST", "Pick lists for order " + order, order);
+        ClearPick(true);
+        SetStatus("Order " + order + " has no pick list waiting to go out at " + Session.SiteCode +
+                  " - it must be picked before it can be despatched.", CueError);
+        return "";
+    }
+
+    /// <summary>Removes the previous pick so nothing on view or actionable belongs to another one.</summary>
+    private void ClearPick(bool keepOrder)
+    {
+        _lines = null;
+        _despatch = [];
+        _selected = -1;
+        _confirmed = false;
+        _loadedPick = "";
+        _loadedOrder = "";
+        if (!keepOrder) _order = "";
+        _customer = "-";
+        Outcome("", 0m, 0m, NotYet);
+    }
+
+    /// <summary>The result panel: blank values plus a plain English outcome whenever the engine did not confirm.</summary>
+    private void Outcome(string despatchRef, decimal cogs, decimal journal, string text)
+    {
+        _despatchRef = despatchRef == "" ? "-" : despatchRef;
+        _cogs = despatchRef == "" ? "-" : SoFmt.Money(cogs);
+        _journal = despatchRef == "" ? "-" : journal.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        _outcome = text;
+    }
+
+    private void SelectRow(int index)
+    {
+        if (index == _selected) return;
+        _selected = index;
+    }
+
+    /// <summary>The DataGridView keys: Up/Down (and Enter, which commits the cell) move the current row.</summary>
+    protected override Task? OnKey(KeyInfo key)
+    {
+        if (key.TargetField != "Lines" || key.Ctrl || key.Alt || _lines is not { Count: > 0 }) return null;
+        int next;
+        switch (key.Key)
+        {
+            case "ArrowDown":
+            case "Enter":
+                next = Math.Min(_lines.Count - 1, _selected + 1);
+                break;
+            case "ArrowUp":
+                next = Math.Max(0, _selected - 1);
+                break;
+            default:
+                return null;
+        }
+        if (next != _selected)
+        {
+            _selected = next;
+            if (key.TargetTag == "input") _pendingFocus = QtyId(next);
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingFocus is { } id)
+        {
+            _pendingFocus = null;
+            await Browser.SelectAllAsync(id);
+        }
+    }
+
+    /// <summary>F10 - DESPATCH CONFIRM. Picking is not despatch; this is the issue.</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        if (_lines is null || _lines.Count == 0)
+        {
+            SetStatus("Load a pick list first (F5).", CueWarning);
+            return;
+        }
+        if (_pickRef.Trim().ToUpperInvariant() != _loadedPick || _order.Trim().ToUpperInvariant() != _loadedOrder)
+        {
+            SetStatus("The pick list or order has been changed since it was loaded - press F5 to load it first.", CueWarning);
+            return;
+        }
+        var total = 0m;
+        foreach (var q in _despatch) total += SoFmt.Dec(q);
+        if (total <= 0m)
+        {
+            SetStatus("Key at least one despatch quantity.", CueWarning);
+            return;
+        }
+        var despatchOn = DespatchDate();
+        if (!despatchOn.HasValue)
+        {
+            SetStatus("Enter a valid despatch date in dd/MM/yyyy form before confirming.", CueWarning);
+            await Browser.FocusAsync(Uid("date"));
+            return;
+        }
+        if (!await ConfirmAsync("Confirm the despatch of pick list " + _pickRef.Trim() + " for order " + _order.Trim() + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var res = SoResult.From(await Api.PostAsync("/api/so/v1/sales-orders/" + Query.Path(_loadedOrder) + "/despatches/confirm",
+                Request(despatchOn.Value), Instruction.New().Options()));
+            if (!await ShowResultAsync(res))
+            {
+                Outcome("", 0m, 0m, "NOT CONFIRMED (" + res.Severity + ") - " + res.Display + ".  Nothing has been despatched.");
+                SetStatus("Despatch refused: " + res.Display, res.IsHold ? CueHold : CueError);
+                return;
+            }
+            _confirmed = true;
+            var a = res.Area;
+            var despatchRef = SoFmt.AreaText(a, "despatchRef");
+            Outcome(despatchRef, SoFmt.Dec(SoFmt.Col(a, "cogsGbp")), SoFmt.Dec(SoFmt.Col(a, "journalId")),
+                    "CONFIRMED - " + SoFmt.AreaText(a, "status") + " on " + SoFmt.AreaDate(a, "despatchDate") + ".");
+            SetStatus("Despatch " + despatchRef + " confirmed; cost of sales " + SoFmt.Money(SoFmt.Dec(SoFmt.Col(a, "cogsGbp"))) +
+                      ", journal " + SoFmt.AreaText(a, "journalNo") + ".", CueOk);
+        });
+    }
+
+    /// <summary>
+    /// SalesOrderService.NewDespatch + AddDespatchLine as frmDespatchConfirm.BuildArea called them: the loaded order and pick, at
+    /// most 30 lines with a positive quantity, each with the order line, schedule and bin of the pick (the pick line number is not
+    /// the order line), the item code as description and a blank unit.
+    /// </summary>
+    private JsonObject Request(DateOnly despatchOn)
+    {
+        var lines = new JsonArray();
+        for (var i = 0; i < _lines!.Count; i++)
+        {
+            var qty = SoFmt.Dec(_despatch[i]);
+            if (qty <= 0m) continue;
+            if (lines.Count + 1 > MaxLines) break;
+            var r = _lines[i];
+            lines.Add(new JsonObject
+            {
+                ["orderLine"] = SoFmt.Int(SoFmt.Col(r, "OrderLineNum")),
+                ["schedule"] = SoFmt.Int(SoFmt.Col(r, "ScheduleNo")),
+                ["warehouse"] = SoFmt.Str(SoFmt.Col(r, "WarehouseCode")),
+                ["location"] = SoFmt.Str(SoFmt.Col(r, "LocationCode")),
+                ["itemCode"] = SoFmt.Str(SoFmt.Col(r, "ItemCode")),
+                ["description"] = SoFmt.Str(SoFmt.Col(r, "ItemCode")),
+                ["pickedQty"] = SoFmt.Dec(SoFmt.Col(r, "PickedQty")),
+                ["quantity"] = qty,
+                ["uom"] = "",
+                ["lot"] = SoFmt.Str(SoFmt.Col(r, "LotCode")),
+                ["serial"] = SoFmt.Str(SoFmt.Col(r, "SerialNo")),
+            });
+        }
+        return new JsonObject
+        {
+            ["picklistRef"] = _loadedPick,
+            ["customer"] = _customer.Trim(),
+            ["despatchDate"] = SoFmt.Iso(despatchOn),
+            ["carrierCode"] = _carrier.Trim(),
+            ["carrierRef"] = _carrierRef.Trim(),
+            ["packCount"] = SoFmt.Int(_packs),
+            ["grossWeight"] = SoFmt.Dec(_weight),
+            ["incoterms"] = _incoterms.Trim(),
+            ["incotermsPlace"] = _incoPlace.Trim(),
+            ["isExport"] = _export ? "Y" : "N",
+            ["destCountry"] = _destination.Trim(),
+            ["customerEori"] = _eori.Trim(),
+            ["exportDeclRef"] = _declRef.Trim(),
+            ["lines"] = lines,
+        };
+    }
+
+    /// <summary>F2 - the pick lists at this site with picked stock still to go out (GUI-004).</summary>
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        var code = await Dialogs.LookupAsync("named", "SO.PICKLIST", "Pick lists waiting to be despatched");
+        if (code == "") return;
+        _pickRef = code;
+        await LoadPickAsync();
+    }
+}

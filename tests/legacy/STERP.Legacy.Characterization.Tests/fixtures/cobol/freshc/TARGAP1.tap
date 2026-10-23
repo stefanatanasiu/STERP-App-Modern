@@ -1,0 +1,32 @@
+# suite TARGAP1 customer lifecycle, pa
+ok 1 - VALIDATE reaches a decision on a seeded account
+ok 2 - A complete account names no missing information
+ok 3 - An incomplete account is refused with CUS0010
+ok 4 - An unknown lifecycle step is refused with CUS0098
+ok 5 - Suspension without a reason is refused with CUS0014
+ok 6 - A refused suspension carries an error return code
+ok 7 - Retirement without a reason is refused too
+ok 8 - Retiring an account leaves every open item in place
+ok 9 - A relationship without a counterparty is refused
+ok 10 - An account cannot be its own paying party
+ok 11 - Only invoiced, paying and statement roles exist
+ok 12 - A paying party relationship is accepted
+ok 13 - Naming a payer moves no debt off the other account
+ok 14 - The paying party is reported on the relate
+ok 15 - The statement party is reported on the relate
+ok 16 - A later read returns the paying party held
+ok 17 - A later read returns the statement party held
+ok 18 - The invoiced party read back is the one held
+ok 19 - A credit note may not return stock (ARC0003)
+ok 20 - The stock returning credit note is an
+ok 21 - No credit note was created for a refused request
+ok 22 - A value credit must name the original invoice
+ok 23 - A credit note without a reason is refused
+ok 24 - A credit note with no lines is refused
+ok 25 - The original invoice gross is read back
+ok 26 - Remaining creditable is gross less prior credits
+ok 27 - Crediting does not edit the original invoice
+ok 28 - A credit beyond the remaining amount is refused
+1..28
+# TARGAP1 customer lifecycle, pa passed 00028 failed 00000
+# exit 0

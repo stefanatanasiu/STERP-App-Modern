@@ -1,0 +1,171 @@
+@inherits StListPage
+@* frmChainTrace (page:xmd/chain-trace, FR-STERP-XMD-012; frmChainTrace.vb:13-115, frmChainTrace.Designer.vb:17-24): one
+   document reference in, the ordered steps of its chain out - "Trace (F10)" through CHAINTRC (xmd_traceBusinessChain),
+   "Whole chain" through rpt.usp_ChainTrace (xmd_listBusinessChainSteps). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StSelectField Caption="Document &type:" Inline="true" Width="130" Items="Types" @bind-Value="_type" Id="@Uid("type")" />
+        <StTextField Caption="&Reference:" Inline="true" Width="180" @bind-Value="_ref" Id="@Uid("ref")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Trace (F10)" Glyph="ENGINE" OnClick="TraceAsync" />
+        <StToolButton Text="Whole chain" Glyph="FIND" OnClick="ListAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    /// <summary>XmdService.MaxSteps: CHAINTRC fills at most this many steps and then reports truncation.</summary>
+    private const int MaxSteps = 24;
+
+    /// <summary>The picker items of BuildFilters (frmChainTrace.vb:25-26); the blank first item is selected.</summary>
+    private static readonly IReadOnlyList<(string Value, string Text)> Types =
+        StSelectField.Of("", "ORDER", "PO", "KIT", "INVOICE", "DESPATCH", "RECEIPT", "PAYMENT", "RETURN");
+
+    private string _type = "";
+    private string _ref = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Business Chain Trace");
+        if (FormArgument != "") _ref = FormArgument;
+    }
+
+    /// <summary>frmChainTrace.Code: the reference trimmed and upper-cased.</summary>
+    private string Code() => _ref.Trim().ToUpperInvariant();
+
+    /// <summary>frmChainTrace.DocType: the picker text trimmed and upper-cased.</summary>
+    private string DocType() => _type.Trim().ToUpperInvariant();
+
+    /// <summary>LoadData (open, F5, Refresh): a blank reference only prompts; otherwise the chain is traced.</summary>
+    protected override Task LoadDataAsync()
+    {
+        if (Code() == "")
+        {
+            SetStatus("Enter a document reference, then Trace (F10).", "");
+            return Task.CompletedTask;
+        }
+        return TraceAsync();
+    }
+
+    protected override Task OnConfirmAsync() => TraceAsync();
+
+    /// <summary>
+    /// TraceClicked: the engine answer, the chain exactly as CHAINTRC walks it. The steps are bound whenever CHAINTRC
+    /// answered (the facade's step table is empty unless RC 0/4), then the outcome is shown; RC 0/4 end with the
+    /// Describe() status line.
+    /// </summary>
+    private async Task TraceAsync()
+    {
+        if (Code() == "")
+        {
+            SetStatus("A chain trace needs a document reference.", CueWarning);
+            return;
+        }
+        var docType = DocType();
+        var docRef = Code();
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/xmd/v1/business-chains/trace", new JsonObject { ["docType"] = docType, ["docRef"] = docRef });
+            if (r.IsSuccess || r.Problem?.ReturnCode is not null) Populate(Steps(r.IsSuccess ? r.Data : null));
+            if (!await ShowResultAsync(r)) return;
+            SetStatus(Describe(r.Data), StatusTag(r.Data));
+        });
+    }
+
+    /// <summary>
+    /// ListClicked: the same chain from rpt.usp_ChainTrace, for an ORDER, a PO or a KIT only (XmdService.IsSetTraceable);
+    /// a procedure that is not deployed is reported, not failed.
+    /// </summary>
+    private async Task ListAsync()
+    {
+        if (Code() == "")
+        {
+            SetStatus("A chain trace needs a document reference.", CueWarning);
+            return;
+        }
+        var docType = DocType();
+        if (docType is not ("ORDER" or "PO" or "KIT"))
+        {
+            SetStatus("The whole chain is walked from an ORDER, a PO or a KIT - choose one.", CueWarning);
+            return;
+        }
+        var docRef = Code();
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/xmd/v1/business-chains/steps", new JsonObject { ["docType"] = docType, ["reference"] = docRef });
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            if (r.Json?["deployed"] is JsonValue d && d.TryGetValue<bool>(out var deployed) && !deployed)
+            {
+                SetStatus("rpt.usp_ChainTrace is not deployed on this database.", CueWarning);
+                return;
+            }
+            var rows = WholeChain(r.Json);
+            Populate(rows);
+            SetStatus("rpt.usp_ChainTrace returned " + rows.Count + " step(s) for " + docRef + ".", CueOk);
+        });
+    }
+
+    /// <summary>
+    /// XmdService.StepSpec shaped for the grid (Seq:I, Stage, DocType, Reference, Dated:T, Status, Quantity:D, ValueGBP:D,
+    /// Kind, Note): GridHelper formats Integer as INT, Date as DATE and both Decimal columns as MONEY.
+    /// </summary>
+    private static GridData Steps(JsonNode? data) => GridData.FromItems(data?["steps"] as JsonArray ?? [],
+        new GridColumn("seq", kind: "INT", legacyName: "Seq"),
+        new GridColumn("stage", kind: "TEXT", legacyName: "Stage"),
+        new GridColumn("docType", kind: "TEXT", legacyName: "DocType"),
+        new GridColumn("reference", kind: "TEXT", legacyName: "Reference"),
+        new GridColumn("date", kind: "DATE", legacyName: "Dated"),
+        new GridColumn("status", kind: "TEXT", legacyName: "Status"),
+        new GridColumn("quantity", kind: "MONEY", legacyName: "Quantity"),
+        new GridColumn("valueGbp", kind: "MONEY", legacyName: "ValueGBP"),
+        new GridColumn("kind", kind: "TEXT", legacyName: "Kind"),
+        new GridColumn("note", kind: "TEXT", legacyName: "Note"));
+
+    /// <summary>
+    /// Table 0 of rpt.usp_ChainTrace in its column order (usp_ChainTrace.sql:167-171): StepNo bigint, StepDate date,
+    /// Quantity decimal(19,6) and AmountGBP decimal(18,2) as GridHelper.GuessType formats them.
+    /// </summary>
+    private static GridData WholeChain(JsonNode? body) => GridData.FromItems(body?["items"] as JsonArray ?? [],
+        new GridColumn("stepNo", kind: "INT", legacyName: "StepNo"),
+        new GridColumn("stage", kind: "TEXT", legacyName: "Stage"),
+        new GridColumn("stepKind", kind: "TEXT", legacyName: "StepKind"),
+        new GridColumn("documentType", kind: "TEXT", legacyName: "DocumentType"),
+        new GridColumn("reference", kind: "TEXT", legacyName: "Reference"),
+        new GridColumn("stepDate", kind: "DATE", legacyName: "StepDate"),
+        new GridColumn("status", kind: "TEXT", legacyName: "Status"),
+        new GridColumn("quantity", kind: "MONEY", legacyName: "Quantity"),
+        new GridColumn("amountGbp", kind: "MONEY", legacyName: "AmountGBP"),
+        new GridColumn("note", kind: "TEXT", legacyName: "Note"));
+
+    /// <summary>
+    /// frmChainTrace.Describe: "&lt;chain name, else type&gt;: &lt;n&gt; step(s), party &lt;party&gt;, value &lt;£#,##0.00&gt;,
+    /// &lt;n&gt; reversal(s)" plus the complete, broken and truncated markers.
+    /// </summary>
+    private static string Describe(JsonNode? d)
+    {
+        var s = Text(d, "chainName").Trim();
+        if (s == "") s = Text(d, "chainType").Trim();
+        return s + ": " + Number(d, "stepCount").ToString("0", UkFormat.Culture) + " step(s), party " + Text(d, "party").Trim() +
+               ", value " + Money(Number(d, "totalGbp")) + ", " + Number(d, "reversals").ToString("0", UkFormat.Culture) + " reversal(s)" +
+               (Text(d, "complete") == "Y" ? ", complete" : "") +
+               (Text(d, "broken") == "Y" ? ", *** BROKEN CHAIN" : "") +
+               (Text(d, "truncated") == "Y" ? ", *** TRUNCATED AT " + MaxSteps + " STEPS" : "");
+    }
+
+    /// <summary>frmChainTrace.StatusTag: !  WARNING for a broken or truncated chain, else OK.</summary>
+    private static string StatusTag(JsonNode? d) =>
+        Text(d, "broken") == "Y" || Text(d, "truncated") == "Y" ? CueWarning : CueOk;
+
+    /// <summary>XmdService.Text: a COMMAREA field as text.</summary>
+    private static string Text(JsonNode? d, string name) => d?[name] is JsonValue v && v.TryGetValue<string>(out var s) ? s : "";
+
+    /// <summary>XmdService.Num: a COMMAREA field as a number.</summary>
+    private static decimal Number(JsonNode? d, string name) =>
+        d?[name] is JsonValue v && v.TryGetValue<decimal>(out var n) ? n : 0m;
+
+    /// <summary>Fmt.Money (dotnet/STERP.Common/Fmt.cs:57): "£#,##0.00;-£#,##0.00;£0.00".</summary>
+    private static string Money(decimal v) => v.ToString("£#,##0.00;-£#,##0.00;£0.00", UkFormat.Culture);
+}

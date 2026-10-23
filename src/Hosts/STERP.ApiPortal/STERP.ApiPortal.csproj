@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Sterp.ApiPortal</RootNamespace>
+    <AssemblyName>STERP.ApiPortal</AssemblyName>
+    <Description>STERP-PORTAL: the API Console - catalogue of the thirteen binding OpenAPI documents with their legacy traceability, Try it out with Windows credentials, Negotiate curl/PowerShell command lines, a contract-drift check against the running hosts and the 'How to call the STERP APIs' guide. Reads documents only; never connects to the database (FR-STERP-PORTAL-001).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="YamlDotNet" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- the binding Agent 06 documents (byte-identical copies of contracts/openapi) -->
+    <EmbeddedResource Include="..\..\..\contracts\openapi\*.openapi.yaml" LogicalName="openapi/%(Filename)%(Extension)" />
+    <!-- 'How to call the STERP APIs': shared platform contracts sections 4 and 5 (FR-STERP-PORTAL-013) -->
+    <EmbeddedResource Include="Guide\how-to-call-the-sterp-apis.md" LogicalName="guide/how-to-call-the-sterp-apis.md" />
+  </ItemGroup>
+</Project>

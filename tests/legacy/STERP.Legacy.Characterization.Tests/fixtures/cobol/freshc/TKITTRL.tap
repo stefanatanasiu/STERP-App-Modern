@@ -1,0 +1,23 @@
+# suite TKITTRL
+ok 1 - KITTRIAL leaves KT-COMMITTED N after an unknown function
+ok 2 - KITTRIAL refuses an unknown function with KIT0002
+ok 3 - KITTRIAL returns 08 for an unknown function
+ok 4 - Paging a trial result still commits nothing
+ok 5 - A zero trial quantity is refused with KIT0003
+ok 6 - A trial without a parent item is refused
+ok 7 - SAVE without a result first is refused with KIT0021
+ok 8 - MULTITRL holds both competing kits in one scenario
+ok 9 - A multi-kit trial commits nothing either
+ok 10 - CLEAR empties the scenario
+ok 11 - A kit for zero units is refused with KIT0003
+ok 12 - GETKIT returns both kits
+ok 13 - The higher priority kit is sequenced first
+ok 14 - The lower priority kit is sequenced second
+ok 15 - Sequence number 1 is the priority 1 kit
+ok 16 - Each competing kit still wants four units
+ok 17 - The sequence rule is recorded, not implied
+ok 18 - The thirteenth kit is refused with KIT0025
+ok 19 - The scenario still holds exactly twelve kits
+1..19
+# TKITTRL passed 00019 failed 00000
+# exit 0

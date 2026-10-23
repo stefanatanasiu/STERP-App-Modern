@@ -1,0 +1,22 @@
+@inherits ShellComponentBase
+@* frmMain.BuildMenu: the menu bar from core.MenuItem, captions with access keys, shortcut text shown and bound. Clicks in
+   the menu bar and the toolbar do not close an open drop-down; a click anywhere else in the shell does. *@
+<div class="st-menubar" role="menubar" @onclick:stopPropagation="true">
+    @if (Shell.Menu.Count == 0)
+    {
+        <span class="st-menu-empty" role="menuitem" aria-disabled="true">(no menu entries)</span>
+    }
+    @foreach (var top in Shell.Menu)
+    {
+        var node = top;
+        var open = Shell.IsOpen(node);
+        <div class="st-menu-top @(open ? "st-open" : null)" @key="node.Code">
+            <span class="st-menu-head" role="menuitem" aria-haspopup="menu" aria-expanded="@(open ? "true" : "false")" tabindex="-1"
+                  @onclick="() => Shell.ToggleTop(node)" @onmouseenter="() => Shell.HoverTop(node)"><StMnemonic Text="@node.Caption" /></span>
+            @if (open)
+            {
+                <StMenuDropdown Node="node" Depth="1" />
+            }
+        </div>
+    }
+</div>

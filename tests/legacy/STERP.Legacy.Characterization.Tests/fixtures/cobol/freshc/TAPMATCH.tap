@@ -1,0 +1,49 @@
+# suite TAPMATCH match tolerances
+ok 1 - 80 accepted units are available
+ok 2 - ten invoiced units cannot be matched
+ok 3 - the quantity test fails
+ok 4 - a 5 per cent price variance still passes
+ok 5 - price inside tolerance does not cure quantity
+ok 6 - the line is returned for approval
+ok 7 - the refusal names the receipt shortfall
+ok 8 - a variance is reported as return code 6
+ok 9 - the corrected invoice matches
+ok 10 - all eighty units are matched
+ok 11 - matched invoice value is 656.00
+ok 12 - GRNI cleared at order price is 640.00
+ok 13 - 16.00 is attributed as price difference
+ok 14 - the price variance is 2.5 per cent
+ok 15 - stated input VAT of 131.20 is accepted
+ok 16 - the amount payable is 787.20
+ok 17 - the line is matched
+ok 18 - the variance is 5.01 per cent
+ok 19 - the quantity test passes
+ok 20 - 5.01 per cent fails the percentage rule
+ok 21 - the price variance is quoted
+ok 22 - quarantine and returns are not available
+ok 23 - only the available quantity is matched
+ok 24 - twenty five units remain unmatched
+ok 25 - the line cannot be matched in full
+ok 26 - the carriage variance is 35.00
+ok 27 - quantity and price are still in order
+ok 28 - the carriage tolerance of 25.00 is breached
+ok 29 - the carriage variance is quoted
+ok 30 - VAT is 3.95 more than the rate gives
+ok 31 - the VAT tolerance of 0.05 is breached
+ok 32 - the VAT difference is quoted
+ok 33 - the missing order price is flagged
+ok 34 - no percentage is invented
+ok 35 - a zero reference is not within tolerance
+ok 36 - the reason is explained to the clerk
+ok 37 - five boxes of twelve are sixty units
+ok 38 - sixty converted units match
+ok 39 - the converted line is within tolerance
+ok 40 - 840.00 per hundred is 8.40 each
+ok 41 - the matched value is 672.00
+ok 42 - the differing price basis is not an error
+ok 43 - a service needs no goods receipt
+ok 44 - the agreed service value matches
+ok 45 - the service line is matched
+1..45
+# TAPMATCH match tolerances passed 00045 failed 00000
+# exit 0

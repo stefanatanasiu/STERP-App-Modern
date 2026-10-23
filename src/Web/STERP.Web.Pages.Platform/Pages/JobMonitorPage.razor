@@ -1,0 +1,61 @@
+@inherits StListPage
+@* frmJobMonitor (page:platform/job-monitor, FR-STERP-PLATFORM-046): Status (ALL, RUNNING, OK, WARNING, FAILED, ABENDED) and
+   From (today minus 7 days); View spool opens the run's spool file, else its log file; the operator console is reached
+   from here (route /operator-console). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StSelectField Caption="&Status:" Inline="true" Width="120" Items="Statuses" Value="@_status" ValueChanged="StatusChangedAsync" Id="@Uid("status")" />
+        <StTextField Caption="Fro&m:" Inline="true" Width="80" @bind-Value="_from" Id="@Uid("from")" />
+        <a href="/operator-console" class="st-link" style="margin-left:auto" @onclick="OpenConsole" @onclick:preventDefault="true">Operator console</a>
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="View spool" Glyph="PRINT" OnClick="ViewSpool" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Statuses = StSelectField.Of("ALL", "RUNNING", "OK", "WARNING", "FAILED", "ABENDED");
+    private string _status = "ALL";
+    private string _from = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Job Monitor");
+        _from = Date(DateOnly.FromDateTime(DateTime.Today).AddDays(-7));
+    }
+
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var from = UkFormat.ParseDate(_from) ?? DateOnly.FromDateTime(DateTime.Today).AddDays(-7);
+        var r = await Api.GetAsync(ApiHost.Jobs, "/api/jobs/v1/runs" + Query.Build(("fromDate", from.ToString("yyyy-MM-dd", UkFormat.Culture)), ("status", _status)));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json,
+            new GridColumn("jobRunId", kind: "INT"), new GridColumn("jobName"), new GridColumn("companyCode"), new GridColumn("submittedBy"),
+            new GridColumn("startedAt", kind: "STAMP"), new GridColumn("endedAt", kind: "STAMP"), new GridColumn("status"),
+            new GridColumn("returnCode", kind: "INT"), new GridColumn("logFile"), new GridColumn("spoolFile"), new GridColumn("seconds", kind: "INT")));
+    });
+
+    private async Task StatusChangedAsync(string value)
+    {
+        _status = value;
+        await LoadDataAsync();
+    }
+
+    /// <summary>frmJobMonitor.ViewClicked: SpoolFile, else LogFile, else "This run produced no spool file.".</summary>
+    private void ViewSpool()
+    {
+        var file = SelectedText("spoolFile").Trim();
+        if (file.Length == 0) file = SelectedText("logFile").Trim();
+        if (file.Length == 0)
+        {
+            SetStatus("This run produced no spool file.", "");
+            return;
+        }
+        OpenForm("frmSpoolViewer", file);
+    }
+
+    private void OpenConsole() => OpenForm(GuiRoutes.OperatorConsole, "");
+}

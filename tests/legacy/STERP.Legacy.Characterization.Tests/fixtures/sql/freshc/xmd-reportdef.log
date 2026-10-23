@@ -1,0 +1,11 @@
+# xmd-reportdef
+# registered under their own report code: RPT-001 RPT-002 RPT-003 RPT-004 RPT-005 RPT-006 RPT-007 RPT-008 RPT-010 RPT-012 RPT-015 RPT-016 RPT-017 RPT-019
+# registered by the owning module and tagged: RPT-009=POPIPE RPT-011=CSTRP010 RPT-013=KITRP010 RPT-014=CSTRP020 RPT-018=APPPR
+# not registered anywhere in core.ReportDef: (none)
+ok 1 - all nineteen catalogue reports RPT-001 to RPT-019 are registered in core.ReportDef -- REQ: XMD-009, COM-022
+ok 2 - every RPT-nnn definition names its own requirement id in RequirementRefs -- REQ: XMD-012, COM-022
+ok 3 - every catalogue report names a module, a title and the batch program that produces it -- REQ: XMD-009
+ok 4 - every permission a report names exists in core.Permission -- REQ: COM-002, COM-022
+ok 5 - RPT-015 runs RECONCTL and RPT-016 runs EXCPAGE, the programs the rpt views mirror -- REQ: RPT-015, RPT-016, XMD-005, XMD-006
+ok 6 - the obligations register, OTIF, chain trace and conversion reports are registered -- REQ: XMD-001, XMD-010, XMD-013
+ok 7 - every catalogue report takes the company parameter its run dialogue needs -- REQ: XMD-009, COM-001

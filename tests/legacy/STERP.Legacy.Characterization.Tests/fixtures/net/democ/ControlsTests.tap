@@ -1,0 +1,6 @@
+ok - acc: a failed step leaves an owned exception, not a half finished document  # REQ: COM-013,COM-014,COM-016,COM-022 AC: AC-007
+ok - acc: an action taken in bulk still obeys every single authority it crosses  # REQ: XMD-007,XMD-009,COM-003 AC: AC-103
+ok - acc: company wide stock and value invariants hold across every module  # REQ: XMD-011,XMD-012,RPT-010,RPT-011 AC: AC-105
+ok - acc: history is retained and restricted under policy rather than deleted  # REQ: COM-021,COM-027,COM-028 AC: AC-113
+ok - acc: opening balances are imported once, reconcile to their control and keep their audit trail  # REQ: COM-018,COM-021,COM-023,COM-024 AC: AC-008
+ok - acc: the forecast and the profitability enquiry use one definition across the modules  # REQ: XMD-010,RPT-004,RPT-014 AC: AC-104

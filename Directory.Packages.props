@@ -1,0 +1,36 @@
+<Project>
+  <!--
+    Central package versions (Agent 06 contracts section 2 package policy): exact versions, locked restore,
+    latest stable patch within the frozen major on the implementation date (2026-10-20, package feed proxy).
+    Packages outside the contracts table carry an advisory deviation record (agent-08/02-design-deviations.md).
+  -->
+  <PropertyGroup>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- data access (binding: SqlClient 7.x + Dapper 2.x, no EF) -->
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <PackageVersion Include="Dapper" Version="2.1.89" />
+    <!-- web/API/auth (binding: ASP.NET Core 10, Negotiate 10.x) -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.Negotiate" Version="10.0.13" />
+    <!-- GUI (binding: Blazor Web App, Interactive WebAssembly, .NET 10) -->
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.11.0" />
+    <!-- observability (binding: OpenTelemetry .NET 1.x) -->
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
+    <!-- binding OpenAPI YAML reading (advisory deviation AD-08-01) -->
+    <PackageVersion Include="YamlDotNet" Version="18.1.0" />
+    <!-- security pin: SqlClient 7.1.1 brings 9.0.18 transitively (same pin as Agent 07 AD-07-04) -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <!-- Agent 08 verification tests (same stack as Agent 07) -->
+    <PackageVersion Include="xunit.v3" Version="4.0.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+  </ItemGroup>
+</Project>

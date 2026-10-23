@@ -1,0 +1,22 @@
+# suite TLOTSER
+ok 1 - a lot controlled receipt must carry a lot
+ok 2 - and the movement is not usable
+ok 3 - the item master decides traceability, not the caller
+ok 4 - a receipt that carries its lot is accepted
+ok 5 - and the movement is usable
+ok 6 - an issue of traced stock must say which lot
+ok 7 - a lot that is not known is never assumed usable
+ok 8 - missing shelf life data is not unlimited life
+ok 9 - an expiry of 1 January 2025 is <n> days past
+ok 10 - so the lot is not usable
+ok 11 - ten days remain on the lot
+ok 12 - ten days against a thirty day rule is a hold
+ok 13 - 365 days remain on the lot
+ok 14 - a lot with a year to run clears the minimum
+ok 15 - an untracked item needs no lot or serial
+ok 16 - an unsupported function is refused
+ok 17 - a receipt registers a lot it has never seen
+ok 18 - the lot row is on inv.Lot afterwards
+1..18
+# TLOTSER passed 00018 failed 00000
+# exit 0

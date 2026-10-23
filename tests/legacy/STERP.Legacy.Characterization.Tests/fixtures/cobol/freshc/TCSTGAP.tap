@@ -1,0 +1,55 @@
+# suite TCSTGAP enquiry context and ro
+ok 1 - An enquiry with no company is refused
+ok 2 - An enquiry with no item is refused
+ok 3 - A VAT recovery above a hundred per cent is barred
+ok 4 - A cost basis that is not a cost basis is refused
+ok 5 - The refusal is an error, not a quiet zero
+ok 6 - No unit cost is handed back with the refusal
+ok 7 - No basis is claimed to have been used
+ok 8 - A stale approval state is not carried forward
+ok 9 - The enquiry states its currency
+ok 10 - The enquiry states its purpose
+ok 11 - The enquiry states its effective date
+ok 12 - The enquiry states its price-per quantity
+ok 13 - A quote estimate is marked provisional
+ok 14 - The quote says in words that it is not a valuation
+ok 15 - A valuation enquiry is not a provisional estimate
+ok 16 - The valuation purpose is kept as asked for
+ok 17 - A roll-up with no item is refused
+ok 18 - A negative costing lot size is refused
+ok 19 - The refusal explains the missing denominator
+ok 20 - A boundary that is neither EXPAND nor STOP is out
+ok 21 - An unsupported roll-up function is refused
+ok 22 - Every roll-up states one valuation boundary
+ok 23 - Every roll-up states its currency
+ok 24 - A fixed setup charge always has a denominator
+ok 25 - The cost date follows the stated effective date
+ok 26 - An unheld standard cost is reported as not found
+ok 27 - The refusal names the no-substitution rule
+ok 28 - An unavailable basis leaves the answer incomplete
+ok 29 - No average or last purchase cost is substituted
+ok 30 - The extended cost of a missing basis is nothing
+ok 31 - An available basis is named on the answer
+ok 32 - The answer states where the cost came from
+ok 33 - The answer states its approval state
+ok 34 - A valuation enquiry is not a provisional estimate
+ok 35 - The extended cost is the stated quantity's cost
+ok 36 - B1 expanded roll-up is complete
+ok 37 - B1 states the boundary it used
+ok 38 - B1 material cost is 70.10
+ok 39 - B1 fixed setup for the one run is 10.00
+ok 40 - B1 conversion excluding the setup is 20.00
+ok 41 - B1 charges the fixed setup to the parent once
+ok 42 - B1 total for ten good frames is 100.10
+ok 43 - B1 cost per good frame is 10.01
+ok 44 - B1 divides by the ten good frames planned
+ok 45 - B1 reports its costed tree
+ok 46 - Every costed line declares its value boundary
+ok 47 - At least one line is counted into the total
+ok 48 - A stopped roll-up states the STOP boundary
+ok 49 - A stopped roll-up expands less than a full one
+ok 50 - A subassembly with no cost is not silently expanded
+ok 51 - The branch and its components are not both charged
+1..51
+# TCSTGAP enquiry context and ro passed 00051 failed 00000
+# exit 0

@@ -1,0 +1,18 @@
+ok - gui: VAT box selection survives drill-button focus  # REQ: FIN-026,COM-024
+ok - gui: a recorded receipt cannot be posted again without reloading  # REQ: AR-010
+ok - gui: blank customer refresh clears every account result  # REQ: AR-021,COM-024
+ok - gui: blank receipt refresh clears allocations and preview totals  # REQ: AR-009,COM-024
+ok - gui: cost comparison retains its selected action target  # REQ: CST-007,CST-012
+ok - gui: despatch refuses invalid dates without substituting the business date  # REQ: SO-012,COM-024
+ok - gui: duplicate checks identify both seeded invoices and credit notes  # REQ: AP-004
+ok - gui: empty BOM enquiries remove old results and parent selection  # REQ: BOM-012,BOM-023
+ok - gui: goods receipt derives supplier and currency from its site-scoped order  # REQ: PO-009,PO-014
+ok - gui: goods receipt editors are above decorative groups  # REQ: PO-009,PO-010,COM-024
+ok - gui: goods receipt offers only engine-supported ownership bases  # REQ: PO-014,PO-018
+ok - gui: invalid explosion inputs clear rather than calculate substitutes  # REQ: BOM-012,COM-024
+ok - gui: job monitor filters use actual stored statuses  # REQ: COM-018,XMD-007
+ok - gui: maintenance refresh synchronizes a single selected record and clears empty results  # REQ: COM-013,COM-024,BOM-004
+ok - gui: payment totals load the selected proposal instead of reporting zero  # REQ: AP-011
+ok - gui: promise toolbar uses the keyboard promise workflow  # REQ: AR-016,COM-024
+ok - gui: receipt actions require the loaded customer and currency  # REQ: AR-009,AR-010
+ok - gui: receipt traceability retains its specific reason and loaded lines  # REQ: PO-009,PO-025

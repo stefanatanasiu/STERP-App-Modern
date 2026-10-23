@@ -1,0 +1,20 @@
+# suite TXMDVAT VAT audit trail listin
+ok 1 - the detail listing runs and returns 00 or 04
+ok 2 - the detail listing names its spool file
+ok 3 - one listed line per VAT transaction of the period
+ok 4 - the MTD audit trail runs and returns 00 or 04
+ok 5 - the MTD audit trail names its spool file
+ok 6 - all nine VAT return boxes are listed
+ok 7 - box 01 of the listing equals fin.VatReturnBox
+ok 8 - box 02 of the listing equals fin.VatReturnBox
+ok 9 - box 03 of the listing equals fin.VatReturnBox
+ok 10 - box 04 of the listing equals fin.VatReturnBox
+ok 11 - box 05 of the listing equals fin.VatReturnBox
+ok 12 - box 06 of the listing equals fin.VatReturnBox
+ok 13 - box 07 of the listing equals fin.VatReturnBox
+ok 14 - box 08 of the listing equals fin.VatReturnBox
+ok 15 - box 09 of the listing equals fin.VatReturnBox
+ok 16 - an unknown VAT period is refused with 08
+1..16
+# TXMDVAT VAT audit trail listin passed 00016 failed 00000
+# exit 0

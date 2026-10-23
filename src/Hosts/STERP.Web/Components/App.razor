@@ -1,0 +1,25 @@
+@using Microsoft.AspNetCore.Components.Web
+@using Sterp.Web.Client
+@* STERP-WEB root document. The shell runs as Interactive WebAssembly without prerendering (D-WEB-01): every API call is
+   made by the browser with the user's own Windows credentials. sterp.js is loaded first (busy signal, key routing). *@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>STERP - Supply Chain Management</title>
+    <link rel="stylesheet" href="@Assets["_content/STERP.Web.Framework/sterp.css"]" />
+    <script src="@Assets["_content/STERP.Web.Framework/sterp.js"]"></script>
+    <HeadOutlet @rendermode="Mode" />
+</head>
+<body>
+    <div id="st-boot" style="position:fixed; left:50%; top:40%; transform:translate(-50%,-50%); font:11px 'Microsoft Sans Serif', Tahoma, sans-serif">Starting STERP...</div>
+    <Routes @rendermode="Mode" />
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+</html>
+
+@code {
+    private static readonly IComponentRenderMode Mode = new InteractiveWebAssemblyRenderMode(prerender: false);
+}

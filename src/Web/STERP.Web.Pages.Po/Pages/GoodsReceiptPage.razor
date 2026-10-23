@@ -1,0 +1,421 @@
+@inherits PoPage
+@* frmGoodsReceipt (page:po/goods-receipt, FR-STERP-PO-030; frmGoodsReceipt.vb:13-228, GoodsReceiptService.vb): Validate (and
+   F5) reads the outstanding lines of the order into the receipt document (po_validateGoodsReceipt), Count line writes the
+   counted quantity back into that document without a call, F10 confirms the whole document (po_confirmGoodsReceipt),
+   Reverse and Record inspection call po_reverseGoodsReceipt / po_recordInspection. The validated document (the RECEIPTCA
+   COMMAREA kept by GoodsReceiptService) and the header captured at validation are page state (contracts 6.9). Layout: the
+   legacy control positions. *@
+<div class="st-page" style="overflow:auto">
+    <div style="position:relative; flex:0 0 auto; height:294px; min-width:920px">
+        <PoBox Text="Inspection of a quarantined line" X="8" Y="150" Width="904" Height="136" />
+        <PoBox Text="Counted quantity for the selected line" X="620" Y="2" Width="292" Height="136" />
+        @for (var i = 0; i < Head.Length; i++)
+        {
+            var f = Head[i];
+            <PoEdit Caption="@f.Caption" CaptionX="8" CaptionWidth="110" X="120" Y="@(8 + i * 24)" Width="@f.Width" Value="@_edit[f.Key]"
+                    ValueChanged="v => _edit[f.Key] = v" Id="@Uid(f.Key.ToLowerInvariant())" Field="@f.Key" />
+        }
+        <PoPicker Caption="Ownershi&p passes:" CaptionX="330" CaptionWidth="110" X="444" Y="6" Width="150" Items="Owners" Value="@_ownership"
+                  ValueChanged="v => _ownership = v" Id="@Uid("ownership")" Field="OWNERSHIP" />
+        <PoButton Text="&Validate" X="330" Y="36" Width="90" OnClick="ValidateClickedAsync" />
+        <PoButton Text="Co&unt line" X="426" Y="36" Width="90" OnClick="CountClickedAsync" />
+        <PoButton Text="Re&verse" X="522" Y="36" Width="90" OnClick="ReverseClickedAsync" />
+        @for (var i = 0; i < Counts.Length; i++)
+        {
+            var f = Counts[i];
+            <PoEdit Caption="@f.Caption" CaptionX="630" CaptionWidth="80" X="714" Y="@(22 + i * 24)" Width="@f.Width" Value="@_edit[f.Key]"
+                    ValueChanged="v => _edit[f.Key] = v" Id="@Uid(f.Key.ToLowerInvariant())" Field="@f.Key" />
+        }
+        @for (var i = 0; i < Inspections.Length; i++)
+        {
+            var f = Inspections[i];
+            var (x, y) = InspectionAt(i);
+            <PoEdit Caption="@f.Caption" CaptionX="@x" CaptionWidth="92" X="@(x + 94)" Y="@y" Width="@f.Width" Value="@_edit[f.Key]"
+                    ValueChanged="v => _edit[f.Key] = v" Id="@Uid(f.Key.ToLowerInvariant())" Field="@f.Key" />
+        }
+        <PoPicker Caption="Dispositio&n:" CaptionX="618" CaptionWidth="86" X="706" Y="170" Width="140" Items="Dispositions" Value="@_disposition"
+                  ValueChanged="v => _disposition = v" Id="@Uid("disposition")" Field="DISPOSITION" />
+        <PoEdit Caption="Re&ason:" CaptionX="618" CaptionWidth="86" X="706" Y="194" Width="190" Value="@(_edit[ReasonKey])"
+                ValueChanged="v => _edit[ReasonKey] = v" Id="@Uid("reason")" Field="REASON" />
+        <PoButton Text="Record &inspection" X="706" Y="220" Width="140" OnClick="InspectClickedAsync" />
+    </div>
+    <StGrid Id="@Uid("grid")" Data="_grid" Selected="_selected" SelectedChanged="i => _selected = i" Style="margin:0 8px 8px 8px" />
+</div>
+
+@code {
+    /// <summary>Header boxes (frmGoodsReceipt.vb:16-19): captions at x 8, boxes at x 120, 24 pixels apart from y 8.</summary>
+    private static readonly (string Key, string Caption, int Width)[] Head =
+    [
+        ("ORDER", "&Order:", 150), ("DELNOTE", "&Delivery note:", 150), ("PHYSDATE", "&Arrived:", 90), ("WHS", "&Warehouse:", 90),
+        ("EVIDENCE", "Shipping &evidence:", 200), ("IMPORTENTRY", "&Import entry:", 150),
+    ];
+
+    /// <summary>Count box (frmGoodsReceipt.vb:21-23): captions at x 630, boxes at x 714, 24 pixels apart from y 22.</summary>
+    private static readonly (string Key, string Caption, int Width)[] Counts =
+    [
+        ("COUNTED", "Co&unted:", 90), ("LOC", "&Location:", 90), ("LOT", "Lo&t:", 110), ("SERIAL", "&Serial:", 110),
+    ];
+
+    /// <summary>Inspection box (frmGoodsReceipt.vb:25-29): two columns from (18, 172), 24 pixels apart, 300 pixels apart.</summary>
+    private static readonly (string Key, string Caption, int Width)[] Inspections =
+    [
+        ("INSPECTED", "Ins&pected:", 80), ("ACCEPTED", "A&ccepted:", 80), ("REJECTED", "&Rejected:", 80), ("REWORK", "Re&work:", 80),
+        ("REASONCODE", "Reason cod&e:", 90), ("CONCESSION", "Concession re&f:", 140), ("GOODLOC", "Good locatio&n:", 90),
+    ];
+
+    private static readonly string[] Owners = ["RECEIPT", "INCOTERMS", "DROPSHIP"];
+
+    private static readonly string[] Dispositions = ["ACCEPT", "REJECT", "REWORK", "CONCESSION", "SCRAP", "RETURN"];
+
+    /// <summary>The Reason box beside the disposition picker (frmGoodsReceipt.vb:80-81).</summary>
+    private const string ReasonKey = "REASON";
+
+    /// <summary>The legacy placement loop of the inspection boxes: down from y 172, a new column once y passes 244.</summary>
+    private static (int X, int Y) InspectionAt(int index)
+    {
+        int x = 18, y = 172;
+        for (var i = 0; i < index; i++)
+        {
+            y += 24;
+            if (y > 244)
+            {
+                x += 300;
+                y = 172;
+            }
+        }
+        return (x, y);
+    }
+
+    private readonly Dictionary<string, string> _edit =
+        Head.Concat(Counts).Concat(Inspections).Select(f => f.Key).Append("REASON").ToDictionary(k => k, _ => "");
+
+    private string _ownership = Owners[0];
+    private string _disposition = Dispositions[0];
+    private GridData _grid = GridData.Empty;
+    private int _selected = -1;
+
+    /// <summary>The header captured at validation (frmGoodsReceipt._loadedHeader).</summary>
+    private Dictionary<string, string>? _loadedHeader;
+
+    // GoodsReceiptService instance state (GoodsReceiptService.vb:14, 46-56)
+    private JsonObject? _area;
+    private string _receiptRef = "";
+    private string _status = "";
+    private decimal _grniGbp;
+    private decimal _ppvGbp;
+    private string _journalNumber = "";
+    private int _linesAccepted;
+    private int _linesHeld;
+    private int _linesQuarantined;
+    private bool _wasDuplicate;
+
+    /// <summary>frmGoodsReceipt.OnLoad (frmGoodsReceipt.vb:93-99).</summary>
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        LegacySize(920, 580);
+        _edit["PHYSDATE"] = PoFmt.Date(Session.BusinessDate);
+        _edit["WHS"] = "MAIN";
+        if (FormArgument != "") _edit["ORDER"] = FormArgument;
+        SetStatus("Validate the delivery note against the order, count each line, then F10 to confirm it.");
+    }
+
+    /// <summary>
+    /// F2 on Order: frmLookup.Pick(Me, "po.usp_OpenOrders", company, "Open order") - the named lookup PO.OPENORDERS with the
+    /// company as argument (the procedure rejects the lookup parameters, BC-PO-03 reproduced); elsewhere the BaseForm answer.
+    /// </summary>
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        if (key.TargetField != "ORDER")
+        {
+            await base.OnLookupAsync(key);
+            return;
+        }
+        var c = await Dialogs.LookupAsync("named", "PO.OPENORDERS", "Open order", Session.CompanyCode);
+        if (c != "") _edit["ORDER"] = c;
+        StateHasChanged();
+    }
+
+    protected override Task OnRefreshKeyAsync() => ValidateClickedAsync();
+
+    private Dictionary<string, string> Values() => new(_edit);
+
+    /// <summary>frmGoodsReceipt.Header: the header boxes trimmed, plus the ownership picker.</summary>
+    private Dictionary<string, string> Header()
+    {
+        var values = Head.ToDictionary(f => f.Key, f => PoFmt.T(_edit[f.Key]));
+        values["OWNERSHIP"] = _ownership;
+        return values;
+    }
+
+    /// <summary>frmGoodsReceipt.HeaderReady (frmGoodsReceipt.vb:215-227): the header validated must still be the header shown.</summary>
+    private bool HeaderReady()
+    {
+        if (_loadedHeader is null)
+        {
+            SetStatus("Validate the delivery against an order before counting or confirming.", CueWarning);
+            return false;
+        }
+        foreach (var (key, value) in Header())
+        {
+            if (!string.Equals(value, _loadedHeader[key], StringComparison.OrdinalIgnoreCase))
+            {
+                SetStatus("The receipt header has changed. Validate it again before counting or confirming.", CueWarning);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>Validate (and F5): reads the outstanding order lines into the receipt document (frmGoodsReceipt.vb:115-128).</summary>
+    private async Task ValidateClickedAsync()
+    {
+        _loadedHeader = null;
+        Bind(null);
+        await GuardAsync(async () =>
+        {
+            var v = Values();
+            v["OWNERSHIP"] = _ownership;
+            var r = await ValidateAsync(v);
+            Bind(_area);
+            if (_grid.Count > 0) _loadedHeader = Header();
+            if (!await ShowResultAsync(r)) return;
+            var txt = _grid.Count + " outstanding line(s) on " + v["ORDER"];
+            if (_wasDuplicate) txt += "   *** this delivery note has been received before";
+            SetStatus(txt, _wasDuplicate ? CueWarning : CueOk);
+        });
+    }
+
+    /// <summary>Count line: writes one counted quantity back into the validated document, no call (frmGoodsReceipt.vb:132-146).</summary>
+    private async Task CountClickedAsync()
+    {
+        if (!HeaderReady()) return;
+        if (_selected < 0)
+        {
+            SetStatus("Select the line you have counted first.", CueWarning);
+            return;
+        }
+        await GuardAsync(() =>
+        {
+            var i = _selected + 1;
+            var v = Values();
+            Count(i, PoFmt.D(v["COUNTED"]), PoFmt.S(v["LOC"]), PoFmt.S(v["LOT"]), PoFmt.S(v["SERIAL"]));
+            Bind(_area);
+            if (_grid.Count >= i) _selected = i - 1;
+            SetStatus("Line " + i + " counted as " + PoFmt.Str(PoFmt.D(v["COUNTED"])) + ".  Count the rest, then F10 to confirm the delivery.", CueOk);
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>F10 confirms the delivery: RECEIPT applies the tolerances and posts (frmGoodsReceipt.vb:150-163).</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        if (!HeaderReady()) return;
+        if (!await ConfirmAsync("Confirm this delivery against " + PoFmt.T(_edit["ORDER"]) + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var r = await ConfirmReceiptAsync();
+            Bind(_area);
+            if (!await ShowResultAsync(r)) return;
+            _loadedHeader = null;
+            SetStatus("Receipt " + _receiptRef + " " + _status + ": " + _linesAccepted + " accepted, " + _linesQuarantined + " quarantined, " +
+                      _linesHeld + " held.  GRNI " + PoFmt.Money(_grniGbp) + ", price variance " + PoFmt.Money(_ppvGbp) + ", journal " +
+                      _journalNumber + ".", _linesHeld > 0 ? CueWarning : CueOk);
+        });
+    }
+
+    /// <summary>Record inspection of a quarantined line: the receipt of this sitting, line = the selected row (frmGoodsReceipt.vb:167-181).</summary>
+    private Task InspectClickedAsync() => GuardAsync(async () =>
+    {
+        var v = Values();
+        var line = _selected < 0 ? 1 : _selected + 1;
+        var body = new JsonObject
+        {
+            ["itemCode"] = "",
+            ["lotCode"] = PoFmt.S(v["LOT"]),
+            ["serialNo"] = PoFmt.S(v["SERIAL"]),
+            ["warehouse"] = PoFmt.S(v["WHS"]),
+            ["location"] = PoFmt.S(v["LOC"]),
+            ["goodLocation"] = PoFmt.S(v["GOODLOC"]),
+            ["uomCode"] = "",
+            ["inspectedQty"] = PoFmt.D(v["INSPECTED"]),
+            ["acceptedQty"] = PoFmt.D(v["ACCEPTED"]),
+            ["rejectedQty"] = PoFmt.D(v["REJECTED"]),
+            ["reworkQty"] = PoFmt.D(v["REWORK"]),
+            ["disposition"] = _disposition,
+            ["rejectReason"] = PoFmt.S(v["REASONCODE"]),
+            ["rejectNarr"] = PoFmt.T(v["REASON"]),
+            ["concessionRef"] = PoFmt.T(v["CONCESSION"]),
+            ["concessionBy"] = "",
+            ["certRef"] = "",
+        };
+        var r = await LinkAsync(Api.PostAsync($"/api/po/v1/goods-receipts/{Seg(_receiptRef)}/lines/{line}/inspection", body,
+            Instruction.New().Options()));
+        var ia = r.Data;
+        if (!await ShowResultAsync(r)) return;
+        SetStatus("Inspection recorded: " + PoFmt.Str(PoFmt.Dec(PoFmt.Get(ia, "toGoodQty"))) + " to good stock, " +
+                  PoFmt.Str(PoFmt.Dec(PoFmt.Get(ia, "toScrapQty"))) + " scrapped (" + PoFmt.Money(PoFmt.Dec(PoFmt.Get(ia, "scrapValueGbp"))) +
+                  "), " + PoFmt.Str(PoFmt.Dec(PoFmt.Get(ia, "heldForRetQty"))) + " held for return.  Quality status " +
+                  PoFmt.Text(ia, "qualityStatus") + ".", CueOk);
+    });
+
+    /// <summary>Reverse a confirmed receipt of this sitting with its reason (frmGoodsReceipt.vb:185-195).</summary>
+    private async Task ReverseClickedAsync()
+    {
+        if (_receiptRef == "")
+        {
+            SetStatus("There is no receipt on this screen to reverse.", CueWarning);
+            return;
+        }
+        if (!await ConfirmAsync("Reverse receipt " + _receiptRef + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var no = _receiptRef;
+            var r = await LinkAsync(Api.PostAsync($"/api/po/v1/goods-receipts/{Seg(no)}/reverse",
+                new JsonObject { ["reverseReason"] = PoFmt.T(_edit["REASON"]) }, Instruction.New().Options()));
+            if (r.Data is JsonObject area) _area = area;
+            Read(r.Data ?? new JsonObject { ["receiptRef"] = no });
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Receipt " + _receiptRef + " reversed; journal " + _journalNumber + ".", CueOk);
+        });
+    }
+
+    // ---------------------------------------------------------------------- GoodsReceiptService (the facade)
+
+    /// <summary>GoodsReceiptService.Read (GoodsReceiptService.vb:270-281).</summary>
+    private void Read(JsonNode? ca)
+    {
+        var no = PoFmt.Text(ca, "receiptRef");
+        if (no != "") _receiptRef = no;
+        _status = PoFmt.Text(ca, "status");
+        _grniGbp = PoFmt.Dec(PoFmt.Get(ca, "grniGbp"));
+        _ppvGbp = PoFmt.Dec(PoFmt.Get(ca, "ppvGbp"));
+        _journalNumber = PoFmt.Text(ca, "journalNumber");
+        _linesAccepted = PoFmt.Int(PoFmt.Get(ca, "linesAccepted"));
+        _linesHeld = PoFmt.Int(PoFmt.Get(ca, "linesHeld"));
+        _linesQuarantined = PoFmt.Int(PoFmt.Get(ca, "linesQuarant"));
+        _wasDuplicate = PoFmt.Text(ca, "wasDuplicate") == "Y";
+    }
+
+    /// <summary>
+    /// GoodsReceiptService.Validate (GoodsReceiptService.vb:60-96): the previous document is dropped, the API loads the
+    /// outstanding lines (location, lot and serial of the count box applied to every line) and RECEIPT validates them; the
+    /// answer - also a refusal, which carries the document - becomes the document of this sitting.
+    /// </summary>
+    private async Task<PoResult> ValidateAsync(Dictionary<string, string> v)
+    {
+        _area = null;
+        _receiptRef = "";
+        Read(new JsonObject());
+        var ownership = PoFmt.S(v["OWNERSHIP"]);
+        var body = new JsonObject
+        {
+            ["orderNumber"] = PoFmt.S(v["ORDER"]),
+            ["supplier"] = "",
+            ["deliveryNote"] = PoFmt.T(v["DELNOTE"]),
+            ["physicalDate"] = PoFmt.Iso(PoFmt.Dt(v["PHYSDATE"], Session.BusinessDate)),
+            ["postingDate"] = PoFmt.Iso(Session.BusinessDate),
+            ["warehouse"] = PoFmt.S(v["WHS"]),
+            ["ownership"] = ownership == "" ? "RECEIPT" : ownership,
+            ["incoterm"] = "",
+            ["shipEvidence"] = PoFmt.T(v["EVIDENCE"]),
+            ["importEntry"] = PoFmt.S(v["IMPORTENTRY"]),
+            ["subcontractJob"] = "",
+            ["dupPolicy"] = "WARN",
+            ["location"] = PoFmt.S(v["LOC"]),
+            ["lotCode"] = PoFmt.S(v["LOT"]),
+            ["serialNo"] = PoFmt.S(v["SERIAL"]),
+        };
+        var r = await LinkAsync(Api.PostAsync("/api/po/v1/goods-receipts/validate", body));
+        _area = r.Data as JsonObject;
+        Read(_area);
+        return r;
+    }
+
+    /// <summary>The RC-LINE entries of the document (GoodsReceiptService.Lines: the first RC-LINE-CNT occurrences).</summary>
+    private List<JsonObject> AreaLines()
+    {
+        var n = Math.Max(PoFmt.Int(PoFmt.Get(_area, "lineCnt")), 0);
+        return (PoFmt.Get(PoFmt.Get(_area, "lineTable"), "line") as JsonArray ?? []).OfType<JsonObject>().Take(n).ToList();
+    }
+
+    /// <summary>
+    /// GridHelper.Bind of GoodsReceiptService.Lines(): no document = an empty table without columns; otherwise CommArea.GetTable
+    /// of RC-LINE - one column per copybook field in copybook order, numeric fields (dates included, PIC 9(8)) as decimals,
+    /// which GridHelper formats as MONEY. The first row becomes current.
+    /// </summary>
+    private void Bind(JsonObject? area)
+    {
+        if (area is null)
+        {
+            _grid = GridData.Empty;
+        }
+        else
+        {
+            var rows = AreaLines().Select(l =>
+            {
+                var row = new JsonObject();
+                foreach (var c in LineColumns)
+                {
+                    var value = PoFmt.Get(l, c.Json);
+                    row[c.Legacy] = c.Kind switch
+                    {
+                        "NUM" => (JsonNode)PoFmt.Dec(value),
+                        "DATE" => (JsonNode)PoFmt.Yyyymmdd(value),
+                        _ => (JsonNode)PoFmt.Str(value),
+                    };
+                }
+                return row;
+            }).ToList();
+            _grid = new GridData(LineColumns.Select(c => PoFmt.Col(c.Legacy, c.Kind == "TEXT" ? "TEXT" : "MONEY")), rows);
+        }
+        _selected = _grid.Count > 0 ? 0 : -1;
+        StateHasChanged();
+    }
+
+    /// <summary>RECEIPTCA RC-LINE (cobol/copy/RECEIPTCA.cpy): copybook name, API property, kind.</summary>
+    private static readonly (string Legacy, string Json, string Kind)[] LineColumns =
+    [
+        ("RC-L-NUM", "lNum", "NUM"), ("RC-L-PO-LINE", "lPoLine", "NUM"), ("RC-L-SCHEDULE", "lSchedule", "NUM"), ("RC-L-ITEM", "lItem", "TEXT"),
+        ("RC-L-REVISION", "lRevision", "TEXT"), ("RC-L-DESC", "lDesc", "TEXT"), ("RC-L-ORDERED", "lOrdered", "NUM"),
+        ("RC-L-CANCELLED", "lCancelled", "NUM"), ("RC-L-COUNTED", "lCounted", "NUM"), ("RC-L-RECEIVED", "lReceived", "NUM"),
+        ("RC-L-UOM", "lUom", "TEXT"), ("RC-L-FACTOR", "lFactor", "NUM"), ("RC-L-STOCK-QTY", "lStockQty", "NUM"),
+        ("RC-L-LOCATION", "lLocation", "TEXT"), ("RC-L-LOT", "lLot", "TEXT"), ("RC-L-SERIAL", "lSerial", "TEXT"),
+        ("RC-L-SUPP-LOT", "lSuppLot", "TEXT"), ("RC-L-EXPIRY", "lExpiry", "DATE"), ("RC-L-TRACE", "lTrace", "TEXT"),
+        ("RC-L-INSPECT", "lInspect", "TEXT"), ("RC-L-STOCKED", "lStocked", "TEXT"), ("RC-L-PRICE", "lPrice", "NUM"),
+        ("RC-L-STD-COST", "lStdCost", "NUM"), ("RC-L-PROMISED", "lPromised", "DATE"), ("RC-L-OVER-PCT", "lOverPct", "NUM"),
+        ("RC-L-ACCEPTED", "lAccepted", "NUM"), ("RC-L-QUARANT", "lQuarant", "NUM"), ("RC-L-OVER-QTY", "lOverQty", "NUM"),
+        ("RC-L-OUTSTAND", "lOutstand", "NUM"), ("RC-L-VALUE-GBP", "lValueGbp", "NUM"), ("RC-L-PPV-GBP", "lPpvGbp", "NUM"),
+        ("RC-L-MOVEMENT", "lMovement", "NUM"), ("RC-L-OUTCOME", "lOutcome", "TEXT"), ("RC-L-REASON", "lReason", "TEXT"),
+    ];
+
+    /// <summary>
+    /// GoodsReceiptService.Count (GoodsReceiptService.vb:159-170): RC-L-RECEIVED of the line (this delivery) := the count; the
+    /// location, lot and serial only when entered.
+    /// </summary>
+    private void Count(int index, decimal counted, string location, string lot, string serial)
+    {
+        if (_area is null) throw new InvalidOperationException("Validate a delivery before counting its lines.");
+        var lines = AreaLines();
+        if (index < 1 || index > PoFmt.Int(PoFmt.Get(_area, "lineCnt")) || index > lines.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index), "Select a loaded delivery line.");
+        }
+        var line = lines[index - 1];
+        line["lReceived"] = counted;
+        if (location != "") line["lLocation"] = location;
+        if (lot != "") line["lLot"] = lot;
+        if (serial != "") line["lSerial"] = serial;
+    }
+
+    /// <summary>GoodsReceiptService.Confirm("CONFIRM") (GoodsReceiptService.vb:173-185): the whole document, a new correlation id.</summary>
+    private async Task<PoResult> ConfirmReceiptAsync()
+    {
+        if (_area is null) return new PoResult(8, "RCP0000", "The delivery has not been validated against an order yet.", "ERROR", null);
+        var r = await LinkAsync(Api.PostAsync("/api/po/v1/goods-receipts/confirm", new JsonObject { ["receipt"] = _area.DeepClone() },
+            Instruction.New().Options()));
+        if (r.Data is JsonObject area) _area = area;
+        Read(_area);
+        return r;
+    }
+}

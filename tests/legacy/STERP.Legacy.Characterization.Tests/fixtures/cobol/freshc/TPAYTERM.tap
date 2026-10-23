@@ -1,0 +1,33 @@
+# suite po PAYTERMC
+ok 1 - 20 days is within the 30 day policy
+ok 2 - 20 days returns return code zero
+ok 3 - 20 days is not reported in payment practices
+ok 4 - 30 days exactly at policy is within
+ok 5 - 30 days leaves no excess
+ok 6 - 45 days warns against the 30 day policy
+ok 7 - 45 days gives return code 04
+ok 8 - 45 days is 15 days over policy
+ok 9 - 45 days is reported in payment practices
+ok 10 - 45 days needs no exception
+ok 11 - D-25 60 days exactly at the maximum only warns
+ok 12 - 60 days does not need an exception
+ok 13 - 75 days breaches the 60 day maximum
+ok 14 - a breach is a hold, return code 06
+ok 15 - 75 days is 15 days over the maximum
+ok 16 - a breach needs an authorised exception
+ok 17 - a breach reason code is PTC0004
+ok 18 - an authorised exception clears the breach
+ok 19 - an excepted order proceeds with a warning
+ok 20 - an excepted order is still reportable
+ok 21 - an approver without a reason still breaches
+ok 22 - a half exception reports PTC0005
+ok 23 - 45 days breaches a 30 day small supplier maximum
+ok 24 - the small supplier limit is the effective one
+ok 25 - the agreed terms snapshot is self contained
+ok 26 - the default basis is the invoice date
+ok 27 - a missing company code is rejected
+ok 28 - an unknown function is rejected
+ok 29 - terms with neither a code nor a day count fail
+1..29
+# po PAYTERMC passed 00029 failed 00000
+# exit 0

@@ -1,0 +1,115 @@
+@inherits StListPage
+@* frmStockEnquiry (page:itm/stock-enquiry, FR-STERP-ITM-041): stock by site, location, lot, owner and quality condition
+   (inv.usp_StockEnquiry), the AVAILQ availability line, 180 days of movements and the LOTSER trace of the selected lot or
+   serial row. Third-party, in-transit and quarantined stock are never read as available (frmStockEnquiry.vb:1-95). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Item:" Inline="true" Width="180" Field="ITEM" @bind-Value="_item" Id="@Uid("item")" />
+        <StTextField Caption="S&ite:" Inline="true" Width="60" Field="SITE" @bind-Value="_site" Id="@Uid("site")" />
+        <StSelectField Caption="&Condition:" Inline="true" Width="110" Items="Conditions" Value="@_condition" ValueChanged="ConditionChangedAsync" Id="@Uid("cond")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Availability (F10)" Glyph="ENGINE" OnClick="AvailabilityAsync" />
+        <StToolButton Text="Movements" Glyph="FIND" OnClick="MovementsAsync" />
+        <StToolButton Text="Lot trace" Glyph="RUN" OnClick="TraceAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Conditions =
+        StSelectField.Of("ALL", "ACCEPTED", "QUARANTINE", "INSPECTION", "REJECTED", "EXPIRED");
+
+    private string _item = "";
+    private string _site = "";
+    private string _condition = "ALL";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Stock Enquiry");
+        _site = Session.SiteCode;
+        if (FormArgument != "") _item = FormArgument;
+    }
+
+    private string Item => _item.Trim().ToUpperInvariant();
+
+    private string Site => _site.Trim().ToUpperInvariant();
+
+    /// <summary>frmStockEnquiry.Condition: ALL means no filter.</summary>
+    private string Condition => _condition == "ALL" ? "" : _condition;
+
+    /// <summary>frmStockEnquiry.LoadData: StockService.Enquiry (itm_listStockBalances, @IncludeZero = 0).</summary>
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/itm/v1/stock-balances" +
+            Query.Build(("itemCode", Item), ("siteCode", Site), ("condition", Condition), ("includeZero", "false")));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json));
+    });
+
+    private async Task ConditionChangedAsync(string value)
+    {
+        _condition = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => AvailabilityAsync();
+
+    /// <summary>frmStockEnquiry.AvailabilityClicked: AVAILQ owns the bucket arithmetic; the screen only reports it.</summary>
+    private async Task AvailabilityAsync()
+    {
+        if (Item == "")
+        {
+            SetStatus("Enter an item code first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync($"/api/itm/v1/items/{Query.Path(Item)}/availability" + Query.Build(("siteCode", Site)));
+            var result = LegacyResult.From(r);
+            // AVAIL returns no lines; a function that lists buckets replaces the grid (StockService.Lines)
+            if (result.Data?["lines"] is JsonArray lines && lines.Count > 0)
+            {
+                Populate(GridData.FromCommArea(lines, "AV-", "lExpiry"));
+            }
+            if (!await ShowResultAsync(r)) return;
+            var free = result.Dec("qtyFree");
+            SetStatus("Physical " + UkFormat.Qty(result.Dec("qtyPhysical")) + " | eligible " + UkFormat.Qty(result.Dec("qtyEligible")) +
+                      " | reserved " + UkFormat.Qty(result.Dec("qtyReserved")) + " | free " + UkFormat.Qty(free) +
+                      " | expected " + UkFormat.Qty(result.Dec("qtyExpected")) + " | planned " + UkFormat.Qty(result.Dec("qtyPlanned")),
+                      free > 0m ? CueOk : CueWarning);
+        });
+    }
+
+    /// <summary>frmStockEnquiry.MovementsClicked: 180 days of StockService.Movements.</summary>
+    private Task MovementsAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/itm/v1/stock-movements" + Query.Build(("itemCode", Item), ("siteCode", Site), ("days", "180")));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json));
+    });
+
+    /// <summary>frmStockEnquiry.TraceClicked: LOTSER TRACE of the selected row's lot or serial.</summary>
+    private async Task TraceAsync()
+    {
+        var lot = Json.Str(SelectedValue("lotCode")).TrimEnd();
+        var serial = Json.Str(SelectedValue("serialNo")).TrimEnd();
+        if (Item == "" || (lot == "" && serial == ""))
+        {
+            SetStatus("Select a lot or serial row first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync($"/api/itm/v1/items/{Query.Path(Item)}/trace" + Query.Build(("lotCode", lot), ("serialNo", serial)));
+            var result = LegacyResult.From(r);
+            if (result.Data?["trace"] is JsonArray trace && trace.Count > 0)
+            {
+                Populate(GridData.FromCommArea(trace, "LS-", "tDate"));
+            }
+            if (await ShowResultAsync(r)) SetStatus("Traceability for " + (lot != "" ? lot : serial) + ".", CueOk);
+        });
+    }
+}

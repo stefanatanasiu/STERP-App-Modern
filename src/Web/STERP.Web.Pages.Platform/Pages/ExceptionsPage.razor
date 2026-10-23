@@ -1,0 +1,78 @@
+@inherits StListPage
+@* frmExceptions (page:platform/exceptions, FR-STERP-PLATFORM-038/039): Status, Severity and Owner filters; Resolve (F10)
+   asks for a resolution note (a blank note or Cancel does nothing). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StSelectField Caption="&Status:" Inline="true" Width="120" Items="Statuses" Value="@_status" ValueChanged="StatusChangedAsync" Id="@Uid("status")" />
+        <StSelectField Caption="Se&verity:" Inline="true" Width="100" Items="Severities" Value="@_severity" ValueChanged="SeverityChangedAsync" Id="@Uid("severity")" />
+        <StTextField Caption="&Owner:" Inline="true" Width="90" @bind-Value="_owner" Id="@Uid("owner")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Resolve (F10)" Glyph="POST" OnClick="ResolveAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Statuses = StSelectField.Of("OPEN", "ACKNOWLEDGED", "RESOLVED", "ALL");
+    private static readonly IReadOnlyList<(string Value, string Text)> Severities = StSelectField.Of("ALL", "HOLD", "WARNING", "ERROR");
+    private string _status = "OPEN";
+    private string _severity = "ALL";
+    private string _owner = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Exception Worklist");
+    }
+
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/platform/v1/exceptions" + Query.Build(("status", _status), ("severity", _severity), ("ownerUser", _owner.Trim())));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json,
+            new GridColumn("exceptionId", kind: "INT"), new GridColumn("companyCode"), new GridColumn("module"),
+            new GridColumn("severity"), new GridColumn("category"), new GridColumn("documentType"), new GridColumn("documentRef"),
+            new GridColumn("message"), new GridColumn("ownerUser"), new GridColumn("priority", kind: "TEXT"),
+            new GridColumn("raisedAt", kind: "STAMP"), new GridColumn("status"), new GridColumn("ageDays", kind: "INT")));
+    });
+
+    private async Task StatusChangedAsync(string value)
+    {
+        _status = value;
+        await LoadDataAsync();
+    }
+
+    private async Task SeverityChangedAsync(string value)
+    {
+        _severity = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => ResolveAsync();
+
+    private async Task ResolveAsync()
+    {
+        var id = SelectedValue("exceptionId");
+        if (id is null)
+        {
+            SetStatus("Select an exception first.", "");
+            return;
+        }
+        var note = await InputBoxAsync("Resolution note for exception " + Json.Raw(id) + ":", "STERP - Resolve Exception", "");
+        if (note.Trim().Length == 0) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/platform/v1/exceptions/{Json.Raw(id)}/resolve",
+                new JsonObject { ["resolutionNote"] = note }, Instruction.New().Options());
+            if (!r.IsSuccess)
+            {
+                if (r.Problem!.Kind == "business-rule") { await ShowRefusalAsync(r); return; }
+                throw new ApiFailure(r);
+            }
+            SetStatus("Exception resolved.", CueOk);
+            await LoadDataAsync();
+        });
+    }
+}

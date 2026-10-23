@@ -1,0 +1,14 @@
+# bom-whereused
+ok 1 - the direct parent of the plate is the brace -- REQ: BOM-023
+ok 2 - the frame is reported as an indirect parent with the full path -- REQ: BOM-023, BOM-031
+ok 3 - 0.4 kg on each of two braces is 0.8 kg per frame -- REQ: BOM-023, BOM-010
+ok 4 - the shared screw reports both direct parents -- REQ: BOM-023
+ok 5 - the shared root is reported once for each distinct path -- REQ: BOM-023, BOM-031
+ok 6 - a drafted bill is not part of a released where used answer -- REQ: BOM-031
+ok 7 - the engineer can ask for the drafted bills as well -- REQ: BOM-031
+ok 8 - the upward walk over a cyclic structure terminates -- REQ: BOM-013
+ok 9 - no reported path visits the same parent twice -- REQ: BOM-013
+ok 10 - a two bill loop is walked once and then stopped -- REQ: BOM-013, BOM-023
+ok 11 - an item that quotes itself is reported once, not endlessly -- REQ: BOM-013
+ok 12 - an unused component answers an empty where used list -- REQ: BOM-023
+# bom-whereused done

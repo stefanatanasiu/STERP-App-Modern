@@ -1,0 +1,11 @@
+# core-controls
+ok 1 - document numbers are unique and continuous -- REQ: COM-005, D-15
+ok 2 - a voided number is traceable and not reissued -- REQ: COM-005, COM-013, D-15
+ok 3 - a repeated instruction returns the original result -- REQ: COM-015
+ok 4 - the restricted user is denied company CAL and site BHM -- REQ: COM-002, COM-019
+ok 5 - bank details are limited to banking authority -- REQ: COM-021, D-17
+ok 6 - a missing exchange rate is refused -- REQ: COM-010, D-14
+ok 7 - the euro spot rate is quoted per pound -- REQ: COM-010, D-14
+ok 8 - Christmas Day is not a business day and is skipped -- REQ: COM-009, D-15
+ok 9 - a parameter change is audited -- REQ: COM-013, COM-018
+ok 10 - a sanctions list match is reported -- REQ: COM-029, D-29

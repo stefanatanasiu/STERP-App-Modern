@@ -1,0 +1,108 @@
+# suite TVATRET value added tax
+ok 1 - AC-015 the standard rate is 20 per cent
+ok 2 - AC-015 the reduced rate is 5 per cent
+ok 3 - AC-015 a new rate is dated from its own start
+ok 4 - AC-015 a tax point before the rate has no rate
+ok 5 - FIN-016 an unknown VAT code is not found
+ok 6 - AC-015 0.6 of a penny on one line rounds to 0.01
+ok 7 - AC-015 the document totals its lines
+ok 8 - AC-015 the first standard line carries 0.01
+ok 9 - AC-015 the second standard line carries 0.01
+ok 10 - AC-015 standard rated VAT totals 0.02 and not 0.01
+ok 11 - AC-015 the reduced rated line of 10.00 carries 0.50
+ok 12 - AC-015 the invoice net is 10.06
+ok 13 - AC-015 the invoice VAT is 0.52
+ok 14 - AC-015 the invoice gross is 10.58
+ok 15 - FIN-017 VAT is due on the discounted net of 95.00
+ok 16 - FIN-017 the gross is the discounted net plus its VAT
+ok 17 - FIN-017 a document with no lines is refused
+ok 18 - FIN-028 services from abroad reverse charge
+ok 19 - FIN-028 the reverse charge declares 200.00 output VAT
+ok 20 - FIN-028 the same 200.00 is claimed as input VAT
+ok 21 - FIN-025 the output leg belongs in box 1
+ok 22 - FIN-025 the input leg belongs in box 4
+ok 23 - FIN-028 self accounting is reported to the caller
+ok 24 - FIN-029 imported goods use postponed VAT accounting
+ok 25 - FIN-029 postponed import VAT declares 100.00
+ok 26 - FIN-029 postponed import VAT reclaims 100.00
+ok 27 - FIN-029 the imported net is declared in box 7
+ok 28 - FIN-029 an import adds nothing to the sales net box
+ok 29 - FIN-028 an ordinary standard rated line self acco
+ok 30 - FIN-018 the tax point selects the open return
+ok 31 - FIN-018 an item in the open period is not late
+ok 32 - AC-015 an item dated in a finalised period is late
+ok 33 - AC-015 the late item moves to the next open return
+ok 34 - AC-015 the late entry is reported, not refused
+ok 35 - AC-018 the return prepares for the open period
+ok 36 - AC-018 box 1 output VAT is 16.00
+ok 37 - AC-018 box 2 acquisitions are nil
+ok 38 - AC-018 box 4 input VAT is 24.00
+ok 39 - AC-018 box 6 is 80 whole pounds of outputs
+ok 40 - AC-018 box 7 is 120 whole pounds of inputs
+ok 41 - FIN-025 box 3 equals box 1 plus box 2
+ok 42 - FIN-025 box 3 is 16.00
+ok 43 - FIN-025 box 5 equals box 3 less box 4
+ok 44 - AC-018 8.00 of net VAT is reclaimable from HMRC
+ok 45 - AC-018 a negative box 5 is a repayment
+ok 46 - FIN-026 preparing twice does not change the figures
+ok 47 - FIN-026 a ledger clerk may not prepare the return
+ok 48 - FIN-026 an unknown function is refused
+ok 49 - FIN-027 a 9,000.00 error is under the flat limit
+ok 50 - FIN-027 the flat threshold of 10,000.00 applies
+ok 51 - FIN-027 a correction within the threshold is allowed
+ok 52 - FIN-027 12,000.00 on 500,000.00 turnover is disclosed
+ok 53 - FIN-027 a disclosure is held for approval
+ok 54 - FIN-027 one per cent of turnover raises the limit
+ok 55 - FIN-027 the same error now goes on the next return
+ok 56 - FIN-027 the one per cent limit is capped at 50,000
+ok 57 - FIN-027 an error above the cap is disclosed
+ok 58 - FIN-027 a deliberate error is always disclosed
+ok 59 - FIN-027 a deliberate error is never within threshold
+ok 60 - FIN-029 box 1 drills down
+ok 61 - FIN-029 one sales invoice stands behind box 1
+ok 62 - FIN-029 the drilled document is the sales invoice
+ok 63 - FIN-029 the drilled VAT is 16.00
+ok 64 - FIN-029 the box 1 drill reconciles to the box total
+ok 65 - FIN-029 one purchase invoice stands behind box 4
+ok 66 - FIN-029 the drilled input VAT is 24.00
+ok 67 - FIN-029 the box 4 drill reconciles to the box total
+ok 68 - FIN-029 there is no box zero to drill into
+ok 69 - FIN-025 the VAT control account carries nothing
+ok 70 - FIN-025 the whole of box 5 is unexplained
+ok 71 - FIN-025 the difference is reported as VTR0050
+ok 72 - SOD-VAT the preparer may not finalise the return
+ok 73 - SOD-VAT the refused return is still a draft
+ok 74 - FIN-026 the controller finalises the return
+ok 75 - FIN-026 the return is reported as finalised
+ok 76 - FIN-026 the ledger holds the finalised return
+ok 77 - FIN-026 all nine boxes are frozen
+ok 78 - FIN-026 the four box contributions are frozen too
+ok 79 - FIN-026 the VAT period closes with the return
+ok 80 - FIN-026 a finalised return is not prepared again
+ok 81 - FIN-026 the frozen box 5 is read back unchanged
+ok 82 - FIN-026 a return is never finalised twice
+ok 83 - FIN-026 the second finalisation is refused
+ok 84 - FIN-030 a submission without a receipt is refused
+ok 85 - COM-003 a ledger clerk may not submit to HMRC
+ok 86 - FIN-030 the finalised return is submitted
+ok 87 - FIN-030 the return is reported as submitted
+ok 88 - FIN-030 the HMRC receipt is retained
+ok 89 - FIN-026 a submitted return can no longer change
+ok 90 - FIN-027 a correction must say how the error arose
+ok 91 - FIN-027 the submitted return is amended by correction
+ok 92 - FIN-027 a 500.00 error goes on the next return
+ok 93 - FIN-027 the correction is recorded and open
+ok 94 - FIN-027 the correction is given an identity
+ok 95 - FIN-027 the ledger holds the open correction
+ok 96 - COM-003 a ledger clerk may not approve a correction
+ok 97 - FIN-027 the correction to approve must be named
+ok 98 - FIN-027 the correction is approved
+ok 99 - FIN-027 the approved correction is reported back
+ok 100 - FIN-027 the correction is carried into ZZTVQ3
+ok 101 - FIN-027 an approved correction is not approved twice
+ok 102 - FIN-027 60,000.00 is above the threshold
+ok 103 - FIN-027 a disclosure is held for approval
+ok 104 - FIN-027 a disclosure is not carried to a return
+1..104
+# TVATRET value added tax passed 00104 failed 00000
+# exit 0

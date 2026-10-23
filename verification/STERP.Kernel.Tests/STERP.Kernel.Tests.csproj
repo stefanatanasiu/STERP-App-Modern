@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Sterp.Kernel.Tests</RootNamespace>
+    <Description>Agent 08 kernel verification: pure tests of the COBOL numeric/date/text/rounding/terms/allocation algorithms and integration tests of the kernel services against the isolated LocalDB instance (STERPA08_*, never the shared server).</Description>
+    <!-- the kernel calls take an optional CancellationToken; the tests rely on the defaults -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Platform\STERP.Platform.Kernel\STERP.Platform.Kernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

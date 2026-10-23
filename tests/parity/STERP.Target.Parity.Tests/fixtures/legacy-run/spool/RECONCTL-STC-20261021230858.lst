@@ -1,0 +1,60 @@
+Stellar Components Ltd                           RECONCTL                                                      Page    1
+Registered number: 07412936    Place of registration:   England and Wales
+Control account reconciliation                                                                         Run date 21/10/2026
+Subsidiary ledgers against the general ledger                                                          FINCTRL              23:08:58
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+Event cutoff (as at date)  31/10/2026    Accounting period 2026/07 OPEN    Mode  PREVIEW       Tolerance  0.01
+Basis: POSTED journals only, sterling carrying values, same cutoff on both sides.
+
+Control    Description                      Control accounts       Subsidiary          GL balance        Difference    Status
+------------------------------------------------------------------------------------------------------------------------------------
+AR         Trade debtors control            1200                   176,653.83         176,653.83               0.00    AGREED
+AP         Trade creditors control          2000                    50,944.96          50,944.96               0.00    AGREED
+INVENTORY  Inventory control                1100..               1,060,064.57       1,060,064.57               0.00    AGREED
+WIP        Work in progress control         1110                     2,482.50           2,482.50               0.00    AGREED
+GRNI       Goods received not invoiced      2010                    83,388.82-         83,388.82-              0.00    AGREED
+VAT        VAT control                      1250..                 103,213.40         103,213.40               0.00    AGREED
+BANK       Bank and cash control            1300                   376,085.00         376,085.00               0.00    AGREED
+ACCRUAL    Service accruals control         2020                         0.00               0.00               0.00    AGREED
+====================================================================================================================================
+Control totals                                                   1,686,055.44       1,686,055.44               0.00    RECONCILED
+
+Unreconciled control families      0   Exceptions raised or listed   0
+
+  Each difference stays explicit and owned until it               is corrected at source or adjusted with a reviewer.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

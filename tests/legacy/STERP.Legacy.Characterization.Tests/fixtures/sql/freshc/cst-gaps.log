@@ -1,0 +1,21 @@
+# cst-gaps
+ok 1 - the reconciliation reports the ledger, the unposted and the exceptions -- REQ: CST-022
+ok 2 - an unposted journal does not move the posted ledger balance -- REQ: CST-022  AC: AC-067
+ok 3 - the unposted journal is separately visible at 1234.56 -- REQ: CST-022
+ok 4 - posting the journal moves the ledger balance by 1234.56 -- REQ: CST-022
+ok 5 - once posted it is no longer counted as unposted -- REQ: CST-022
+ok 6 - a journal dated after the cut off is outside the reconciliation -- REQ: CST-022
+ok 7 - an unresolved costing exception is separately visible -- REQ: CST-022  AC: AC-067
+ok 8 - a resolved exception leaves the open count -- REQ: CST-022
+ok 9 - the write down is shown beside the gross value, not inside it -- REQ: CST-022  AC: AC-067
+ok 10 - the net inventory carried is the gross less the allowance -- REQ: CST-022
+ok 11 - the reconciliation states the difference to the posted ledger -- REQ: CST-022
+ok 12 - the agreement flag follows the difference at the cut off -- REQ: CST-022  AC: AC-067
+ok 13 - a quoted estimate does not move the posted valuation -- REQ: CST-022, CST-001
+ok 14 - a cost set must state a governed purpose -- REQ: CST-001  AC: AC-059
+ok 15 - a cost set must state a governed approval state -- REQ: CST-001
+ok 16 - the enquiry names the cost set the standard came from -- REQ: CST-001  AC: AC-059
+ok 17 - the quoted 99.00 is not offered as the approved standard -- REQ: CST-001
+ok 18 - every basis is shown side by side with its unit and method -- REQ: CST-001
+ok 19 - the inventory value is the carrying value, not the quote -- REQ: CST-001, CST-022
+# cst-gaps done

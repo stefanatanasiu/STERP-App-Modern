@@ -1,0 +1,48 @@
+<Solution>
+  <Folder Name="/platform/">
+    <Project Path="src/Platform/STERP.Platform.Kernel/STERP.Platform.Kernel.csproj" />
+    <Project Path="src/Platform/STERP.Platform.Hosting/STERP.Platform.Hosting.csproj" />
+  </Folder>
+  <Folder Name="/modules/">
+    <Project Path="src/Modules/STERP.Modules.Platform/STERP.Modules.Platform.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Itm/STERP.Modules.Itm.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Ar/STERP.Modules.Ar.csproj" />
+    <Project Path="src/Modules/STERP.Modules.So/STERP.Modules.So.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Xmd/STERP.Modules.Xmd.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Fin/STERP.Modules.Fin.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Po/STERP.Modules.Po.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Ap/STERP.Modules.Ap.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Bom/STERP.Modules.Bom.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Kit/STERP.Modules.Kit.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Cst/STERP.Modules.Cst.csproj" />
+    <Project Path="src/Modules/STERP.Modules.Composition/STERP.Modules.Composition.csproj" />
+  </Folder>
+  <Folder Name="/web/">
+    <Project Path="src/Web/STERP.Web.Framework/STERP.Web.Framework.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Ap/STERP.Web.Pages.Ap.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Itm/STERP.Web.Pages.Itm.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Platform/STERP.Web.Pages.Platform.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Ar/STERP.Web.Pages.Ar.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.So/STERP.Web.Pages.So.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Bom/STERP.Web.Pages.Bom.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Kit/STERP.Web.Pages.Kit.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Template/STERP.Web.Pages.Template.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Fin/STERP.Web.Pages.Fin.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Cst/STERP.Web.Pages.Cst.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Po/STERP.Web.Pages.Po.csproj" />
+    <Project Path="src/Web/STERP.Web.Pages.Xmd/STERP.Web.Pages.Xmd.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/STERP.Tools.Traceability/STERP.Tools.Traceability.csproj" />
+  </Folder>
+  <Folder Name="/hosts/">
+    <Project Path="src/Hosts/STERP.Api/STERP.Api.csproj" />
+    <Project Path="src/Hosts/STERP.Jobs/STERP.Jobs.csproj" />
+    <Project Path="src/Hosts/STERP.Web.Client/STERP.Web.Client.csproj" />
+    <Project Path="src/Hosts/STERP.Web/STERP.Web.csproj" />
+    <Project Path="src/Hosts/STERP.ApiPortal/STERP.ApiPortal.csproj" />
+  </Folder>
+  <Folder Name="/verification/">
+    <Project Path="verification/STERP.Kernel.Tests/STERP.Kernel.Tests.csproj" />
+  </Folder>
+</Solution>

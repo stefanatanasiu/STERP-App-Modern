@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Itm</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Itm</AssemblyName>
+    <Description>STERP-ITM pages (STERP-WEB section 7.2): Item and Part Maintenance, Stock Enquiry, Stock Movement Entry, Stock Count and Adjustment.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>
+

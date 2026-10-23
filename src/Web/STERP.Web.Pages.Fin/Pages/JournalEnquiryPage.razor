@@ -1,0 +1,119 @@
+@inherits StListPage
+@* frmJournalEnquiry (page:fin/journal-enquiry, FR-STERP-FIN-041): posted journal headers with their approval, reversal and
+   evidence trail (fin_listJournals), the lines behind one journal (fin_listJournalLines) and the linked reversal of a
+   posting that was wrong (fin_reverseJournal). Posted money is never altered; a correction is a second, linked entry. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Journal:" Inline="true" Width="150" Field="JournalNumber" @bind-Value="_number" Id="@Uid("number")" />
+        <StTextField Caption="&Account:" Inline="true" Width="110" Field="AccountCode" @bind-Value="_account" Id="@Uid("account")" />
+        <StSelectField Caption="&Status:" Inline="true" Width="110" Field="Status" Items="Statuses" Value="@_status" ValueChanged="StatusChanged" Id="@Uid("status")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Lines" Glyph="FIND" OnClick="LinesAsync" />
+        <StToolButton Text="Reverse (F10)" Glyph="REJECT" OnClick="ReverseAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Statuses =
+        StSelectField.Of("ALL", "POSTED", "DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "VOID");
+
+    private string _number = "";
+    private string _account = "";
+    private string _status = "ALL";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Journal Enquiry");
+        if (FormArgument != "") _number = FormArgument;
+    }
+
+    /// <summary>frmJournalEnquiry.LoadData: fin.usp_JournalEnquiry with the journal number and account upper-cased.</summary>
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/fin/v1/journals" + Query.Build(
+            ("journalNumber", _number.Trim().ToUpperInvariant()),
+            ("status", _status == "ALL" ? "" : _status),
+            ("account", _account.Trim().ToUpperInvariant())));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(LegacyGrid.Bind(r.Json,
+            LegacyGrid.Col("journalId", "JournalId", "INT"), LegacyGrid.Col("journalNumber", "JournalNumber", "TEXT"),
+            LegacyGrid.Col("journalType", "JournalType", "TEXT"), LegacyGrid.Col("description", "Description", "TEXT"),
+            LegacyGrid.Col("sourceModule", "SourceModule", "TEXT"), LegacyGrid.Col("sourceRef", "SourceRef", "TEXT"),
+            LegacyGrid.Col("eventCode", "EventCode", "TEXT"), LegacyGrid.Col("documentDate", "DocumentDate", "DATE"),
+            LegacyGrid.Col("postingDate", "PostingDate", "DATE"), LegacyGrid.Col("fiscalYear", "FiscalYear", "TEXT"),
+            LegacyGrid.Col("periodNo", "PeriodNo", "TEXT"), LegacyGrid.Col("currencyCode", "CurrencyCode", "TEXT"),
+            LegacyGrid.Col("fxRate", "FxRate", "MONEY"), LegacyGrid.Col("totalDebitGbp", "TotalDebitGBP", "MONEY"),
+            LegacyGrid.Col("totalCreditGbp", "TotalCreditGBP", "MONEY"), LegacyGrid.Col("status", "Status", "TEXT"),
+            LegacyGrid.Col("isReversal", "IsReversal", "BOOL"), LegacyGrid.Col("reversedAmountGbp", "ReversedAmountGBP", "MONEY"),
+            LegacyGrid.Col("reversibleGbp", "ReversibleGBP", "MONEY"), LegacyGrid.Col("reversalOfNumber", "ReversalOfNumber", "TEXT"),
+            LegacyGrid.Col("recurringCode", "RecurringCode", "TEXT"), LegacyGrid.Col("occurrenceNo", "OccurrenceNo", "INT"),
+            LegacyGrid.Col("preparedBy", "PreparedBy", "TEXT"), LegacyGrid.Col("approvedBy", "ApprovedBy", "TEXT"),
+            LegacyGrid.Col("approvedAt", "ApprovedAt", "STAMP"), LegacyGrid.Col("postedBy", "PostedBy", "TEXT"),
+            LegacyGrid.Col("postedAt", "PostedAt", "STAMP"), LegacyGrid.Col("evidenceRef", "EvidenceRef", "TEXT"),
+            LegacyGrid.Col("correlationId", "CorrelationId", "TEXT")));
+    });
+
+    private Task StatusChanged(string value)
+    {
+        _status = value;
+        return LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => ReverseAsync();
+
+    /// <summary>frmJournalEnquiry.LinesClicked: the lines replace the headers; F5 goes back to them.</summary>
+    private async Task LinesAsync()
+    {
+        var id = SelectedValue("JournalId");
+        if (id is null)
+        {
+            SetStatus("Select a journal first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/fin/v1/journals/" + Query.Path(LegacyFmt.Str(id)) + "/lines");
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(LegacyGrid.Bind(r.Json,
+                LegacyGrid.Col("lineNum", "LineNum", "INT"), LegacyGrid.Col("accountCode", "AccountCode", "TEXT"),
+                LegacyGrid.Col("debitAmount", "DebitAmount", "MONEY"), LegacyGrid.Col("creditAmount", "CreditAmount", "MONEY"),
+                LegacyGrid.Col("currencyCode", "CurrencyCode", "TEXT"), LegacyGrid.Col("debitAmountGbp", "DebitAmountGBP", "MONEY"),
+                LegacyGrid.Col("creditAmountGbp", "CreditAmountGBP", "MONEY"), LegacyGrid.Col("dimCostCentre", "DimCostCentre", "TEXT"),
+                LegacyGrid.Col("dimProject", "DimProject", "TEXT"), LegacyGrid.Col("vatCode", "VatCode", "TEXT"),
+                LegacyGrid.Col("subledgerRef", "SubledgerRef", "TEXT"), LegacyGrid.Col("narrative", "Narrative", "TEXT")));
+            // read after the lines are bound, as the legacy form did: the lines carry no JournalNumber, so the number is blank
+            SetStatus("Lines of journal " + LegacyFmt.Str(SelectedValue("JournalNumber")) + ".  Press F5 to go back to the headers.", "");
+        });
+    }
+
+    /// <summary>frmJournalEnquiry.ReverseClicked: JNLPOST REVERSE writes a linked contra entry with a recorded reason.</summary>
+    private async Task ReverseAsync()
+    {
+        var number = LegacyFmt.Str(SelectedValue("JournalNumber"));
+        if (number == "")
+        {
+            SetStatus("Select a posted journal first.", CueWarning);
+            return;
+        }
+        var reason = await InputBoxAsync("Why is journal " + number + " being reversed?", "STERP - Journal Reversal", "");
+        if (reason.Trim() == "")
+        {
+            SetStatus("A reversal needs a recorded reason.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = LegacyResult.From(await Api.PostAsync("/api/fin/v1/journals/" + Query.Path(number) + "/reverse",
+                new JsonObject { ["reason"] = reason.Trim() }, Instruction.New().Options()));
+            var newNumber = LegacyFmt.Str(r["newJournalNumber"]);
+            var totalDebit = LegacyFmt.Dec(r["totalDrGbp"]);
+            if (!await ShowResultAsync(r.Response)) return;
+            SetStatus("Journal " + number + " reversed by " + newNumber + ", " + LegacyFmt.Money(totalDebit) + " each side.", CueOk);
+            await LoadDataAsync();
+        });
+    }
+}

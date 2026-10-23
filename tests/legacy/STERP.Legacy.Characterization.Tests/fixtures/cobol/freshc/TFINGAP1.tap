@@ -1,0 +1,41 @@
+# suite TFINGAP1 corrections and the s
+ok 1 - An adjustment without a company is refused
+ok 2 - An unknown adjustment instruction is refused
+ok 3 - A write-off needs an approved reason (ADJ0010)
+ok 4 - A write-off needs supporting evidence (ADJ0011)
+ok 5 - A missing evidence reference is reported as such
+ok 6 - Both the adjusted account and its contra are needed
+ok 7 - A small correction is a clerk's decision
+ok 8 - A clerk level correction needs no second signature
+ok 9 - A clerk level correction is posted under
+ok 10 - The clerk threshold itself is still a
+ok 11 - A penny over the clerk limit needs a manager
+ok 12 - A manager level correction is held for approval
+ok 13 - Above the manager limit the controller decides
+ok 14 - A negative correction is sized by its magnitude
+ok 15 - 1,000.00 less a 100.00 write-down carries 900.00
+ok 16 - A value correction leaves the quantity untouched
+ok 17 - A quantity change without a stock movement
+ok 18 - The refused adjustment records nothing
+ok 19 - A stock movement that does not exist is refused too
+ok 20 - With an authorised movement named, the
+ok 21 - The company's accounting framework is on file
+ok 22 - The accounting reference date is on file
+ok 23 - An unknown statutory instruction is refused
+ok 24 - Accounts are filed nine months after the year end
+ok 25 - Corporation tax is paid nine months and a day after
+ok 26 - The CT600 is filed twelve months after the year end
+ok 27 - The confirmation statement follows fourteen days on
+ok 28 - All four statutory obligations are listed
+ok 29 - A reference date change needs both of its dates
+ok 30 - A period of account longer than 18 months is refused
+ok 31 - The over long period is reported as invalid
+ok 32 - A reference date change needs a recorded reason
+ok 33 - A twelve month period of account is accepted
+ok 34 - Its length is recorded in months
+ok 35 - No posting account is left off the statutory format
+ok 36 - The statutory map is reported complete
+ok 37 - A complete map does not block the statement
+1..37
+# TFINGAP1 corrections and the s passed 00037 failed 00000
+# exit 0

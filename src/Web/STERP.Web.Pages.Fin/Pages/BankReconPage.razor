@@ -1,0 +1,209 @@
+@inherits StPage
+@* frmBankRecon (page:fin/bank-recon, FR-STERP-FIN-043): statement entries on the left, the cash book on the right and the
+   bridge from the book balance to the statement balance on the status line. BANKREC ties n statement entries to m book
+   entries and refuses unequal totals without a written explanation (fin_matchBankEntries, fin_unmatchBankGroup). *@
+<div class="st-page" style="padding:6px 8px">
+    <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px">
+        <StTextField Caption="&Bank account:" Inline="true" Width="120" Field="BankAccount" Id="@Uid("bank")" @bind-Value="_bank" />
+        <StTextField Caption="&As at:" Inline="true" Width="90" Field="AsAt" Id="@Uid("asat")" @bind-Value="_asAt" />
+        <StCheckField Caption="&Outstanding book entries only" Inline="true" Field="Outstanding" Id="@Uid("outstanding")" @bind-Value="_outstanding" />
+        <span style="display:inline-flex; gap:6px">
+            <button type="button" class="st-button" style="width:90px" @onclick="LoadDataAsync"><StMnemonic Text="&Refresh (F5)" /></button>
+            <button type="button" class="st-button" style="width:90px" @onclick="MatchAsync"><StMnemonic Text="&Match (F10)" /></button>
+            <button type="button" class="st-button" style="width:90px" @onclick="UnmatchAsync"><StMnemonic Text="&Unmatch" /></button>
+        </span>
+    </div>
+    <div style="display:flex; flex:1 1 auto; min-height:0; gap:8px; margin-top:6px">
+        <div style="display:flex; flex-direction:column; flex:1 1 0; min-width:0">
+            <div style="margin-bottom:3px">Statement entries:</div>
+            <FinMultiGrid Id="@Uid("statement")" Data="_statement" Selection="_statementSel" SelectionChanged="StateHasChanged" />
+        </div>
+        <div style="display:flex; flex-direction:column; flex:1 1 0; min-width:0">
+            <div style="margin-bottom:3px">Cash book entries:</div>
+            <FinMultiGrid Id="@Uid("book")" Data="_book" Selection="_bookSel" SelectionChanged="StateHasChanged" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _bank = "";
+    private string _asAt = "";
+    private bool _outstanding = true;
+    private GridData _statement = GridData.Empty;
+    private GridData _book = GridData.Empty;
+    private readonly MultiSelection _statementSel = new();
+    private readonly MultiSelection _bookSel = new();
+
+    // BankService state
+    private decimal _bookBalance;
+    private decimal _statementBalance;
+    private decimal _outstandingReceipts;
+    private decimal _outstandingPayments;
+    private decimal _bridgedBalance;
+    private decimal _unexplained;
+    private int _unmatchedCount;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Bank Reconciliation");
+    }
+
+    /// <summary>frmBankRecon.OnLoad: as at the business date; the form argument or else the first bank account of the company.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _asAt = LegacyFmt.Date(Session.BusinessDate);
+        _bank = FormArgument;
+        if (_bank == "")
+        {
+            JsonArray? accounts = null;
+            await GuardAsync(async () =>
+            {
+                var r = await Api.GetAsync("/api/fin/v1/bank-accounts");
+                if (!r.IsSuccess) throw new ApiFailure(r);
+                accounts = r.Items;
+            });
+            if (accounts is { Count: > 0 }) _bank = LegacyFmt.Str(accounts[0]?["bankAccountCode"]);
+        }
+        if (_bank != "") await LoadDataAsync();
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadDataAsync();
+
+    protected override Task OnConfirmAsync() => MatchAsync();
+
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        var code = await Dialogs.LookupAsync("master", "FIN.BANK", "Bank account");
+        if (code != "")
+        {
+            _bank = code;
+            await LoadDataAsync();
+        }
+        StateHasChanged();
+    }
+
+    private string Bank() => _bank.Trim().ToUpperInvariant();
+
+    /// <summary>The bank account as a path segment (a blank account still reaches the operation, as the legacy query did).</summary>
+    private string BankPath() => "/api/fin/v1/bank-accounts/" + (Bank() == "" ? "%20" : Query.Path(Bank()));
+
+    /// <summary>frmBankRecon.LoadData: both sides plus the bridge (book balance, outstanding items, statement balance).</summary>
+    private Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var asAt = LegacyFmt.ParseDate(_asAt) ?? Session.BusinessDate;
+        var s = await Api.GetAsync(BankPath() + "/statement-lines" + Query.Build(("status", "ALL")));
+        if (!s.IsSuccess) throw new ApiFailure(s);
+        _statement = LegacyGrid.Bind(s.Json,
+            LegacyGrid.Col("statementLineId", "StatementLineId", "INT"), LegacyGrid.Col("entryDate", "EntryDate", "DATE"),
+            LegacyGrid.Col("valueDate", "ValueDate", "DATE"), LegacyGrid.Col("statementRef", "StatementRef", "TEXT"),
+            LegacyGrid.Col("lineNum", "LineNum", "INT"), LegacyGrid.Col("description", "Description", "TEXT"),
+            LegacyGrid.Col("bankReference", "BankReference", "TEXT"), LegacyGrid.Col("entryType", "EntryType", "TEXT"),
+            LegacyGrid.Col("amount", "Amount", "MONEY"), LegacyGrid.Col("currencyCode", "CurrencyCode", "TEXT"),
+            LegacyGrid.Col("matchStatus", "MatchStatus", "TEXT"), LegacyGrid.Col("matchedAmount", "MatchedAmount", "MONEY"),
+            LegacyGrid.Col("matchedBy", "MatchedBy", "TEXT"));
+        _statementSel.Reset(_statement.Count);
+        var b = await Api.GetAsync(BankPath() + "/cash-book-lines" + Query.Build(
+            ("asAt", LegacyFmt.Iso(asAt)), ("outstandingOnly", _outstanding ? "1" : "0")));
+        if (!b.IsSuccess) throw new ApiFailure(b);
+        _book = LegacyGrid.Bind(b.Json,
+            LegacyGrid.Col("journalLineId", "JournalLineId", "INT"), LegacyGrid.Col("postingDate", "PostingDate", "DATE"),
+            LegacyGrid.Col("journalNumber", "JournalNumber", "TEXT"), LegacyGrid.Col("sourceModule", "SourceModule", "TEXT"),
+            LegacyGrid.Col("sourceRef", "SourceRef", "TEXT"), LegacyGrid.Col("narrative", "Narrative", "TEXT"),
+            LegacyGrid.Col("movementType", "MovementType", "TEXT"), LegacyGrid.Col("signedGbp", "SignedGBP", "MONEY"),
+            LegacyGrid.Col("currencyCode", "CurrencyCode", "TEXT"), LegacyGrid.Col("reconMatchId", "ReconMatchId", "INT"),
+            LegacyGrid.Col("reconState", "ReconState", "TEXT"));
+        _bookSel.Reset(_book.Count);
+        var r = LegacyResult.From(await Api.GetAsync(BankPath() + "/bridge" + Query.Build(("asAt", LegacyFmt.Iso(asAt)))));
+        _bookBalance = LegacyFmt.Dec(r["bookBalance"]);
+        _statementBalance = LegacyFmt.Dec(r["stmtBalance"]);
+        _outstandingReceipts = LegacyFmt.Dec(r["outReceipts"]);
+        _outstandingPayments = LegacyFmt.Dec(r["outPayments"]);
+        _bridgedBalance = LegacyFmt.Dec(r["bridgedBalance"]);
+        _unexplained = LegacyFmt.Dec(r["unexplained"]);
+        _unmatchedCount = (int)LegacyFmt.Dec(r["unmatchedCnt"]);
+        SetStatus("Book " + LegacyFmt.Money(_bookBalance) + " | outstanding receipts " + LegacyFmt.Money(_outstandingReceipts) +
+                  " | payments " + LegacyFmt.Money(_outstandingPayments) + " | statement " + LegacyFmt.Money(_statementBalance) +
+                  " | bridged " + LegacyFmt.Money(_bridgedBalance) + " | unexplained " + LegacyFmt.Money(_unexplained) +
+                  " | " + _unmatchedCount + " unmatched", _unexplained == 0m ? CueOk : CueWarning);
+    });
+
+    /// <summary>frmBankRecon.MatchClicked: ties the selected statement entries to the selected book entries.</summary>
+    private async Task MatchAsync()
+    {
+        var statement = Picked(_statement, _statementSel, "StatementLineId", "Amount");
+        var book = Picked(_book, _bookSel, "JournalLineId", "SignedGBP");
+        if (statement.Count == 0 || book.Count == 0)
+        {
+            SetStatus("Select at least one entry on each side.  Hold Ctrl to pick several.", CueWarning);
+            return;
+        }
+        var narrative = "";
+        var difference = statement.Sum(x => x.Amount) - book.Sum(x => x.Amount);
+        if (difference != 0m)
+        {
+            narrative = await InputBoxAsync("The two sides differ by " + LegacyFmt.Money(difference) +
+                                            ".  Explain the difference in writing, or cancel:", "STERP - Grouped Match", "");
+            if (narrative.Trim() == "")
+            {
+                SetStatus("Unequal totals are only reconciled with a written explanation.", CueWarning);
+                return;
+            }
+        }
+        await GuardAsync(async () =>
+        {
+            var r = LegacyResult.From(await Api.PostAsync(BankPath() + "/matches", new JsonObject
+            {
+                ["narrative"] = narrative.Trim(),
+                ["statementEntries"] = Entries(statement),
+                ["bookEntries"] = Entries(book),
+            }, Instruction.New().Options()));
+            var statementTotal = LegacyFmt.Dec(r["stmtTotal"]);
+            var bookTotal = LegacyFmt.Dec(r["bookTotal"]);
+            var matchedDifference = LegacyFmt.Dec(r["difference"]);
+            var matchType = LegacyFmt.Str(r["matchType"]);
+            var matchedCount = (int)LegacyFmt.Dec(r["matchedCnt"]);
+            if (!await ShowResultAsync(r.Response)) return;
+            SetStatus(matchType + " match of " + matchedCount + " entries: statement " + LegacyFmt.Money(statementTotal) +
+                      " against book " + LegacyFmt.Money(bookTotal) + ", difference " + LegacyFmt.Money(matchedDifference) + ".", CueOk);
+            await LoadDataAsync();
+        });
+    }
+
+    /// <summary>frmBankRecon.UnmatchClicked: reverses the match group of the current cash book row; the evidence stays on file.</summary>
+    private async Task UnmatchAsync()
+    {
+        var matchId = _bookSel.Current >= 0 ? _book.Value(_bookSel.Current, "ReconMatchId") : null;
+        if (matchId is null)
+        {
+            SetStatus("Select a reconciled cash book entry first.", CueWarning);
+            return;
+        }
+        var id = LegacyFmt.Str(matchId);
+        var reason = await InputBoxAsync("Why is match group " + id + " being reopened?", "STERP - Unmatch", "");
+        if (reason.Trim() == "")
+        {
+            SetStatus("Reopening a match needs a recorded reason.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = LegacyResult.From(await Api.PostAsync(BankPath() + "/matches/" + Query.Path(id) + "/unmatch",
+                new JsonObject { ["reason"] = reason.Trim() }, Instruction.New().Options()));
+            if (await ShowResultAsync(r.Response)) await LoadDataAsync();
+        });
+    }
+
+    /// <summary>frmBankRecon.Picked: {line id, amount} of every selected row, most recently selected first (SelectedRows).</summary>
+    private static List<(decimal Id, decimal Amount)> Picked(GridData grid, MultiSelection selection, string idColumn, string amountColumn) =>
+        selection.SelectedRows.Where(i => i < grid.Count)
+            .Select(i => (LegacyFmt.Dec(grid.Value(i, idColumn)), LegacyFmt.Dec(grid.Value(i, amountColumn)))).ToList();
+
+    /// <summary>BankService.Match: at most 20 entries a side (BR-STMT / BR-BOOK OCCURS 20).</summary>
+    private static JsonArray Entries(List<(decimal Id, decimal Amount)> entries)
+    {
+        var a = new JsonArray();
+        foreach (var (id, amount) in entries.Take(20)) a.Add(new JsonObject { ["lineId"] = id, ["amount"] = amount });
+        return a;
+    }
+}

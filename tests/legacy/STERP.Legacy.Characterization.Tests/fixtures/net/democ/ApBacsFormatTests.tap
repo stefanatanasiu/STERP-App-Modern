@@ -1,0 +1,1 @@
+ok - ap Bacs format: exact Standard18 bytes, label fields, balancing contra and asymmetric counts # SKIP writing tests require a dedicated STERP_QA_AP_ database, not production/shared GUI QA

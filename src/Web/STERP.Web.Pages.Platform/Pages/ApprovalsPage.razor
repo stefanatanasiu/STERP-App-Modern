@@ -1,0 +1,69 @@
+@inherits StListPage
+@* frmApprovals (page:platform/approvals, FR-STERP-PLATFORM-036/037): Status filter, Approve (F10) and Reject with a comment
+   for the audit trail. Cancelling the comment prompt still decides with an empty comment (InputBox returns "", BC-PLATFORM-02
+   rejected). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StSelectField Caption="&Status:" Inline="true" Width="110" Items="Statuses" Value="@_status" ValueChanged="StatusChangedAsync" Id="@Uid("status")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Approve (F10)" Glyph="POST" OnClick='() => DecideAsync("APPROVED", "Approve")' />
+        <StToolButton Text="Reject" Glyph="REJECT" OnClick='() => DecideAsync("REJECTED", "Reject")' />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Statuses = StSelectField.Of("PENDING", "APPROVED", "REJECTED", "INVALIDATED", "ALL");
+    private string _status = "PENDING";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Approvals Inbox");
+    }
+
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/platform/v1/approvals" + Query.Build(("status", _status)));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json,
+            new GridColumn("approvalId", kind: "INT"), new GridColumn("companyCode"), new GridColumn("documentType"),
+            new GridColumn("documentRef"), new GridColumn("approvalType"), new GridColumn("amount", kind: "MONEY"),
+            new GridColumn("requestedBy"), new GridColumn("requestedAt", kind: "STAMP"), new GridColumn("status"),
+            new GridColumn("ageDays", kind: "INT")));
+    });
+
+    private async Task StatusChangedAsync(string value)
+    {
+        _status = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => DecideAsync("APPROVED", "Approve");
+
+    private async Task DecideAsync(string decision, string verb)
+    {
+        var id = SelectedValue("approvalId");
+        if (id is null)
+        {
+            SetStatus("Select an approval request first.", "");
+            return;
+        }
+        var docRef = SelectedText("documentRef");
+        var comment = await InputBoxAsync(verb + " " + docRef + ".  Enter a comment for the audit trail:", "STERP - " + verb, "");
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/platform/v1/approvals/{Json.Raw(id)}/decide",
+                new JsonObject { ["decision"] = decision, ["comment"] = comment }, Instruction.New().Options());
+            if (!r.IsSuccess)
+            {
+                if (r.Problem!.Kind == "business-rule") { await ShowRefusalAsync(r); return; }
+                throw new ApiFailure(r);
+            }
+            SetStatus(docRef + " " + decision.ToLowerInvariant() + ".", CueOk);
+            await LoadDataAsync();
+        });
+    }
+}

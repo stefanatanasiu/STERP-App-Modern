@@ -1,0 +1,137 @@
+# suite TAPGAP2 credits, FX, VAT, paye
+ok 1 - the return detail is found
+ok 2 - ten units were returned
+ok 3 - none of them has been credited yet
+ok 4 - ten units remain to be credited
+ok 5 - 250.00 of value sits in return clearing
+ok 6 - and all 250.00 of it is still uncredited
+ok 7 - the returned item is identified
+ok 8 - the return has settled nothing in the ledger
+ok 9 - a credit cannot be linked to no return
+ok 10 - the credit is linked to the return
+ok 11 - the link quotes the return clearing rule
+ok 12 - a supplier credit moves no stock
+ok 13 - what is not credited stays in return clearing
+ok 14 - linking the credit settled no payable
+ok 15 - a credit beyond the return is held
+ok 16 - the over-credit is named
+ok 17 - the advance is recorded
+ok 18 - it is described as a prepayment asset
+ok 19 - the whole 20.00 is still unapplied
+ok 20 - the ledger keeps it as an advance, not a payment
+ok 21 - it stands as a 20.00 debit to the supplier
+ok 22 - the advance is applied cleanly
+ok 23 - nothing of the advance is left
+ok 24 - 80.00 of the invoice is left to pay
+ok 25 - the advance asset has been used up
+ok 26 - it cannot be applied a second time
+ok 27 - the second attempt is named
+ok 28 - and the expense is not relieved twice
+ok 29 - a refund must say what it refunds
+ok 30 - an applied advance cannot be refunded as well
+ok 31 - the unapplied balance rule is quoted
+ok 32 - a set-off without an agreement is held
+ok 33 - the missing right of set-off is named
+ok 34 - an agreed set-off still needs authority
+ok 35 - an agreed and approved set-off is recorded
+ok 36 - the original US$1,200 is kept
+ok 37 - the liability was carried at 960.00
+ok 38 - the realised exchange difference is 40.00
+ok 39 - paying 1,000.00 for a 960.00 debt is a loss
+ok 40 - it is not a settlement difference
+ok 41 - and it is not a settlement discount
+ok 42 - the currency of the debt is retained
+ok 43 - a stronger pound settles 923.08 against 960.00
+ok 44 - that difference is a gain
+ok 45 - settling at the carrying rate realises nothing
+ok 46 - a sterling debt has no exchange difference
+ok 47 - the settlement is reported as a warning
+ok 48 - it quotes the realised exchange rule
+ok 49 - the full US$1,200 was applied
+ok 50 - 960.00 of carried payable was cleared
+ok 51 - 40.00 is held out as a realised exchange loss
+ok 52 - the invoice is settled
+ok 53 - nothing is booked as a settlement difference
+ok 54 - and the foreign payable is fully cleared
+ok 55 - a reverse charge line codes cleanly
+ok 56 - the net is 500.00
+ok 57 - the supplier charges no VAT at all
+ok 58 - the invoice is therefore paid net
+ok 59 - 100.00 is self accounted at 20 per cent
+ok 60 - and the same 100.00 is recoverable input tax
+ok 61 - none of it is charged to the cost
+ok 62 - the input tax belongs in box 4
+ok 63 - and the net value in box 7
+ok 64 - standard rated input tax is 100.00
+ok 65 - with evidence it is all recoverable
+ok 66 - the supplier does charge this VAT
+ok 67 - without evidence none of it is recoverable
+ok 68 - the whole 100.00 is accounted as a cost
+ok 69 - 100.00 of output tax is self accounted
+ok 70 - and 100.00 is reclaimed as input tax
+ok 71 - so the net effect on the return is nil
+ok 72 - the output goes to box 1
+ok 73 - the supply is declared in box 7
+ok 74 - the company accounts for the tax itself
+ok 75 - where the supply is not recoverable, none is
+ok 76 - the 100.00 is accounted separately as a cost
+ok 77 - a 60 per cent business use recovers 60.00
+ok 78 - the other 40.00 is non recoverable
+ok 79 - import VAT without its statement is held
+ok 80 - the evidence rule is quoted
+ok 81 - none of the tax is released
+ok 82 - the whole 100.00 is held for review
+ok 83 - with the statement the import VAT is released
+ok 84 - and all 100.00 of it may be claimed
+ok 85 - the requested destination is recorded
+ok 86 - it is recorded as pending, not usable
+ok 87 - it cannot be paid to yet
+ok 88 - it is a change, so it supersedes a destination
+ok 89 - the payment run will not use it
+ok 90 - the unverified destination is named
+ok 91 - an emailed change cannot be approved as it stands
+ok 92 - the missing verification is named
+ok 93 - the call-back cannot precede the payee check
+ok 94 - a close match on its own is held
+ok 95 - the missing decision is named
+ok 96 - a recorded decision accepts the close match
+ok 97 - the payee check is now on the record
+ok 98 - calling the number in the email verifies nothing
+ok 99 - the contact on record rule is quoted
+ok 100 - the call-back must say who was telephoned
+ok 101 - a call-back to the contact on record verifies it
+ok 102 - the destination is now verified
+ok 103 - it still may not be paid to
+ok 104 - the preparer cannot approve the change
+ok 105 - self approval is named
+ok 106 - an independent approver may approve it
+ok 107 - the destination becomes approved
+ok 108 - and only now may it be paid to
+ok 109 - the payment run now accepts the destination
+ok 110 - the close match result is retained with it
+ok 111 - so is the decision that accepted it
+ok 112 - the destination it replaced is superseded
+ok 113 - the email that asked for it is kept on record
+ok 114 - the debt was paid sixty days after it fell due
+ok 115 - the statutory rate is base plus the eight per cent
+ok 116 - interest of 108.90 accrues over those sixty days
+ok 117 - a debt of 5,000.00 carries the 70.00 fixed sum
+ok 118 - the claim is the interest plus that fixed sum
+ok 119 - it is coded to finance cost, not to the goods
+ok 120 - the statute it is claimed under is named
+ok 121 - a debt just under 1,000.00 carries 40.00
+ok 122 - a debt of 10,000.00 carries 100.00
+ok 123 - a debt paid before it fell due is not late
+ok 124 - and no statutory claim arises from it
+ok 125 - ninety day terms for a small supplier are refused
+ok 126 - they need an authorised exception
+ok 127 - and the exception flag says so
+ok 128 - the same terms for a large supplier only warn
+ok 129 - under its own reason code
+ok 130 - sixty days is the maximum, so it is allowed
+ok 131 - and needs no exception
+ok 132 - the agreed N30 terms are read as thirty days
+ok 133 - thirty days is within the approved maximum
+1..133
+# TAPGAP2 credits, FX, VAT, paye passed 00133 failed 00000
+# exit 0

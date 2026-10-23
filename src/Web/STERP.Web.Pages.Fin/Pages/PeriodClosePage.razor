@@ -1,0 +1,182 @@
+@inherits StListPage
+@* frmPeriodClose (page:fin/period-close, FR-STERP-FIN-042): the close checklist of a fiscal year and period with soft close,
+   hard close and reopen. PERCLOSE decides readiness, holds the materiality limit and refuses a hard close while a blocking
+   step is open (fin_getPeriodCloseStatus, fin_completeCloseStep, fin_softClosePeriod, fin_hardClosePeriod,
+   fin_reopenPeriod); the page only reports it. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="Fiscal &year:" Inline="true" Width="70" Field="FiscalYear" @bind-Value="_year" Id="@Uid("year")" />
+        <StTextField Caption="&Period:" Inline="true" Width="50" Field="PeriodNo" @bind-Value="_period" Id="@Uid("period")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Complete step (F10)" Glyph="SAVE" OnClick="StepAsync" />
+        <StToolButton Text="Soft close" Glyph="RETIRE" OnClick="SoftAsync" />
+        <StToolButton Text="Hard close" Glyph="POST" OnClick="HardAsync" />
+        <StToolButton Text="Reopen" Glyph="RUN" OnClick="ReopenAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private string _year = "";
+    private string _period = "";
+
+    // PeriodService state (PeriodService.Finish)
+    private string _periodName = "";
+    private string _periodStatus = "";
+    private string _readiness = "";
+    private int _stepCount;
+    private int _doneCount;
+    private int _blockingOpen;
+    private decimal _unresolvedDifference;
+    private decimal _materiality;
+    private GridData? _steps;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Period Close Checklist");
+        _year = (Session.Period?.FiscalYear ?? 0).ToString(LegacyFmt.Uk);
+        _period = (Session.Period?.PeriodNo ?? 0).ToString(LegacyFmt.Uk);
+        if (FormArgument != "") _period = FormArgument;
+    }
+
+    private int Fy() => LegacyFmt.Int(_year);
+
+    private int Pn() => LegacyFmt.Int(_period);
+
+    private string PeriodPath() => "/api/fin/v1/periods/" + Fy().ToString(LegacyFmt.Uk) + "/" + Pn().ToString(LegacyFmt.Uk);
+
+    /// <summary>frmPeriodClose.LoadData: PERCLOSE STATUS, its steps or else the checklist of fin.usp_CloseStatus, then the report.</summary>
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = LegacyResult.From(await Api.GetAsync(PeriodPath() + "/close-status"));
+        Finish(r);
+        var steps = _steps ?? await ChecklistAsync();
+        Populate(steps ?? GridData.Empty);
+        if (r.IsNotFound && steps is null)
+        {
+            SetStatus("No checklist is held for " + LegacyFmt.Period(Fy(), Pn()) + ".", CueWarning);
+            return;
+        }
+        Report();
+    });
+
+    /// <summary>
+    /// PeriodService.Checklist: the second result set of fin.usp_CloseStatus (an empty table when the period has no steps);
+    /// Nothing only when that result set is missing.
+    /// </summary>
+    private async Task<GridData?> ChecklistAsync()
+    {
+        var c = await Api.GetAsync(PeriodPath() + "/checklist");
+        if (!c.IsSuccess) throw new ApiFailure(c);
+        if (c.Json?["items"] is not JsonArray) return null;
+        return LegacyGrid.Bind(c.Json,
+            LegacyGrid.Col("checklistId", "ChecklistId", "INT"), LegacyGrid.Col("stepCode", "StepCode", "TEXT"),
+            LegacyGrid.Col("stepName", "StepName", "TEXT"), LegacyGrid.Col("ownerRole", "OwnerRole", "TEXT"),
+            LegacyGrid.Col("ownerUser", "OwnerUser", "TEXT"), LegacyGrid.Col("status", "Status", "TEXT"),
+            LegacyGrid.Col("isBlocking", "IsBlocking", "BOOL"), LegacyGrid.Col("differenceGbp", "DifferenceGBP", "MONEY"),
+            LegacyGrid.Col("evidenceRef", "EvidenceRef", "TEXT"), LegacyGrid.Col("completedBy", "CompletedBy", "TEXT"),
+            LegacyGrid.Col("completedAt", "CompletedAt", "STAMP"), LegacyGrid.Col("reviewedBy", "ReviewedBy", "TEXT"),
+            LegacyGrid.Col("reviewedAt", "ReviewedAt", "STAMP"), LegacyGrid.Col("note", "Note", "TEXT"));
+    }
+
+    /// <summary>frmPeriodClose.Report: the status line, cue OK only when PERCLOSE says READY.</summary>
+    private void Report()
+    {
+        SetStatus(LegacyFmt.Period(Fy(), Pn()) + " " + _periodName + " is " + _periodStatus + ".  " + _doneCount + " of " + _stepCount +
+                  " step(s) done, " + _blockingOpen + " blocking, unresolved difference " + LegacyFmt.Money(_unresolvedDifference) +
+                  " against a materiality limit of " + LegacyFmt.Money(_materiality) + ".  Readiness " + _readiness + ".",
+                  _readiness == "READY" ? CueOk : CueWarning);
+    }
+
+    /// <summary>PeriodService.Finish: the period state and the CL-STEPS table PERCLOSE listed (none when nothing was listed).</summary>
+    private void Finish(LegacyResult r)
+    {
+        _periodName = LegacyFmt.Str(r["periodName"]);
+        _periodStatus = LegacyFmt.Str(r["periodStatus"]);
+        _readiness = LegacyFmt.Str(r["readiness"]);
+        _stepCount = (int)LegacyFmt.Dec(r["stepCnt"]);
+        _doneCount = (int)LegacyFmt.Dec(r["doneCnt"]);
+        _blockingOpen = (int)LegacyFmt.Dec(r["blockingOpen"]);
+        _unresolvedDifference = LegacyFmt.Dec(r["unresolvedDiff"]);
+        _materiality = LegacyFmt.Dec(r["materiality"]);
+        var listed = (int)LegacyFmt.Dec(r["stepsListed"]);
+        var answered = r["steps"] as JsonArray ?? [];
+        if (listed <= 0)
+        {
+            _steps = null;
+            return;
+        }
+        var rows = new List<JsonObject>();
+        for (var i = 0; i < Math.Min(listed, 20); i++)
+        {
+            var s = i < answered.Count ? answered[i] : null;
+            rows.Add(new JsonObject
+            {
+                ["CL-S-CODE"] = LegacyFmt.Str(s?["stepCode"]),
+                ["CL-S-NAME"] = LegacyFmt.Str(s?["stepName"]),
+                ["CL-S-STATUS"] = LegacyFmt.Str(s?["status"]),
+                ["CL-S-BLOCKING"] = LegacyFmt.Str(s?["blocking"]),
+                ["CL-S-DIFF"] = LegacyFmt.Dec(s?["difference"]),
+                ["CL-S-OWNER"] = LegacyFmt.Str(s?["ownerRole"]),
+                ["CL-S-EVIDENCE"] = LegacyFmt.Str(s?["evidenceRef"]),
+            });
+        }
+        string[] names = ["CL-S-CODE", "CL-S-NAME", "CL-S-STATUS", "CL-S-BLOCKING", "CL-S-DIFF", "CL-S-OWNER", "CL-S-EVIDENCE"];
+        _steps = new GridData(names.Select(n => LegacyGrid.Col(n, n, n == "CL-S-DIFF" ? "MONEY" : "TEXT")), rows);
+    }
+
+    protected override Task OnConfirmAsync() => StepAsync();
+
+    /// <summary>frmPeriodClose.StepClicked: each completed step must reference its evidence (FIN-011).</summary>
+    private async Task StepAsync()
+    {
+        var code = LegacyFmt.Str(SelectedValue("StepCode"));
+        if (code == "") code = LegacyFmt.Str(SelectedValue("CL-S-CODE"));
+        if (code == "")
+        {
+            SetStatus("Select a checklist step first.", CueWarning);
+            return;
+        }
+        var evidence = await InputBoxAsync("Evidence reference for step " + code + " (a reconciliation, a report or a sign-off):",
+            "STERP - Close Step", "");
+        if (evidence.Trim() == "") return;
+        await RunAsync(PeriodPath() + "/checklist/" + Query.Path(code) + "/complete", new JsonObject { ["evidenceRef"] = evidence.Trim() });
+    }
+
+    private async Task SoftAsync()
+    {
+        if (!await ConfirmAsync("Soft close " + LegacyFmt.Period(Fy(), Pn()) +
+                                "?  Only authorised close adjustments may be posted into it afterwards.")) return;
+        await RunAsync(PeriodPath() + "/soft-close", new JsonObject());
+    }
+
+    private async Task HardAsync()
+    {
+        if (!await ConfirmAsync("Hard close " + LegacyFmt.Period(Fy(), Pn()) + "?  Nothing may be posted into it afterwards.")) return;
+        await RunAsync(PeriodPath() + "/hard-close", new JsonObject());
+    }
+
+    /// <summary>frmPeriodClose.ReopenClicked: a recorded reason and a named approver (FIN-012).</summary>
+    private async Task ReopenAsync()
+    {
+        var reason = await InputBoxAsync("Why is " + LegacyFmt.Period(Fy(), Pn()) + " being reopened?", "STERP - Reopen Period", "");
+        if (reason.Trim() == "") return;
+        var approver = await InputBoxAsync("Which financial controller approved the reopening?", "STERP - Reopen Period", "");
+        if (approver.Trim() == "") return;
+        await RunAsync(PeriodPath() + "/reopen",
+            new JsonObject { ["reason"] = reason.Trim(), ["reviewer"] = approver.Trim().ToUpperInvariant() });
+    }
+
+    /// <summary>frmPeriodClose.Run: the steps PERCLOSE listed are bound, the outcome shown and, when accepted, the report.</summary>
+    private Task RunAsync(string path, JsonObject body) => GuardAsync(async () =>
+    {
+        var r = LegacyResult.From(await Api.PostAsync(path, body, Instruction.New().Options()));
+        Finish(r);
+        if (_steps is not null) Populate(_steps);
+        if (!await ShowResultAsync(r.Response)) return;
+        Report();
+    });
+}

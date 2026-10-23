@@ -1,0 +1,8 @@
+ok - acc: a credit note never exceeds the invoice it credits and is always linked to it  # REQ: AR-004,AR-005,AR-006 AC: AC-020
+ok - acc: a despatched order keeps its document history and a realised margin  # REQ: SO-022,SO-023 AC: AC-049
+ok - acc: a dispute and a promise to pay are recorded without touching the debt  # REQ: AR-015,AR-016 AC: AC-024
+not ok - acc: order to cash - an accepted order is reserved, picked, despatched and invoiced, and the chain holds together  # REQ: XMD-001,SO-010,SO-013,SO-016,SO-019,AR-003,RPT-008 AC: AC-097
+#   StAssertException: DESPATCH confirmed: Despatch is held on credit: Overdue debt of GBP 8,200.00 is <n> days past due and holds new release  (DSP0006)
+ok - acc: receivables metrics and the collection worklist are reported for the close  # REQ: AR-021,AR-022,RPT-003 AC: AC-027,AC-108
+ok - acc: the aged analysis is answered as at a date and reconciles to the open items  # REQ: AR-017,AR-018,RPT-001 AC: AC-025,AC-106
+ok - acc: the chain trace walks the order to cash documents in both directions  # REQ: XMD-001,XMD-004 AC: AC-097,AC-102

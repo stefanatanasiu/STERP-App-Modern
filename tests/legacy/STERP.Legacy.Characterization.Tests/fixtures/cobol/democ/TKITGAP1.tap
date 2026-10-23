@@ -1,0 +1,31 @@
+# suite TKITGAP1 kit creation, release
+ok 1 - An unknown kit instruction is refused with KIT0002
+ok 2 - A kit without a parent item is refused
+ok 3 - A kit for no output at all is refused
+ok 4 - A job kit must name the job it serves
+ok 5 - A refused creation leaves no kit behind
+ok 6 - An item with no approved bill cannot be kitted
+ok 7 - An incomplete bill never reaches a released status
+ok 8 - An incomplete bill is reported as incomplete, not
+ok 9 - A released kit reports the status it was left in
+ok 10 - A released kit carries fixed gross starts
+ok 11 - A later standard bill change does not alter a # SKIP the released kit has no requirement lines
+ok 12 - The fixed gross starts survive the bill change
+ok 13 - The fixed yield assumption survives it too
+ok 14 - An already released kit cannot be released again
+ok 15 - An unknown completion instruction is refused
+ok 16 - A refused completion records nothing
+ok 17 - Completing a kit that does not exist is not found
+ok 18 - A completion of nothing at all is refused
+ok 19 - Completing more than was planned is refused
+ok 20 - An over completion is an error, not a warning
+ok 21 - The remaining planned output is reported
+ok 22 - Completing exactly what is left is accepted
+ok 23 - The final receipt transfers the whole residual
+ok 24 - The final receipt leaves no work in progress on the job
+ok 25 - A partial receipt takes its share of the work in
+ok 26 - The rest of the work in progress stays on the job
+ok 27 - A dry run completion writes nothing
+1..27
+# TKITGAP1 kit creation, release passed 00027 failed 00000
+# exit 0

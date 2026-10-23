@@ -1,0 +1,5394 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-CST",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-CST-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-001-AC1",
+          "ac": 1,
+          "title": "STERP-API readiness drift check reports the repository cst objects healthy with no cst difference",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM"
+          },
+          "covers": [
+            "health"
+          ],
+          "steps": [
+            {
+              "save": "ready",
+              "call": "api_getReadiness"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ready",
+              "status": 200
+            },
+            {
+              "on": "ready",
+              "json": "$.status",
+              "equals": "Healthy"
+            },
+            {
+              "on": "ready",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "ready",
+              "json": "$.deliveredSlices[*]",
+              "equals": "CST"
+            },
+            {
+              "on": "ready",
+              "notText": "cst."
+            }
+          ],
+          "derivation": "FR-STERP-CST-001 AC1 (drift check finds all 27 cst objects with repository columns, types, nullability, parameters) read through contracts 6.11 readiness and the api_getReadiness example; objects of db/tables/40-cst/*.sql, db/procs/cst/*.sql and db/views/cst/01-cst-views.sql:8-83.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-001-AC2",
+          "ac": 2,
+          "title": "Delivered CST operations emit money scale 2, quantity/unit-cost scale 6, percent scale 4 and issue no DDL",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "bases",
+              "call": "cst_getItemCostBases",
+              "path": {
+                "itemCode": "BAR-AL6082-25MM"
+              }
+            },
+            {
+              "save": "cmp",
+              "call": "cst_compareCostSets",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {
+                "compareTo": "FY2026STD"
+              }
+            },
+            {
+              "save": "rev",
+              "call": "cst_reviewCostSet",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "bases",
+              "bodyContains": "\"qtyOnHand\":260.000000"
+            },
+            {
+              "on": "bases",
+              "bodyContains": "\"averageUnitCost\":18.500000"
+            },
+            {
+              "on": "bases",
+              "bodyContains": "\"carryingValueGbp\":4810.00"
+            },
+            {
+              "on": "cmp",
+              "bodyContains": "\"differencePct\":8.0000"
+            },
+            {
+              "on": "rev",
+              "status": 200
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.objects o WHERE o.is_ms_shipped = 0 AND o.modify_date > (SELECT MAX(h.restore_date) FROM msdb.dbo.restorehistory h WHERE h.destination_database_name = DB_NAME())",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-001 AC2 with spec 8.2 scales (decimal(18,2), decimal(19,6), decimal(9,4); contracts 4.3) on the fixture pool and standards of db/seed/94-cst-demo.sql:173-210; no object of the restored database is modified (contracts 6.1, no DDL).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-002-AC1",
+          "ac": 1,
+          "title": "COSTACC Costing menu in SortOrder, WIP window separate from Job Cost Enquiry, CSTRP030 launcher, Ctrl+K/R/J",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation",
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "menu",
+              "call": "platform_getMenu"
+            },
+            {
+              "save": "wip",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Costing",
+                    "Job Cost Enquiry..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "Costing",
+                    "Work in Progress..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "var",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Costing",
+                    "Variance Analysis..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "keys",
+              "gui": "/",
+              "actions": [
+                {
+                  "press": "Ctrl+K"
+                },
+                {
+                  "press": "Ctrl+R"
+                },
+                {
+                  "press": "Ctrl+J"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "menu",
+              "json": "$.items",
+              "matches": "\"menuCode\":\"CST\\.ENQUIRY\".*\"menuCode\":\"CST\\.COSTSET\".*\"menuCode\":\"CST\\.ROLLUP\".*\"menuCode\":\"CST\\.RATES\".*\"menuCode\":\"CST\\.ELEMENTS\".*\"menuCode\":\"CST\\.POLICY\".*\"menuCode\":\"CST\\.JOB\".*\"menuCode\":\"CST\\.WIP\".*\"menuCode\":\"CST\\.VARIANCE\".*\"menuCode\":\"CST\\.LANDED\".*\"menuCode\":\"CST\\.NRV\".*\"menuCode\":\"CST\\.RPT\\.VAL\".*\"menuCode\":\"CST\\.RPT\\.JOB\".*\"menuCode\":\"CST\\.RPT\\.WIP\".*\"menuCode\":\"CST\\.RPT\\.COMPARE\""
+            },
+            {
+              "on": "wip",
+              "title": "Work in Progress"
+            },
+            {
+              "on": "wip",
+              "text": "Job Cost Enquiry"
+            },
+            {
+              "on": "var",
+              "text": "CSTRP030"
+            },
+            {
+              "on": "keys",
+              "title": "Job Cost Enquiry"
+            },
+            {
+              "on": "keys",
+              "text": "Item Cost Enquiry"
+            },
+            {
+              "on": "keys",
+              "text": "Cost Roll-up and What-if"
+            }
+          ],
+          "derivation": "FR-STERP-CST-002 AC1 with the seeded rows db/seed/41-cst-menu.sql:21-35 and 43-cst-wiprf.sql:43 (SortOrder 10..150, CST.RPT.WIP 145, Ctrl+K/R/J, CST.WIP argument WIP, CST.VARIANCE -> CSTRP030), frmJobCost.vb:22-33 titles and frmMain.vb:81-90 window identity.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-002-AC2",
+          "ac": 2,
+          "title": "User lacking CST.STANDARD.MAINT: no cost-set/roll-up/comparison menu rows; calls and CSTSETCM refused 403 PRM0006",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "menu",
+              "call": "platform_getMenu"
+            },
+            {
+              "save": "rev",
+              "call": "cst_reviewCostSet",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            },
+            {
+              "save": "roll",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 10,
+                "boundary": "EXPAND"
+              }
+            },
+            {
+              "save": "setcm",
+              "call": "cst_submitCstsetcmRun",
+              "body": {
+                "CO": "STC",
+                "COSTSET": "FY2027STD"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "menu",
+              "bodyContains": "CST.ENQUIRY"
+            },
+            {
+              "on": "menu",
+              "notText": "CST.COSTSET"
+            },
+            {
+              "on": "menu",
+              "notText": "CST.ROLLUP"
+            },
+            {
+              "on": "menu",
+              "notText": "CST.RPT.COMPARE"
+            },
+            {
+              "on": "rev",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "FINCTRL does not hold CST.STANDARD.MAINT"
+              }
+            },
+            {
+              "on": "roll",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "FINCTRL does not hold CST.STANDARD.MAINT"
+              }
+            },
+            {
+              "on": "setcm",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "FINCTRL does not hold CST.STANDARD.MAINT"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "DRAFT"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'CSTSETCM'",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-002 AC2 and spec 7.1/7.3 gate codes (CST.COSTSET, CST.ROLLUP, CST.RPT.COMPARE, CSTRP040 = CST.STANDARD.MAINT, db/seed/41-cst-menu.sql:23-24,35,72) for FINCTRL whose role lacks it (03-core-roles-users.sql:38); wording of cobol/online/common/PERMCHK.cob:162-176 (contracts 5.4, 5.10).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-010-AC1",
+          "ac": 1,
+          "title": "BAR-AL6082-25MM company pool row: MWA 260 @ 18.5, carrying 4810.00, allowance 650.00, net 4160.00, impaired",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_getItemCostBases",
+              "path": {
+                "itemCode": "BAR-AL6082-25MM"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].siteCode",
+              "equals": "*"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].costMethod",
+              "equals": "MWA"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].qtyOnHand",
+              "equals": 260
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].averageUnitCost",
+              "equals": 18.5
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].carryingValueGbp",
+              "equals": 4810
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].allowanceGbp",
+              "equals": 650
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].netCarryingGbp",
+              "equals": 4160
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].nrvUnitValue",
+              "equals": 16
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].isImpaired",
+              "equals": "Y"
+            }
+          ],
+          "derivation": "FR-STERP-CST-010 AC1 values of the company pool seeded at db/seed/94-cst-demo.sql:196-210 as returned by cst.usp_CostEnquiry (db/procs/cst/01-cst-enquiry.sql:69-113: ORDER BY SiteCode, net = carrying - allowance, IsImpaired Y when allowance > 0).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-010-AC2",
+          "ac": 2,
+          "title": "Site RDG filter returns only RDG pools of BAR-AL6082-25MM",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_getItemCostBases",
+              "path": {
+                "itemCode": "BAR-AL6082-25MM"
+              },
+              "query": {
+                "site": "RDG"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].siteCode",
+              "equals": "RDG"
+            },
+            {
+              "on": "r",
+              "notText": "\"siteCode\":\"*\""
+            },
+            {
+              "on": "r",
+              "notText": "\"siteCode\":\"BHM\""
+            }
+          ],
+          "derivation": "FR-STERP-CST-010 AC2: site passed to @SiteCode (CostingService.vb:129-134; 01-cst-enquiry.sql:109) over the BAR-AL6082-25MM pools '*' (94-cst-demo.sql:198), BHM and RDG (65-itm-partners-stock.sql:139,169-184; 25-itm-locations.sql:43-68).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-010-AC3",
+          "ac": 3,
+          "title": "Revision omitted or empty returns every revision (blank company pool and revision A site pools)",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "empty",
+              "call": "cst_getItemCostBases",
+              "path": {
+                "itemCode": "BAR-AL6082-25MM"
+              },
+              "query": {
+                "revision": ""
+              }
+            },
+            {
+              "save": "omitted",
+              "call": "cst_getItemCostBases",
+              "path": {
+                "itemCode": "BAR-AL6082-25MM"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "empty",
+              "status": 200
+            },
+            {
+              "on": "empty",
+              "json": "$.items[*].revision",
+              "equals": ""
+            },
+            {
+              "on": "empty",
+              "json": "$.items[*].revision",
+              "equals": "A"
+            },
+            {
+              "on": "omitted",
+              "status": 200
+            },
+            {
+              "on": "omitted",
+              "json": "$.items[*].revision",
+              "equals": ""
+            },
+            {
+              "on": "omitted",
+              "json": "$.items[*].revision",
+              "equals": "A"
+            }
+          ],
+          "derivation": "FR-STERP-CST-010 AC3: an empty revision is bound as NULL (dotnet/STERP.Data/SqlHelper.cs:33) and cst.usp_CostEnquiry then returns all revisions - the '' pool of 94-cst-demo.sql:198 and the revision A site pools of 65-itm-partners-stock.sql:169-184 (item revision A, 20-itm-items-a.sql:46).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-010-AC4",
+          "ac": 4,
+          "title": "Unknown item answers 200 with items [] and count 0",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_getItemCostBases",
+              "path": {
+                "itemCode": "NO-SUCH-ITEM"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.count",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.items",
+              "count": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-010 AC4 (item with no cst.ItemCost row -> 200, items [], count 0) from cst.usp_CostEnquiry returning no rows (01-cst-enquiry.sql:69-113) and the direct-list envelope of contracts 4.10.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-011-AC1",
+          "ac": 1,
+          "title": "status=REVIEW lists FY2027STD prepared by KWATSON, no approver, compared to FY2026STD, not self-approved",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_listCostSets",
+              "query": {
+                "status": "REVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.count",
+              "equals": 1
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].costSet",
+              "equals": "FY2027STD"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].status",
+              "equals": "REVIEW"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].preparedBy",
+              "equals": "KWATSON"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].approvedBy",
+              "isNull": true
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].comparedTo",
+              "equals": "FY2026STD"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].selfApproved",
+              "equals": ""
+            }
+          ],
+          "derivation": "FR-STERP-CST-011 AC1 and the cst_listCostSets demo example from db/seed/94-cst-demo.sql:164-168 through cst.usp_CostSetList (db/procs/cst/02-cst-lists.sql:11-41).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-011-AC2",
+          "ac": 2,
+          "title": "No status lists all 7 STC sets in procedure order, ACTIVE first and SUPERSEDED FY2025STD last",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_listCostSets"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.count",
+              "equals": 7
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].costSet",
+              "equals": "BOMDEMO"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].status",
+              "equals": "ACTIVE"
+            },
+            {
+              "on": "r",
+              "json": "$.items[4].costSet",
+              "equals": "FY2027STD"
+            },
+            {
+              "on": "r",
+              "json": "$.items[6].costSet",
+              "equals": "FY2025STD"
+            },
+            {
+              "on": "r",
+              "json": "$.items[6].status",
+              "equals": "SUPERSEDED"
+            }
+          ],
+          "derivation": "FR-STERP-CST-011 AC2: rank ACTIVE, APPROVED, REVIEW, DRAFT, other then EffectiveFrom DESC, CostSetCode (02-cst-lists.sql:35-37) over the STC sets of db/seed/40-cst-elements.sql:121-130, 90-bom-demo.sql:11-13, 94-cst-demo.sql:164-168 and 95-kit-demo.sql:257-259.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-011-EDGE-SELF-APPROVED-ROW",
+          "ac": null,
+          "title": "Edge record: a set approved by its own preparer is listed with selfApproved YES",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE cst.CostSet SET Status = 'APPROVED', ReviewedBy = 'FINCTRL', ApprovedBy = 'COSTACC', ApprovedAt = SYSDATETIME() WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'"
+            },
+            {
+              "save": "r",
+              "call": "cst_listCostSets",
+              "query": {
+                "status": "APPROVED"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.count",
+              "equals": 2
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].costSet",
+              "equals": "FY2027DRAFT"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].selfApproved",
+              "equals": "YES"
+            },
+            {
+              "on": "r",
+              "json": "$.items[1].costSet",
+              "equals": "QUOTE2026"
+            },
+            {
+              "on": "r",
+              "json": "$.items[1].selfApproved",
+              "equals": ""
+            }
+          ],
+          "derivation": "Spec section 10 edge for FR-011 (SelfApproved rows): SelfApproved = YES when ApprovedBy is not null and equals PreparedBy (db/procs/cst/02-cst-lists.sql:31-32) for FY2027DRAFT prepared by COSTACC (40-cst-elements.sql:126-127).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-012-AC1",
+          "ac": 1,
+          "title": "Review of DRAFT FY2027DRAFT by COSTACC: 200 REVIEW; row Status/ReviewedBy/ModifiedBy set, nothing else changed",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_reviewCostSet",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.status",
+              "equals": "REVIEW"
+            },
+            {
+              "on": "r",
+              "json": "$.data.approvedBy",
+              "equals": "COSTACC"
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "REVIEW"
+            },
+            {
+              "sql": "SELECT ReviewedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "COSTACC"
+            },
+            {
+              "sql": "SELECT ModifiedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "COSTACC"
+            },
+            {
+              "sql": "SELECT CASE WHEN ApprovedBy IS NULL AND ApprovedAt IS NULL AND ActivatedAt IS NULL AND PreparedBy = 'COSTACC' AND Purpose = 'STANDARD' THEN 'UNCHANGED' ELSE 'CHANGED' END FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "UNCHANGED"
+            }
+          ],
+          "derivation": "FR-STERP-CST-012 AC1 and spec 4.2 row 7/8: one UPDATE of Status, ReviewedBy, ModifiedBy, ModifiedAt (cobol/online/cst/STDCOST.cob:286-376) and approvedBy = acting user (BR-STDCOST-020) on FY2027DRAFT (db/seed/40-cst-elements.sql:126-127).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-012-AC2",
+          "ac": 2,
+          "title": "Review of FY2027STD already in REVIEW refused 422 CST0403 with the legacy text; row unchanged",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_reviewCostSet",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0403",
+                "returnCode": 8,
+                "detailContains": "Cost set is REVIEW - it must be DRAFT for this action"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "REVIEW"
+            },
+            {
+              "sql": "SELECT ReviewedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "DFIELD"
+            }
+          ],
+          "derivation": "FR-STERP-CST-012 AC2 with the CST0403 message built at cobol/online/cst/STDCOST.cob:301-309 for the REVIEW set of db/seed/94-cst-demo.sql:164-168 (ReviewedBy DFIELD).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-012-AC3",
+          "ac": 3,
+          "title": "Review of an unknown cost set answers 404 CST0402 'Cost set NOSUCHSET was not found'",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_reviewCostSet",
+              "path": {
+                "costSet": "NOSUCHSET"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "CST0402",
+                "returnCode": 16,
+                "detailContains": "Cost set NOSUCHSET was not found"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-012 AC3 with RC 16 CST0402 'Cost set <set> was not found' (cobol/online/cst/STDCOST.cob:292-298) mapped to 404 by contracts 4.6.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-012-AC4",
+          "ac": 4,
+          "title": "Lower-case set code fy2027draft is upper-cased before lookup and answered as FY2027DRAFT",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_reviewCostSet",
+              "path": {
+                "costSet": "fy2027draft"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.costSet",
+              "equals": "FY2027DRAFT"
+            },
+            {
+              "on": "r",
+              "json": "$.data.status",
+              "equals": "REVIEW"
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "REVIEW"
+            }
+          ],
+          "derivation": "FR-STERP-CST-012 AC4: SC-COST-SET upper-cased in place in STDCOST 0100 (cobol/online/cst/STDCOST.cob:95) before the 2400 read, so the answer and the update address FY2027DRAFT.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-012-EDGE-SET-CODE-TRUNCATION",
+          "ac": null,
+          "title": "Text normalization: 21-character lower-case set code truncated to 20 and upper-cased before lookup",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_reviewCostSet",
+              "path": {
+                "costSet": "fy2027std-candidate-x"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "CST0402",
+                "returnCode": 16,
+                "detailContains": "Cost set FY2027STD-CANDIDATE- was not found"
+              }
+            }
+          ],
+          "derivation": "Contracts 4.4 alphanumeric rule (right-truncate to the field length, CobolCodec.cs:37-43) for SC-COST-SET PIC X(20) (cobol/copy/STDCOSTCA.cpy) followed by the STDCOST upper-casing (STDCOST.cob:95) and the CST0402 text (STDCOST.cob:292-298).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-013-AC1",
+          "ac": 1,
+          "title": "COSTACC approves FY2027STD prepared by KWATSON: 200 APPROVED, row ApprovedBy COSTACC and ApprovedAt set",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_approveCostSet",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.status",
+              "equals": "APPROVED"
+            },
+            {
+              "on": "r",
+              "json": "$.data.approvedBy",
+              "equals": "COSTACC"
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "APPROVED"
+            },
+            {
+              "sql": "SELECT ApprovedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "COSTACC"
+            },
+            {
+              "sql": "SELECT CASE WHEN ApprovedAt IS NULL THEN 0 ELSE 1 END FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": 1
+            }
+          ],
+          "derivation": "FR-STERP-CST-013 AC1 and the cst_approveCostSet demo example: UPDATE Status APPROVED, ApprovedBy, ApprovedAt (cobol/online/cst/STDCOST.cob:334-340) for FY2027STD prepared by KWATSON (db/seed/94-cst-demo.sql:164-168).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-013-AC2",
+          "ac": 2,
+          "title": "Preparer approving FY2027STD gets 202 HOLD RC 6 CST0405 with the legacy message; row unchanged",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE cst.CostSet SET PreparedBy = 'COSTACC' WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'"
+            },
+            {
+              "save": "r",
+              "call": "cst_approveCostSet",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "CST0405",
+                "messageContains": "The preparer of a cost set may not approve it"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "REVIEW"
+            },
+            {
+              "sql": "SELECT ApprovedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": null
+            }
+          ],
+          "derivation": "FR-STERP-CST-013 AC2 and the selfApproval 202 example: TRIM(PreparedBy) = TRIM(user) gives RC 06 CST0405 with nothing written (cobol/online/cst/STDCOST.cob:319-327); KWATSON is no STERP user (db/seed/03-core-roles-users.sql:63-86), so the preparer is arranged as COSTACC.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-013-AC3",
+          "ac": 3,
+          "title": "Approval of a DRAFT set and of an APPROVED set both refused 422 CST0403",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "draft",
+              "call": "cst_approveCostSet",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            },
+            {
+              "save": "appr",
+              "call": "cst_approveCostSet",
+              "path": {
+                "costSet": "QUOTE2026"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "draft",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0403",
+                "returnCode": 8,
+                "detailContains": "Cost set is DRAFT - it must be REVIEW for this action"
+              }
+            },
+            {
+              "on": "appr",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0403",
+                "returnCode": 8,
+                "detailContains": "Cost set is APPROVED - it must be REVIEW for this action"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-013 AC3 with the CST0403 text of cobol/online/cst/STDCOST.cob:301-309 (required status REVIEW, STDCOST.cob:266-270) for FY2027DRAFT (DRAFT) and QUOTE2026 (APPROVED) of db/seed/40-cst-elements.sql:126-129.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-014-AC1",
+          "ac": 1,
+          "title": "Activating an APPROVED STANDARD set: 200 ACTIVE with impact figures; only Status/ActivatedAt/Modified* change",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "sql": "INSERT inv.Item (CompanyCode, ItemCode, Description, ItemClass, StockUomCode, CreatedBy) VALUES ('STC', 'A07-ACT-ITEM', 'A07 activation test item', 'BOUGHT', 'EA', 'A07'); INSERT cst.ItemCost (CompanyCode, ItemCode, Revision, SiteCode, CostMethod, QtyOnHand, CarryingValueGBP, AverageUnitCost, LastUpdatedAt, LastUpdatedBy) VALUES ('STC', 'A07-ACT-ITEM', '', '*', 'MWA', 10.000000, 20.00, 2.000000, SYSDATETIME(), 'A07'); INSERT cst.StandardCost (CompanyCode, CostSetCode, ItemCode, Revision, CostingLotSize, TotalUnitCost, Completeness) VALUES ('STC', 'FY2027DRAFT', 'A07-ACT-ITEM', '', 1, 2.500000, 'COMPLETE'); UPDATE cst.CostSet SET Status = 'APPROVED', ReviewedBy = 'COSTACC', ApprovedBy = 'FINCTRL', ApprovedAt = SYSDATETIME() WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'"
+            },
+            {
+              "save": "r",
+              "call": "cst_activateCostSet",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.status",
+              "equals": "ACTIVE"
+            },
+            {
+              "on": "r",
+              "json": "$.data.itemCount",
+              "equals": 1
+            },
+            {
+              "on": "r",
+              "json": "$.data.revalGbp",
+              "equals": 5.0
+            },
+            {
+              "on": "r",
+              "json": "$.data.approvedBy",
+              "equals": "FINCTRL"
+            },
+            {
+              "on": "r",
+              "json": "$.data.warning",
+              "equals": ""
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "ACTIVE"
+            },
+            {
+              "sql": "SELECT ModifiedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "COSTACC"
+            },
+            {
+              "sql": "SELECT CASE WHEN ActivatedAt IS NOT NULL AND ApprovedBy = 'FINCTRL' AND ReviewedBy = 'COSTACC' AND RevaluationJournalId IS NULL THEN 'OK' ELSE 'CHANGED' END FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "OK"
+            },
+            {
+              "sql": "SELECT CASE WHEN AverageUnitCost = 2.000000 AND StandardUnitCost IS NULL AND QtyOnHand = 10.000000 THEN 'UNCHANGED' ELSE 'REVALUED' END FROM cst.ItemCost WHERE CompanyCode = 'STC' AND ItemCode = 'A07-ACT-ITEM'",
+              "equals": "UNCHANGED"
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2026STD'",
+              "equals": "ACTIVE"
+            }
+          ],
+          "derivation": "FR-STERP-CST-014 AC1 and spec 4.2 rows 7/8: ACTIVATE updates Status, ActivatedAt, ModifiedBy, ModifiedAt (STDCOST.cob:341-347) then re-reads IMPACT (STDCOST.cob:274-282,413-457): 10 x (2.50 - 2.00) = 5.00, stored approver, blank warning; nothing revalued or superseded (spec 2.4). Observed in legacy run RG-010-CST-014-AC1-freshc-legacy-route (STDCOST ACTIVATE RC 0, ACTIVE, 1 item, 5.00, approver FINCTRL, blank warning; set and item rows as asserted). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-010: arrangement made FK-consistent: the inv.Item row is inserted first (FK_ItemCost_Item, db/tables/99-fk/01-ForeignKeys.sql:35)]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-014-AC2",
+          "ac": 2,
+          "title": "Activating an APPROVED SIMULATION set refused 422 CST0404; row unchanged",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE cst.CostSet SET Purpose = 'SIMULATION', Status = 'APPROVED', ApprovedBy = 'FINCTRL', ApprovedAt = SYSDATETIME() WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'"
+            },
+            {
+              "save": "r",
+              "call": "cst_activateCostSet",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0404",
+                "returnCode": 8,
+                "detailContains": "A simulation or quote set cannot be activated"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "APPROVED"
+            }
+          ],
+          "derivation": "FR-STERP-CST-014 AC2 with the purpose check and text of cobol/online/cst/STDCOST.cob:311-317 (spec 4.2 row 5).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-014-AC3",
+          "ac": 3,
+          "title": "Activating FY2027STD in REVIEW refused 422 CST0403",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_activateCostSet",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0403",
+                "returnCode": 8,
+                "detailContains": "Cost set is REVIEW - it must be APPROVED for this action"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "REVIEW"
+            }
+          ],
+          "derivation": "FR-STERP-CST-014 AC3 with the CST0403 text of cobol/online/cst/STDCOST.cob:301-309 and required status APPROVED (STDCOST.cob:274-277) for FY2027STD (db/seed/94-cst-demo.sql:164-168).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-014-AC4",
+          "ac": 4,
+          "title": "APPROVED set approved by its own preparer is still activated (legacy, SME-745)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "sql": "UPDATE cst.CostSet SET Status = 'APPROVED', ApprovedBy = 'COSTACC', ApprovedAt = SYSDATETIME() WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'"
+            },
+            {
+              "save": "r",
+              "call": "cst_activateCostSet",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.status",
+              "equals": "ACTIVE"
+            },
+            {
+              "on": "r",
+              "json": "$.data.approvedBy",
+              "equals": "COSTACC"
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'",
+              "equals": "ACTIVE"
+            }
+          ],
+          "derivation": "FR-STERP-CST-014 AC4: ACTIVATE checks status and purpose only (cobol/online/cst/STDCOST.cob:286-376), so a set prepared and approved by COSTACC (db/seed/40-cst-elements.sql:126-127) activates; BC-CST-07 rejected (spec 12.2).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-015",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-015-AC1",
+          "ac": 1,
+          "title": "Impact of FY2027STD on the demo database: REVIEW, KWATSON, no approver, 7 items, 7274.38, preview warning",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_previewCostSetImpact",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.status",
+              "equals": "REVIEW"
+            },
+            {
+              "on": "r",
+              "json": "$.data.preparedBy",
+              "equals": "KWATSON"
+            },
+            {
+              "on": "r",
+              "json": "$.data.approvedBy",
+              "equals": ""
+            },
+            {
+              "on": "r",
+              "json": "$.data.itemCount",
+              "equals": 7
+            },
+            {
+              "on": "r",
+              "json": "$.data.revalGbp",
+              "equals": 7274.38
+            },
+            {
+              "on": "r",
+              "json": "$.data.adverse",
+              "equals": "N"
+            },
+            {
+              "on": "r",
+              "json": "$.data.warning",
+              "equals": "No stock has been revalued - this is a preview"
+            }
+          ],
+          "derivation": "FR-STERP-CST-015 AC1 (demo values to be confirmed by the legacy oracle, U-CST-02) and the cst_previewCostSetImpact demo example; IMPACT query and warning of cobol/online/cst/STDCOST.cob:413-457; legacy oracle on the restored democ: legacy run RG-003-RG-011-democ-legacy-route (STDCOST IMPACT RC 0, REVIEW, KWATSON, no approver, 7 items, quantity 1185, revalGbp 7274.38, adverse N, preview warning) and the IMPACT statement executed verbatim (RG-011-democ-stdcost-impact-sql). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-011: orientation figure 16094.69 (DEMO-WORKFLOWS.md:76) replaced by the legacy-oracle value 7274.38]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-015-AC2",
+          "ac": 2,
+          "title": "Revaluation sum with more than two decimals (-0.999999) is truncated toward zero to -0.99, adverse Y",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT inv.Item (CompanyCode, ItemCode, Description, ItemClass, StockUomCode, CreatedBy) VALUES ('STC', 'A07-TRUNC-ITEM', 'A07 truncation test item', 'BOUGHT', 'EA', 'A07'); INSERT cst.ItemCost (CompanyCode, ItemCode, Revision, SiteCode, CostMethod, QtyOnHand, CarryingValueGBP, AverageUnitCost, LastUpdatedAt, LastUpdatedBy) VALUES ('STC', 'A07-TRUNC-ITEM', '', '*', 'MWA', 3.000000, 1.00, 0.333333, SYSDATETIME(), 'A07'); INSERT cst.StandardCost (CompanyCode, CostSetCode, ItemCode, Revision, CostingLotSize, TotalUnitCost, Completeness) VALUES ('STC', 'FY2027DRAFT', 'A07-TRUNC-ITEM', '', 1, 0.000000, 'COMPLETE');"
+            },
+            {
+              "save": "r",
+              "call": "cst_previewCostSetImpact",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.itemCount",
+              "equals": 1
+            },
+            {
+              "on": "r",
+              "json": "$.data.revalQty",
+              "equals": 3
+            },
+            {
+              "on": "r",
+              "json": "$.data.revalGbp",
+              "equals": -0.99
+            },
+            {
+              "on": "r",
+              "json": "$.data.adverse",
+              "equals": "Y"
+            }
+          ],
+          "derivation": "FR-STERP-CST-015 AC2: SUM = 3 x (0 - 0.333333) = -0.999999 moved to SC-REVAL-GBP S9(13)V9(2) without ROUNDED (cobol/online/cst/STDCOST.cob:448, cobol/copy/STDCOSTCA.cpy), adverse when < 0 (STDCOST.cob:450-452); contracts 7.1 truncation. Observed in legacy run RG-010-CST-015-AC2-freshc-legacy-route (1 item, quantity 3, -0.99, adverse Y). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-010: arrangement made FK-consistent: the inv.Item row is inserted first (FK_ItemCost_Item, db/tables/99-fk/01-ForeignKeys.sql:35)]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-015-AC3",
+          "ac": 3,
+          "title": "Impact preview writes nothing: set row and item cost pools unchanged",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_previewCostSetImpact",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "sql": "SELECT CASE WHEN Status = 'REVIEW' AND ModifiedBy IS NULL AND ApprovedBy IS NULL THEN 'UNCHANGED' ELSE 'CHANGED' END FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "UNCHANGED"
+            },
+            {
+              "sql": "SELECT CASE WHEN QtyOnHand = 260 AND StandardUnitCost = 18.500000 AND CarryingValueGBP = 4810.00 THEN 'UNCHANGED' ELSE 'CHANGED' END FROM cst.ItemCost WHERE CompanyCode = 'STC' AND ItemCode = 'BAR-AL6082-25MM' AND SiteCode = '*'",
+              "equals": "UNCHANGED"
+            }
+          ],
+          "derivation": "FR-STERP-CST-015 AC3: IMPACT runs with SC-COMMIT N and issues only the SELECTs of cobol/online/cst/STDCOST.cob:378-457 (spec 8.1 read-only) over the fixture rows of db/seed/94-cst-demo.sql:164-210.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-016",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-016-AC1",
+          "ac": 1,
+          "title": "FY2027STD vs FY2026STD: BAR-AL6082-25MM company pool 18.50 -> 19.98 (+8%, 384.80); BATTERY new; BB-SHELL not listed",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_compareCostSets",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {
+                "compareTo": "FY2026STD"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].item",
+              "equals": "BAR-AL6082-25MM"
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].oldCost",
+              "equals": 18.5
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].newCost",
+              "equals": 19.98
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].difference",
+              "equals": 1.48
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].differencePct",
+              "equals": 8.0
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[*].qtyHeld",
+              "equals": 260
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[*].revaluation",
+              "equals": 384.8
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[*].note",
+              "equals": "New item in this set"
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[*].oldCost",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "notText": "BB-SHELL-BSA68"
+            }
+          ],
+          "derivation": "FR-STERP-CST-016 AC1 and the cst_compareCostSets demo example: STDCOST 5000/5100 (cobol/online/cst/STDCOST.cob:538-626) over the standards and company pool of db/seed/94-cst-demo.sql:173-210 (260 x 1.48 = 384.80; pct ROUNDED 1.48 x 100 / 18.5 = 8.0000).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-016-AC2",
+          "ac": 2,
+          "title": "More than 20 joined rows: 20 lines, moreLines Y, itemCount = all 25 rows, revalGbp = 20-line window sum",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "sql": "INSERT cst.StandardCost (CompanyCode, CostSetCode, ItemCode, Revision, CostingLotSize, TotalUnitCost, Completeness) SELECT TOP (25) 'STC', 'FY2027DRAFT', 'A07-W' + RIGHT('0' + CAST(ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS varchar(2)), 2), '', 1, 1.000000, 'COMPLETE' FROM sys.all_objects; INSERT inv.Item (CompanyCode, ItemCode, Description, ItemClass, StockUomCode, CreatedBy) SELECT 'STC', s.ItemCode, 'A07 comparison window item', 'BOUGHT', 'EA', 'A07' FROM cst.StandardCost s WHERE s.CompanyCode = 'STC' AND s.CostSetCode = 'FY2027DRAFT' AND s.ItemCode LIKE 'A07-W%'; INSERT cst.ItemCost (CompanyCode, ItemCode, Revision, SiteCode, CostMethod, QtyOnHand, CarryingValueGBP, AverageUnitCost, LastUpdatedAt, LastUpdatedBy) SELECT 'STC', s.ItemCode, '', '*', 'MWA', 1.000000, 0.00, 0.000000, SYSDATETIME(), 'A07' FROM cst.StandardCost s WHERE s.CompanyCode = 'STC' AND s.CostSetCode = 'FY2027DRAFT' AND s.ItemCode LIKE 'A07-W%'"
+            },
+            {
+              "save": "r",
+              "call": "cst_compareCostSets",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {
+                "compareTo": "FY2026STD"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines",
+              "count": 20
+            },
+            {
+              "on": "r",
+              "json": "$.data.lineCnt",
+              "equals": 20
+            },
+            {
+              "on": "r",
+              "json": "$.data.moreLines",
+              "equals": "Y"
+            },
+            {
+              "on": "r",
+              "json": "$.data.itemCount",
+              "equals": 25
+            },
+            {
+              "on": "r",
+              "json": "$.data.revalGbp",
+              "equals": 20.0
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[19].item",
+              "equals": "A07-W20"
+            }
+          ],
+          "derivation": "FR-STERP-CST-016 AC2: window of 20 (cobol/online/cst/STDCOST.cob:588-593), SC-ITEM-COUNT = all fetched rows (:599) and SC-REVAL-GBP summed from window lines only (:624), here 25 arranged new items each revalued 1 x 1.00. Observed in legacy run RG-010-CST-016-AC2-freshc-legacy-route (20 lines, line count 20, more lines Y, 25 items, 20.00, line 20 A07-W20). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-010: arrangement made FK-consistent: inv.Item rows for the 25 window items before their cst.ItemCost rows (FK_ItemCost_Item)]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-016-AC3",
+          "ac": 3,
+          "title": "Blank compareTo on BOMDEMO (no ComparedToSetCode) refused 422 CST0410",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_compareCostSets",
+              "path": {
+                "costSet": "BOMDEMO"
+              },
+              "body": {
+                "compareTo": ""
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0410",
+                "returnCode": 8,
+                "detailContains": "No comparison cost set was named"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-016 AC3: blank SC-COMPARE-SET falls back to ComparedToSetCode, still blank -> CST0410 (cobol/online/cst/STDCOST.cob:540-547); BOMDEMO has none (db/seed/90-bom-demo.sql:11-25).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-017",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-017-AC1",
+          "ac": 1,
+          "title": "B1 DEMO-FRAME, BOMDEMO, EXPAND, lot 10: one window, totals 70.10 + 20.00 + 10.00 = 100.10, unit 10.01",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 10,
+                "boundary": "EXPAND"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.materialCost",
+              "equals": 70.1
+            },
+            {
+              "on": "r",
+              "json": "$.data.labourCost",
+              "equals": 20.0
+            },
+            {
+              "on": "r",
+              "json": "$.data.setupCost",
+              "equals": 10.0
+            },
+            {
+              "on": "r",
+              "json": "$.data.totalCost",
+              "equals": 100.1
+            },
+            {
+              "on": "r",
+              "json": "$.data.goodOutput",
+              "equals": 10
+            },
+            {
+              "on": "r",
+              "json": "$.data.unitCost",
+              "equals": 10.01
+            },
+            {
+              "on": "r",
+              "json": "$.data.completeness",
+              "equals": "COMPLETE"
+            },
+            {
+              "on": "r",
+              "json": "$.data.moreLines",
+              "equals": "N"
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].seq",
+              "equals": 1
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[*].item",
+              "equals": "DEMO-BRACE"
+            }
+          ],
+          "derivation": "FR-STERP-CST-017 AC1: BOMCOST B1 figures of cobol/tests/bom/TBOMCOST.cob:6-21,90-127 (material 70.10, conversion 30.00 incl. setup 10.00, denominator 10) mapped by COSTROLL 1100-1300 (labour = conversion - setup, total equation, unit ROUNDED 6 dp; cobol/online/cst/COSTROLL.cob:160-302).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-017-AC2",
+          "ac": 2,
+          "title": "FG-BIKE-COMMUTE-M (>20 lines): all windows contiguous, summary carries zeroed GETLINE totals and COMPLETE",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 10,
+                "boundary": "EXPAND"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].seq",
+              "equals": 1
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[20].seq",
+              "equals": 21
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[*].item",
+              "equals": "PKG-BOX-BIKE-COMPLETE"
+            },
+            {
+              "on": "r",
+              "json": "$.data.totalCost",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.materialCost",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.unitCost",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.completeness",
+              "equals": "COMPLETE"
+            },
+            {
+              "on": "r",
+              "json": "$.data.missingCount",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.moreLines",
+              "equals": "N"
+            }
+          ],
+          "derivation": "FR-STERP-CST-017 AC2 and the 'paged' 200 example: facade paging (CostingService.vb:228-241, spec 4.3) and F-COSTROLL-01 zeroed summary after GETLINE (BC-CST-01 rejected) for the 95-occurrence bike of db/seed/90-bom-showcase.sql:147,252-253 (docs/DEMO-WORKFLOWS.md:68).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-017-AC3",
+          "ac": 3,
+          "title": "Lot 0 is treated as 1; lot -1 refused 422 CST0602; boundary X refused 422 CST0606",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "zero",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 0,
+                "boundary": "EXPAND"
+              }
+            },
+            {
+              "save": "neg",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": -1,
+                "boundary": "EXPAND"
+              }
+            },
+            {
+              "save": "bnd",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 10,
+                "boundary": "X"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "zero",
+              "status": 200
+            },
+            {
+              "on": "zero",
+              "json": "$.data.lotSize",
+              "equals": 1
+            },
+            {
+              "on": "neg",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0602",
+                "returnCode": 8,
+                "detailContains": "The costing lot size must be positive - a fixed setup charge needs a denominator"
+              }
+            },
+            {
+              "on": "bnd",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0606",
+                "returnCode": 8,
+                "detailContains": "The valuation boundary must be EXPAND or STOP"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-017 AC3: COSTROLL 0100 lot 0 -> 1 (cobol/online/cst/COSTROLL.cob:101-103) and 0200 refusals CST0602/CST0606 with their texts (COSTROLL.cob:129-143), RC 08 -> 422 (contracts 4.6).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-017-AC4",
+          "ac": 4,
+          "title": "Recovery credit above the other elements: 202 HOLD CST0609, negative totalCost and no lines",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "sql": "UPDATE bp SET RecoveryValue = 1000.000000 FROM bom.BomByProduct bp JOIN bom.BomHeader h ON h.BomHeaderId = bp.BomHeaderId WHERE h.CompanyCode = 'STC' AND h.BomRef = 'BOM-DEMO-OPT' AND h.BomRevision = 'A'"
+            },
+            {
+              "save": "r",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "DEMO-OPT-TOP"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 1,
+                "boundary": "EXPAND"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "CST0609",
+                "messageContains": "The recovery credit drives the cost below zero"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.totalCost",
+              "lte": -0.01
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines",
+              "count": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-017 AC4 and the 'negative' 202 example: total < 0 -> RC 06 CST0609 (cobol/online/cst/COSTROLL.cob:279-301) and no copied lines when RC > 4 (CostingService.vb:229-230); the DEMO-SWARF recovery of BOM-DEMO-OPT (db/seed/31-bom-structures.sql:145-158) is raised to exceed the cost.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-017-AC5",
+          "ac": 5,
+          "title": "Components without cost: 200 WARNING CST0604, INCOMPLETE, missing count > 0, nothing written",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "DEMO-OPT-TOP"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 1,
+                "boundary": "EXPAND"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "CST0604"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.completeness",
+              "equals": "INCOMPLETE"
+            },
+            {
+              "on": "r",
+              "json": "$.data.missingCount",
+              "gte": 1
+            },
+            {
+              "on": "r",
+              "json": "$.data.warning",
+              "equals": "Some components have no cost in this set"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.StandardCostElement",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.CostSet WHERE CompanyCode = 'STC'",
+              "equals": 7
+            }
+          ],
+          "derivation": "FR-STERP-CST-017 AC5: missing rates -> INCOMPLETE, CST0604, RC 04 (cobol/online/cst/COSTROLL.cob:219-227) for the cost-only resource without rate of BOM-DEMO-OPT (db/seed/31-bom-structures.sql:112; TBOMCOST.cob Check-Missing-Resource-Rate); COSTROLL issues no SQL write (spec 8.1).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-018",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-018-AC1",
+          "ac": 1,
+          "title": "Target price 0 runs SCENARIO: best variant 0, margins 0, fixed labels, variant 3 lot = 2 x lot",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_runWhatIf",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 10,
+                "targetPrice": 0,
+                "materialFactor": 1,
+                "rateFactor": 1
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.bestVariant",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants",
+              "count": 3
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants[0].label",
+              "equals": "AS ENTERED"
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants[1].label",
+              "equals": "MATERIAL -5%"
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants[2].label",
+              "equals": "LOT X2 RATE +10%"
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants[2].lotSize",
+              "equals": 20
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants[0].marginPct",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants[1].marginPct",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants[2].marginPct",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-018 AC1: facade variants and SCENARIO selection (dotnet/STERP.Business/Costing/CostingService.vb:250-284, spec 4.4) with best variant initialised 0 (cobol/online/cst/WHATIF.cob:84) and margin % 0 outside MARGINWI.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-018-AC2",
+          "ac": 2,
+          "title": "Target price 780 on FG-BIKE-COMMUTE-M runs MARGINWI (best variant and margin % values need the legacy oracle)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_runWhatIf",
+              "path": {
+                "itemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 10,
+                "targetPrice": 780,
+                "materialFactor": 1,
+                "rateFactor": 1
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.targetPrice",
+              "equals": 780
+            },
+            {
+              "on": "r",
+              "json": "$.data.variantCnt",
+              "equals": 3
+            },
+            {
+              "on": "r",
+              "json": "$.data.variants",
+              "count": 3
+            }
+          ],
+          "derivation": "FR-STERP-CST-018 AC2 (MARGINWI when price > 0, cobol/online/cst/WHATIF.cob:234-251, MARGIN.cob:269-379); variant units depend on BOMCOST under the zeroed WHATIF header (U-CST-04, SME-794) and the illustrative OpenAPI figures are not binding, so only status and echo are pinned.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-CST-018-AC3",
+          "ac": 3,
+          "title": "What-if writes nothing: sideEffects N, no cost set or element breakdown created",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_runWhatIf",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 10,
+                "targetPrice": 780,
+                "materialFactor": 1,
+                "rateFactor": 1
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.sideEffects",
+              "equals": "N"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.StandardCostElement",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.CostSet WHERE CompanyCode = 'STC'",
+              "equals": 7
+            }
+          ],
+          "derivation": "FR-STERP-CST-018 AC3: WI-SIDE-EFFECTS forced N (cobol/online/cst/WHATIF.cob:86-88) and no SAVESET/commit on the facade route (CostingService.vb:245-249); the 7 STC cost sets of db/seed (40-cst-elements, 90-bom-demo, 94-cst-demo, 95-kit-demo) and the empty cst.StandardCostElement stay as seeded.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-018-AC4",
+          "ac": 4,
+          "title": "What-if with lot size -1 refused 422 CST1203",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_runWhatIf",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": -1,
+                "targetPrice": 0,
+                "materialFactor": 1,
+                "rateFactor": 1
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST1203",
+                "returnCode": 8,
+                "detailContains": "The lot size must be positive"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-018 AC4 with the CST1203 refusal and text of cobol/online/cst/WHATIF.cob:114-119 (RC 08 -> 422, contracts 4.6).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-018-EDGE-LOT-SCALE-ROUNDING",
+          "ac": null,
+          "title": "Numeric scale: lot size 0.0000004 rounds to 0.000000 at the COMMAREA and is then treated as 1",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_runWhatIf",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 0.0000004,
+                "targetPrice": 0,
+                "materialFactor": 1,
+                "rateFactor": 1
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.baseLotSize",
+              "equals": 1
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-with-scale rule (round half away from zero, dotnet/STERP.CobolInterop/CobolCodec.cs:24-29) into WI-BASE-LOT-SIZE PIC S9(13)V9(6) (cobol/copy/WHATIFCA.cpy) followed by WHATIF 0 -> 1 (cobol/online/cst/WHATIF.cob:89-91).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-019",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-019-AC1",
+          "ac": 1,
+          "title": "jobRef=CST27000 lists CST27000 and its two sub-jobs with budget, actual, committed, variance and WIP",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_listCostJobs",
+              "query": {
+                "jobRef": "CST27000"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.count",
+              "equals": 3
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].job",
+              "equals": "CST27000"
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].level",
+              "equals": 1
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].budget",
+              "equals": 56500
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].actual",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].committed",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].variance",
+              "equals": 56500
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].wip",
+              "equals": 33985
+            },
+            {
+              "on": "r",
+              "json": "$.items[1].job",
+              "equals": "CST27001"
+            },
+            {
+              "on": "r",
+              "json": "$.items[1].level",
+              "equals": 2
+            },
+            {
+              "on": "r",
+              "json": "$.items[1].budget",
+              "equals": 31000
+            },
+            {
+              "on": "r",
+              "json": "$.items[1].actual",
+              "equals": 27347
+            },
+            {
+              "on": "r",
+              "json": "$.items[1].committed",
+              "equals": 4380
+            },
+            {
+              "on": "r",
+              "json": "$.items[1].variance",
+              "equals": -727
+            },
+            {
+              "on": "r",
+              "json": "$.items[2].job",
+              "equals": "CST27002"
+            },
+            {
+              "on": "r",
+              "json": "$.items[2].level",
+              "equals": 2
+            },
+            {
+              "on": "r",
+              "json": "$.items[2].budget",
+              "equals": 19500
+            },
+            {
+              "on": "r",
+              "json": "$.items[2].actual",
+              "equals": 4998
+            },
+            {
+              "on": "r",
+              "json": "$.items[2].committed",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.items[2].variance",
+              "equals": 14502
+            }
+          ],
+          "derivation": "FR-STERP-CST-019 AC1 and the cst_listCostJobs demo example: cst.usp_JobList over cst.vw_JobSummary and the latest cst.WipBalance (db/procs/cst/02-cst-lists.sql:46-74; db/views/cst/01-cst-views.sql:32-57) for the jobs, budgets, transactions and WIP of db/seed/94-cst-demo.sql:45-135.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-019-AC2",
+          "ac": 2,
+          "title": "Status filters CLOSED and SUSPENDED return count 0",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "closed",
+              "call": "cst_listCostJobs",
+              "query": {
+                "status": "CLOSED"
+              }
+            },
+            {
+              "save": "susp",
+              "call": "cst_listCostJobs",
+              "query": {
+                "status": "SUSPENDED"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "closed",
+              "status": 200
+            },
+            {
+              "on": "closed",
+              "json": "$.count",
+              "equals": 0
+            },
+            {
+              "on": "closed",
+              "json": "$.items",
+              "count": 0
+            },
+            {
+              "on": "susp",
+              "status": 200
+            },
+            {
+              "on": "susp",
+              "json": "$.count",
+              "equals": 0
+            },
+            {
+              "on": "susp",
+              "json": "$.items",
+              "count": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-019 AC2: @Status filters OperationalStatus (02-cst-lists.sql:70) whose CHECK allows only PLANNED/OPEN/COMPLETE/CANCELLED (db/tables/40-cst/04-Job.sql:5-12), so the page values CLOSED and SUSPENDED match nothing.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-020",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-020-AC1",
+          "ac": 1,
+          "title": "ENQUIRE CST27000 with sub-jobs: budgets 56500/48000, actual 32345, accrued 1640, committed 4380, one REVENUE line",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_enquireCostJob",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.approvedBudget",
+              "equals": 56500
+            },
+            {
+              "on": "r",
+              "json": "$.data.originalBudget",
+              "equals": 48000
+            },
+            {
+              "on": "r",
+              "json": "$.data.actualGbp",
+              "equals": 32345
+            },
+            {
+              "on": "r",
+              "json": "$.data.accruedGbp",
+              "equals": 1640
+            },
+            {
+              "on": "r",
+              "json": "$.data.committedGbp",
+              "equals": 4380
+            },
+            {
+              "on": "r",
+              "json": "$.data.revenueGbp",
+              "equals": 38000
+            },
+            {
+              "on": "r",
+              "json": "$.data.subjobCount",
+              "equals": 2
+            },
+            {
+              "on": "r",
+              "json": "$.data.wipGbp",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines",
+              "count": 1
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].element",
+              "equals": "REVENUE"
+            },
+            {
+              "on": "r",
+              "json": "$.data.lines[0].actual",
+              "equals": -38000
+            }
+          ],
+          "derivation": "FR-STERP-CST-020 AC1 and the cst_enquireCostJob demo example: JOBCOST 4000-4400 totals with sub-jobs, budgets of the job only and own-job element lines (cobol/online/cst/JOBCOST.cob:571-756) over db/seed/94-cst-demo.sql:62-117.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-020-AC2",
+          "ac": 2,
+          "title": "ENQUIRE CST27000 without sub-jobs: actualGbp 0.00 (only the job's own transactions)",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_enquireCostJob",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "includeSubJobs": "N"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.actualGbp",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.committedGbp",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.revenueGbp",
+              "equals": 38000
+            }
+          ],
+          "derivation": "FR-STERP-CST-020 AC2: JC-INCLUDE-SUBJOBS N restricts the 4100 totals to CST27000 whose only transaction is the REVENUE invoice SI270331 (db/seed/94-cst-demo.sql:109; JOBCOST.cob:612-660).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-020-AC3",
+          "ac": 3,
+          "title": "ENQUIRE of an unknown job answers 404 CST0802",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_enquireCostJob",
+              "path": {
+                "jobRef": "NOSUCHJOB"
+              },
+              "body": {
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "CST0802",
+                "returnCode": 16,
+                "detailContains": "Job NOSUCHJOB was not found in this company"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-020 AC3 with the RC 16 CST0802 text 'Job <ref> was not found in this company' (cobol/online/cst/JOBCOST.cob:974-978) mapped to 404 (contracts 4.6).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-021",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-021-AC1",
+          "ac": 1,
+          "title": "FORECAST CST27000: EAC 38365.00, variance -18135.00 favourable, two sub-jobs",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_forecastCostJob",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.approvedBudget",
+              "equals": 56500
+            },
+            {
+              "on": "r",
+              "json": "$.data.actualGbp",
+              "equals": 32345
+            },
+            {
+              "on": "r",
+              "json": "$.data.committedGbp",
+              "equals": 4380
+            },
+            {
+              "on": "r",
+              "json": "$.data.accruedGbp",
+              "equals": 1640
+            },
+            {
+              "on": "r",
+              "json": "$.data.etcGbp",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.eacGbp",
+              "equals": 38365
+            },
+            {
+              "on": "r",
+              "json": "$.data.fcstVarGbp",
+              "equals": -18135
+            },
+            {
+              "on": "r",
+              "json": "$.data.fcstAdverse",
+              "equals": "N"
+            },
+            {
+              "on": "r",
+              "json": "$.data.subjobCount",
+              "equals": 2
+            }
+          ],
+          "derivation": "FR-STERP-CST-021 AC1 and the cst_forecastCostJob demo example (docs/DEMO-WORKFLOWS.md:77): EAC = actual + accrued + committed + estimate, variance = EAC - approved budget (cobol/online/cst/JOBCOST.cob:758-786) over db/seed/94-cst-demo.sql:62-117.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-021-AC2",
+          "ac": 2,
+          "title": "Job without approved or original budget: 200 WARNING with the legacy 'No approved budget' warning",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "sql": "UPDATE cst.JobBudget SET IsOriginal = 0, Status = 'DRAFT' WHERE CompanyCode = 'STC' AND JobRef = 'CST27100'"
+            },
+            {
+              "save": "r",
+              "call": "cst_forecastCostJob",
+              "path": {
+                "jobRef": "CST27100"
+              },
+              "body": {
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.approvedBudget",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.warning",
+              "equals": "No approved budget - the variance is the whole"
+            }
+          ],
+          "derivation": "FR-STERP-CST-021 AC2: approved budget 0 sets the literal 'No approved budget - the variance is the whole ' (emitted right-trimmed) with RC 04 (cobol/online/cst/JOBCOST.cob:776-780) for CST27100 whose only budget (db/seed/94-cst-demo.sql:63-67) is arranged to DRAFT, not original.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-022",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-022-AC1",
+          "ac": 1,
+          "title": "WIP CALC CST27000 2026/07: opening = closing = residual 33985.00, residual held, balanced",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "fiscalYear": 2026,
+                "periodNo": 7,
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.openingGbp",
+              "equals": 33985
+            },
+            {
+              "on": "r",
+              "json": "$.data.closingGbp",
+              "equals": 33985
+            },
+            {
+              "on": "r",
+              "json": "$.data.residualGbp",
+              "equals": 33985
+            },
+            {
+              "on": "r",
+              "json": "$.data.hasResidual",
+              "equals": "Y"
+            },
+            {
+              "on": "r",
+              "json": "$.data.balanced",
+              "equals": "Y"
+            }
+          ],
+          "derivation": "FR-STERP-CST-022 AC1 and the cst_calculateCostJobWip demo example: opening = latest WipBalance closing before 2026/07 (2026/03 = 33985.00, db/seed/94-cst-demo.sql:120-135), no 2026/07 movements, residual = closing (cobol/online/cst/WIPCALC.cob:177-300).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-022-AC2",
+          "ac": 2,
+          "title": "includeSubJobs Y and N give identical figures (sub-job movements of 2026/02 never included)",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "y",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "fiscalYear": 2026,
+                "periodNo": 2,
+                "includeSubJobs": "Y"
+              }
+            },
+            {
+              "save": "n",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "fiscalYear": 2026,
+                "periodNo": 2,
+                "includeSubJobs": "N"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "y",
+              "status": 200
+            },
+            {
+              "on": "y",
+              "json": "$.data.openingGbp",
+              "equals": 0
+            },
+            {
+              "on": "y",
+              "json": "$.data.additionsGbp",
+              "equals": 0
+            },
+            {
+              "on": "y",
+              "json": "$.data.closingGbp",
+              "equals": 0
+            },
+            {
+              "on": "y",
+              "json": "$.data.txnCount",
+              "equals": 0
+            },
+            {
+              "on": "n",
+              "status": 200
+            },
+            {
+              "on": "n",
+              "json": "$.data.openingGbp",
+              "equals": 0
+            },
+            {
+              "on": "n",
+              "json": "$.data.additionsGbp",
+              "equals": 0
+            },
+            {
+              "on": "n",
+              "json": "$.data.closingGbp",
+              "equals": 0
+            },
+            {
+              "on": "n",
+              "json": "$.data.txnCount",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-022 AC2 (SME-818): WIPCALC buckets only the job's own approved ACTUAL/ACCRUED rows and ignores WC-INCLUDE-SUBJOBS (WIPCALC.cob:257-300), so the 2026/02 movements of CST27001/CST27002 (db/seed/94-cst-demo.sql:101-107) never count for CST27000.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-022-AC3",
+          "ac": 3,
+          "title": "No period and a business date outside every fin.Period row: 422 CST0903",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2030-01-15"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0903",
+                "returnCode": 8,
+                "detailContains": "A fiscal year and period are required"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-022 AC3: the session period is the fin.Period row containing the business date (LoginService.vb:161-180; periods 2025-04-01..2028-03-31, db/seed/09-fin-period-vat.sql:8-31), none for 2030-01-15 -> 0/0 -> CST0903 (cobol/online/cst/WIPCALC.cob:133-137).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-022-EDGE-YEAR-PERIOD-HIGH-ORDER",
+          "ac": null,
+          "title": "Numeric magnitude: fiscal year 12026 and period 107 keep their low-order digits (2026/07)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-magnitude"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "fiscalYear": 12026,
+                "periodNo": 107,
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.fiscalYear",
+              "equals": 2026
+            },
+            {
+              "on": "r",
+              "json": "$.data.periodNo",
+              "equals": 7
+            },
+            {
+              "on": "r",
+              "json": "$.data.openingGbp",
+              "equals": 33985
+            },
+            {
+              "on": "r",
+              "json": "$.data.closingGbp",
+              "equals": 33985
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-too-large rule (high-order truncation, dotnet/STERP.CobolInterop/CobolCodec.cs:76-79) into WC-FISCAL-YEAR PIC 9(4) and WC-PERIOD-NO PIC 9(2) (cobol/copy/WIPCALCCA.cpy), giving the 2026/07 roll-forward of db/seed/94-cst-demo.sql:120-135.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-022-EDGE-UNSIGNED-YEAR-PERIOD",
+          "ac": null,
+          "title": "Unsigned: fiscal year -2026 and period -7 are stored as their absolute values (2026/07)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "unsigned"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "fiscalYear": -2026,
+                "periodNo": -7,
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.fiscalYear",
+              "equals": 2026
+            },
+            {
+              "on": "r",
+              "json": "$.data.periodNo",
+              "equals": 7
+            },
+            {
+              "on": "r",
+              "json": "$.data.openingGbp",
+              "equals": 33985
+            },
+            {
+              "on": "r",
+              "json": "$.data.closingGbp",
+              "equals": 33985
+            }
+          ],
+          "derivation": "Contracts 4.4 unsigned rule (absolute value, dotnet/STERP.CobolInterop/CobolCodec.cs:71-86) for the unsigned WC-FISCAL-YEAR PIC 9(4) and WC-PERIOD-NO PIC 9(2) (cobol/copy/WIPCALCCA.cpy).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-022-EDGE-SESSION-PERIOD-BOUNDARY",
+          "ac": null,
+          "title": "Date boundary: business date 2026-09-30 resolves period 2026/06 and 2026-10-01 resolves 2026/07",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "p6",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "headers": {
+                "X-STERP-Business-Date": "2026-09-30"
+              },
+              "body": {
+                "includeSubJobs": "Y"
+              }
+            },
+            {
+              "save": "p7",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "headers": {
+                "X-STERP-Business-Date": "2026-10-01"
+              },
+              "body": {
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "p6",
+              "status": 200
+            },
+            {
+              "on": "p6",
+              "json": "$.data.fiscalYear",
+              "equals": 2026
+            },
+            {
+              "on": "p6",
+              "json": "$.data.periodNo",
+              "equals": 6
+            },
+            {
+              "on": "p7",
+              "status": 200
+            },
+            {
+              "on": "p7",
+              "json": "$.data.fiscalYear",
+              "equals": 2026
+            },
+            {
+              "on": "p7",
+              "json": "$.data.periodNo",
+              "equals": 7
+            }
+          ],
+          "derivation": "D-CST-09 session period: fin.Period row with the business date BETWEEN StartDate AND EndDate (LoginService.vb:161-180) for the April-start periods of db/seed/09-fin-period-vat.sql:15-19 (P6 = September, P7 = October 2026).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-030",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-030-AC1",
+          "ac": 1,
+          "title": "Item Cost Enquiry opened from the menu shows the prompt and loads nothing",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Costing",
+                    "Item Cost Enquiry..."
+                  ]
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "title": "Item Cost Enquiry"
+            },
+            {
+              "on": "page",
+              "text": "Enter an item code and press Refresh (F5)."
+            },
+            {
+              "on": "page",
+              "notText": "basis row(s)"
+            }
+          ],
+          "derivation": "FR-STERP-CST-030 AC1: a blank item sets the prompt and calls nothing (dotnet/STERP.Desktop/Forms/Costing/frmCostEnquiry.vb:30-35) on the page opened by menu row CST.ENQUIRY (db/seed/41-cst-menu.sql:22).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-030-AC2",
+          "ac": 2,
+          "title": "Item bar-al6082-25mm and F5 loads the upper-cased item's basis rows with the stated-basis status, cue OK",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/cst/cost-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "bar-al6082-25mm"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "text": "basis row(s)."
+            },
+            {
+              "on": "page",
+              "text": "A basis is stated, never substituted."
+            },
+            {
+              "on": "page",
+              "text": "BAR-AL6082-25MM"
+            },
+            {
+              "on": "page",
+              "notText": "WARNING"
+            }
+          ],
+          "derivation": "FR-STERP-CST-030 AC2: item trimmed and upper-cased before cst_getItemCostBases and status '<n> basis row(s).  A basis is stated, never substituted.' with cue OK when rows exist (frmCostEnquiry.vb:36-42) for the pools of db/seed/94-cst-demo.sql:196-210.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-030-AC3",
+          "ac": 3,
+          "title": "Unknown item shows 0 basis row(s) with the WARNING cue",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/cst/cost-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NO-SUCH-ITEM"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "text": "0 basis row(s)."
+            },
+            {
+              "on": "page",
+              "text": "WARNING"
+            }
+          ],
+          "derivation": "FR-STERP-CST-030 AC3: zero rows give '0 basis row(s).  A basis is stated, never substituted.' with cue '!  WARNING' (dotnet/STERP.Desktop/Forms/Costing/frmCostEnquiry.vb:40-41).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-031",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-031-AC1",
+          "ac": 1,
+          "title": "Cost Sets: compare FY2027STD with FY2026STD, Impact on the remembered set, cancelled confirmations call nothing",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "cmp",
+              "gui": "/cst/cost-set",
+              "actions": [
+                {
+                  "click": "FY2027STD"
+                },
+                {
+                  "fill": {
+                    "label": "Compare with",
+                    "value": "FY2026STD"
+                  }
+                },
+                {
+                  "click": "Compare"
+                }
+              ]
+            },
+            {
+              "save": "imp",
+              "gui": "/cst/cost-set",
+              "actions": [
+                {
+                  "click": "FY2027STD"
+                },
+                {
+                  "fill": {
+                    "label": "Compare with",
+                    "value": "FY2026STD"
+                  }
+                },
+                {
+                  "click": "Compare"
+                },
+                {
+                  "click": "Impact"
+                }
+              ]
+            },
+            {
+              "save": "cancel",
+              "gui": "/cst/cost-set",
+              "actions": [
+                {
+                  "click": "FY2027STD"
+                },
+                {
+                  "click": "Approve (F10)"
+                },
+                {
+                  "click": "No"
+                },
+                {
+                  "click": "Activate"
+                },
+                {
+                  "click": "No"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cmp",
+              "text": "Compared FY2027STD with FY2026STD:"
+            },
+            {
+              "on": "cmp",
+              "text": "Press F5 for the set list."
+            },
+            {
+              "on": "cmp",
+              "text": "New item in this set"
+            },
+            {
+              "on": "imp",
+              "text": "Impact FY2027STD: status REVIEW, prepared by KWATSON, approved by -, 7 item(s), revaluation £7,274.38"
+            },
+            {
+              "on": "imp",
+              "text": "No stock has been revalued - this is a preview"
+            },
+            {
+              "on": "imp",
+              "text": "WARNING"
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "REVIEW"
+            },
+            {
+              "sql": "SELECT ApprovedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": null
+            }
+          ],
+          "derivation": "FR-STERP-CST-031 AC1 (demo workflow 2 step 8, docs/DEMO-WORKFLOWS.md:76): Compare/Act/Chosen and the confirmations of dotnet/STERP.Desktop/Forms/Costing/frmCostSet.vb:61-138 with Fmt.Money (dotnet/STERP.Common/Fmt.cs:57); impact figures are orientation until the legacy oracle confirms them (U-CST-02). Legacy oracle (U-CST-02): the STDCOST IMPACT statement (STDCOST.cob:429-437) executed verbatim on the restored democ returns 7 items and 7274.3800 (SC-REVAL-GBP PIC S9(13)V99 -> 7274.38), FY2027STD REVIEW/KWATSON/approver NULL; status text frmCostSet.vb:118-124 with Fmt.Money -> '£7,274.38'. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-011: orientation figure 16,094.69 replaced by the legacy-oracle value 7,274.38 (binding-advisory U-CST-02)]",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-031-EDGE-DEMO-JOURNEY",
+          "ac": null,
+          "title": "Demo workflow 2 steps 8-9 via API: compare and impact FY2027STD without posting, then CST27000 forecast",
+          "layer": "e2e",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "sets",
+              "call": "cst_listCostSets",
+              "query": {
+                "status": "REVIEW"
+              }
+            },
+            {
+              "save": "cmp",
+              "call": "cst_compareCostSets",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {
+                "compareTo": "FY2026STD"
+              }
+            },
+            {
+              "save": "imp",
+              "call": "cst_previewCostSetImpact",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {}
+            },
+            {
+              "save": "jobs",
+              "call": "cst_listCostJobs",
+              "query": {
+                "jobRef": "CST27000"
+              }
+            },
+            {
+              "save": "fc",
+              "call": "cst_forecastCostJob",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "includeSubJobs": "Y"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "sets",
+              "json": "$.items[0].costSet",
+              "equals": "FY2027STD"
+            },
+            {
+              "on": "sets",
+              "json": "$.items[0].status",
+              "equals": "REVIEW"
+            },
+            {
+              "on": "cmp",
+              "status": 200
+            },
+            {
+              "on": "cmp",
+              "json": "$.data.costSet",
+              "equals": "FY2027STD"
+            },
+            {
+              "on": "cmp",
+              "json": "$.data.compareSet",
+              "equals": "FY2026STD"
+            },
+            {
+              "on": "imp",
+              "outcome": {
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "imp",
+              "json": "$.data.costSet",
+              "equals": "FY2027STD"
+            },
+            {
+              "on": "imp",
+              "json": "$.data.status",
+              "equals": "REVIEW"
+            },
+            {
+              "on": "imp",
+              "json": "$.data.preparedBy",
+              "equals": "KWATSON"
+            },
+            {
+              "on": "imp",
+              "json": "$.data.approvedBy",
+              "equals": ""
+            },
+            {
+              "on": "imp",
+              "json": "$.data.itemCount",
+              "equals": 7
+            },
+            {
+              "on": "imp",
+              "json": "$.data.revalGbp",
+              "equals": 7274.38
+            },
+            {
+              "sql": "SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": "REVIEW"
+            },
+            {
+              "sql": "SELECT ApprovedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD'",
+              "equals": null
+            },
+            {
+              "on": "jobs",
+              "json": "$.count",
+              "equals": 3
+            },
+            {
+              "on": "fc",
+              "json": "$.data.approvedBudget",
+              "equals": 56500
+            },
+            {
+              "on": "fc",
+              "json": "$.data.actualGbp",
+              "equals": 32345
+            },
+            {
+              "on": "fc",
+              "json": "$.data.committedGbp",
+              "equals": 4380
+            },
+            {
+              "on": "fc",
+              "json": "$.data.eacGbp",
+              "equals": 38365
+            },
+            {
+              "on": "fc",
+              "json": "$.data.fcstVarGbp",
+              "equals": -18135
+            },
+            {
+              "on": "fc",
+              "json": "$.data.fcstAdverse",
+              "equals": "N"
+            },
+            {
+              "on": "fc",
+              "json": "$.data.subjobCount",
+              "equals": 2
+            }
+          ],
+          "derivation": "Binding demo journey of spec section 10 (docs/DEMO-WORKFLOWS.md:76-77, workflow 2 steps 8 and 9): Impact REVIEW, preparer KWATSON, no approver, seven items, 7,274.38 (legacy oracle on democ, U-CST-02); posting actions cancelled so FY2027STD stays REVIEW; CST27000 budget 56,500, actual 32,345, committed 4,380, EAC 38,365, 18,135 favourable. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-011: impact revaluation 16094.69 (DEMO-WORKFLOWS orientation) replaced by the legacy-oracle value 7274.38 of legacy run RG-003-RG-011-democ-legacy-route]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-032",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-032-AC1",
+          "ac": 1,
+          "title": "Roll-up of a >20-line tree shows every returned line and the zeroed totals with COMPLETE",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/cst/cost-rollup",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "FG-BIKE-COMMUTE-M"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Cost set",
+                    "value": "BOMDEMO"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Lot size",
+                    "value": "10"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "Boundary",
+                    "value": "EXPAND SUBASSEMBLY"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "text": "Material £0.00 | conversion £0.00 | overhead £0.00 | recovery £0.00 | total £0.00 | unit £0.00 | COMPLETE"
+            },
+            {
+              "on": "page",
+              "text": "FG-BIKE-COMMUTE-M"
+            },
+            {
+              "on": "page",
+              "text": "PKG-BOX-BIKE-COMPLETE"
+            }
+          ],
+          "derivation": "FR-STERP-CST-032 AC1 (legacy parity F-COSTROLL-01, BC-CST-01 rejected): RollupClicked binds all paged lines then formats the returned summary (dotnet/STERP.Desktop/Forms/Costing/frmCostRollup.vb:56-75) for the bike of db/seed/90-bom-showcase.sql:147,252-253.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-032-AC2",
+          "ac": 2,
+          "title": "HOLD CST0609 roll-up: empty grid, hold presentation, status line not rewritten with the cost summary",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "sql": "UPDATE bp SET RecoveryValue = 1000.000000 FROM bom.BomByProduct bp JOIN bom.BomHeader h ON h.BomHeaderId = bp.BomHeaderId WHERE h.CompanyCode = 'STC' AND h.BomRef = 'BOM-DEMO-OPT' AND h.BomRevision = 'A'"
+            },
+            {
+              "save": "page",
+              "gui": "/cst/cost-rollup",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "DEMO-OPT-TOP"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Cost set",
+                    "value": "BOMDEMO"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "Boundary",
+                    "value": "EXPAND SUBASSEMBLY"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "text": "The recovery credit drives the cost below zero - the controller must review it"
+            },
+            {
+              "on": "page",
+              "text": "## HOLD"
+            },
+            {
+              "on": "page",
+              "notText": "Material £"
+            },
+            {
+              "on": "page",
+              "notText": "DEMO-PIN"
+            }
+          ],
+          "derivation": "FR-STERP-CST-032 AC2: RC 06 makes ShowResult show the hold text with cue '## HOLD' and return False before the status is rewritten (dotnet/STERP.Desktop/BaseForm.vb:189-212; frmCostRollup.vb:62-64), with no lines on HOLD (CostingService.vb:229-230); recovery of BOM-DEMO-OPT raised as in FR-017 AC4.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-032-AC3",
+          "ac": 3,
+          "title": "Lot size 'abc' is sent as lot size 1 (B6 root: total and unit 0.56 for one unit)",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/cst/cost-rollup",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "DEMO-B6-ROOT"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Cost set",
+                    "value": "BOMDEMO"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Lot size",
+                    "value": "abc"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "Boundary",
+                    "value": "EXPAND SUBASSEMBLY"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "text": "Material £0.56 | conversion £0.00 | overhead £0.00 | recovery £0.00 | total £0.56 | unit £0.56 | COMPLETE"
+            }
+          ],
+          "derivation": "FR-STERP-CST-032 AC3: Lot() returns 1 when the text does not parse (frmCostRollup.vb:111-115); one DEMO-B6-ROOT needs 3 + 4 DEMO-B6-SCREW at 0.08 (db/seed/31-bom-structures.sql:101-104; 90-bom-demo.sql:31) = 0.56 with no conversion on the B6 bills.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-033",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-033-AC1",
+          "ac": 1,
+          "title": "Job Cost: CST27000 Forecast status (EAC 38,365.00, -18,135.00 favourable) and Elements status with 2 sub-jobs",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "fc",
+              "gui": "/cst/job-cost",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Job",
+                    "value": "CST27000"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Forecast"
+                }
+              ]
+            },
+            {
+              "save": "el",
+              "gui": "/cst/job-cost",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Job",
+                    "value": "CST27000"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Elements"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "fc",
+              "text": "CST27000 forecast: budget £56,500.00 | actual £32,345.00 | committed £4,380.00 | still to come £0.00 | estimate at completion £38,365.00 | variance -£18,135.00 favourable"
+            },
+            {
+              "on": "el",
+              "text": "CST27000 OPEN/OPEN | budget £56,500.00 | actual £32,345.00 | committed £4,380.00 | WIP £0.00 | 2 sub-job(s), 9 transaction(s)"
+            },
+            {
+              "on": "el",
+              "text": "REVENUE"
+            }
+          ],
+          "derivation": "FR-STERP-CST-033 AC1 (demo workflow 2 step 9, docs/DEMO-WORKFLOWS.md:77): ForecastClicked/ElementsClicked status texts with Fmt.Money (dotnet/STERP.Desktop/Forms/Costing/frmJobCost.vb:57-88) over db/seed/94-cst-demo.sql:45-117 (9 transactions with sub-jobs).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-033-AC2",
+          "ac": 2,
+          "title": "Work in Progress entry, F10 on CST27000 in 2026/07: opening equals closing 33,985.00, residual warning",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "wip",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Costing",
+                    "Work in Progress..."
+                  ]
+                },
+                {
+                  "fill": {
+                    "label": "Job",
+                    "value": "CST27000"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "wip",
+              "title": "Work in Progress"
+            },
+            {
+              "on": "wip",
+              "text": "CST27000 WIP 2026/07: opening £33,985.00 + additions £0.00 - deductions £0.00 = closing £33,985.00 (balanced) | residual £33,985.00 must be cleared before closure"
+            },
+            {
+              "on": "wip",
+              "text": "WARNING"
+            }
+          ],
+          "derivation": "FR-STERP-CST-033 AC2: WIP argument title and F10 = Work in progress (frmJobCost.vb:31-56), WipClicked status with Fmt.Period and cue '!  WARNING' for a residual (frmJobCost.vb:92-108) on session period 2026/07 (09-fin-period-vat.sql:15-23) and the 2026/03 balance of db/seed/94-cst-demo.sql:120-135.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-040",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-040-AC1",
+          "ac": 1,
+          "title": "CSTINVAL STC as at 20261031: BAR-AL6082-25MM allowance 650.00 with WRITE DOWN line, reconciled footing, exit 0",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstinvalRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "DETAIL": "SUMMARY",
+                "MODE": "ALL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "status": 202
+            },
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 0
+            },
+            {
+              "on": "run",
+              "spoolContains": "BAR-AL6082-25MM"
+            },
+            {
+              "on": "run",
+              "spoolContains": "650.00"
+            },
+            {
+              "on": "run",
+              "spoolContains": "WRITE DOWN"
+            },
+            {
+              "on": "run",
+              "spoolContains": "RECONCILIATION TO THE GENERAL LEDGER (CST-022)"
+            },
+            {
+              "on": "run",
+              "spoolContains": "RECONCILED - costing agrees to the ledger"
+            }
+          ],
+          "derivation": "FR-STERP-CST-040 AC1: pool, NRV and footing lines of cobol/batch/cst/CSTINVAL.cob:145-232,486-496,604-632 over db/seed/94-cst-demo.sql:196-210; the INVENTORY control is levelled at 2026-10-31 by the seed bridge (db/seed/98-demo-consistency.sql:84-136,269-293), so cst.usp_ValuationRecon reports Y and the exit code is 0.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-040-AC2",
+          "ac": 2,
+          "title": "CSTINVAL MODE=EXCEPTION lists only the written-down pool; MODE=PREVIEW lists as ALL (company pools)",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "exc",
+              "job": "cst_submitCstinvalRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "SITE": "*",
+                "MODE": "EXCEPTION"
+              }
+            },
+            {
+              "save": "prev",
+              "job": "cst_submitCstinvalRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "SITE": "*",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "exc",
+              "spoolContains": "BAR-AL6082-25MM"
+            },
+            {
+              "on": "exc",
+              "spoolContains": "Pools reported:        1"
+            },
+            {
+              "on": "prev",
+              "spoolContains": "BEARING-6802-2RS"
+            },
+            {
+              "on": "prev",
+              "spoolContains": "Pools reported:        4"
+            }
+          ],
+          "derivation": "FR-STERP-CST-040 AC2 (SME-858): EXCEPTION skips pools with allowance 0 and any other mode prints all (cobol/batch/cst/CSTINVAL.cob:497-502); the SITE=* filter (:426) keeps the four company pools of db/seed/94-cst-demo.sql:196-202, counted on the 'Pools reported:' footing (:189-191).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-040-AC3",
+          "ac": 3,
+          "title": "CSTINVAL DETAIL=LAYER prints the open FIFO layers of BAR-TI6AL4V-16MM and changes no business table",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstinvalRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "DETAIL": "LAYER"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 0
+            },
+            {
+              "on": "run",
+              "spoolContains": "BAR-TI6AL4V-16MM"
+            },
+            {
+              "on": "run",
+              "spoolContains": "GRN270318"
+            },
+            {
+              "on": "run",
+              "spoolContains": "GRN270506"
+            },
+            {
+              "on": "run",
+              "spoolContains": "GRN270611"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.CostLayer WHERE CompanyCode = 'STC' AND ItemCode = 'BAR-TI6AL4V-16MM' AND Revision = '' AND IsClosed = 0",
+              "equals": 3
+            },
+            {
+              "sql": "SELECT QtyOnHand FROM cst.ItemCost WHERE CompanyCode = 'STC' AND ItemCode = 'BAR-AL6082-25MM' AND SiteCode = '*'",
+              "equals": 260
+            }
+          ],
+          "derivation": "FR-STERP-CST-040 AC3: 1200-EMIT-LAYERS prints open layers by ReceiptDate, LayerSeq after each FIFO pool (cobol/batch/cst/CSTINVAL.cob:515-578) - the GRN270318/270506/270611 layers of db/seed/94-cst-demo.sql:212-224 (seed layers of 65-itm-partners-stock.sql:146-168 also print); the program writes no business data (spec 8.1).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-041",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-041-AC1",
+          "ac": 1,
+          "title": "CSTJOBPR JOB=CST27000: one contract block, CST27001 EAC 31727.00 over budget 31000.00 flagged, exit 0",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstjobprRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "JOB": "CST27000"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "status": 202
+            },
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 0
+            },
+            {
+              "on": "run",
+              "spoolContains": "Contract CST27000"
+            },
+            {
+              "on": "run",
+              "spoolContains": "CST27001"
+            },
+            {
+              "on": "run",
+              "spoolContains": "CST27002"
+            },
+            {
+              "on": "run",
+              "spoolContains": "31727.00"
+            },
+            {
+              "on": "run",
+              "spoolContains": "31000.00"
+            },
+            {
+              "on": "run",
+              "spoolContains": "*** forecast over budget"
+            }
+          ],
+          "derivation": "FR-STERP-CST-041 AC1: cst.usp_JobProfitability EAC = actual + committed + accrued (db/procs/cst/01-cst-enquiry.sql:118-179) printed per contract with the over-budget note (cobol/batch/cst/CSTJOBPR.cob:124-150,455-461) for CST27001 27347 + 4380 = 31727 > 31000 (db/seed/94-cst-demo.sql:62-108).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-041-AC2",
+          "ac": 2,
+          "title": "CSTJOBPR MODE=OVERSPEND prints only the job whose EAC exceeds a non-zero budget",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstjobprRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "JOB": "CST27000",
+                "MODE": "OVERSPEND"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 0
+            },
+            {
+              "on": "run",
+              "spoolContains": "CST27001"
+            },
+            {
+              "on": "run",
+              "spoolContains": "*** forecast over budget"
+            },
+            {
+              "on": "run",
+              "spoolContains": "Jobs reported:         1"
+            }
+          ],
+          "derivation": "FR-STERP-CST-041 AC2: OVERSPEND keeps rows with budget <> 0 and EAC > budget (cobol/batch/cst/CSTJOBPR.cob:489-512) - only CST27001 of the CST27000 contract (db/seed/94-cst-demo.sql:62-108) - counted on the 'Jobs reported:' footing (CSTJOBPR.cob:177-179).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-041-AC3",
+          "ac": 3,
+          "title": "CSTJOBPR whose procedure fails ends with exit 12, STERP-E-1001, spool still closed and announced",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT cst.JobCostTransaction (CompanyCode, JobRef, ElementCode, SourceModule, SourceDocType, SourceDocRef, Amount, AmountGBP, CostNature, RecognitionDate, FiscalYear, PeriodNo, Narrative, CreatedBy) VALUES ('STC', 'CST27100', 'REVENUE', 'AR', 'INVOICE', 'A07-REV-001', -0.01, -0.01, 'ACTUAL', '2026-06-30', 2026, 3, 'A07 injected margin percent overflow', 'A07')"
+            },
+            {
+              "save": "run",
+              "job": "cst_submitCstjobprRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "JOB": "CST27100"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 12
+            },
+            {
+              "on": "run",
+              "run": {
+                "messageContains": "STERP-E-1001"
+              }
+            },
+            {
+              "on": "run",
+              "run": {
+                "messageContains": "STERP-I-SPOOL"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-041 AC3: an EXEC failure sets RC 12 and STERP-E-1001 then the spool is closed and STERP-I-SPOOL shown (cobol/batch/cst/CSTJOBPR.cob:383-388,530-540); injected by a 0.01 revenue that overflows MarginPct decimal(9,4) in cst.usp_JobProfitability (01-cst-enquiry.sql:157-159).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-042",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-042-AC1",
+          "ac": 1,
+          "title": "CSTVARRP STC: seven variance rows by type, LANDED LC270620 flagged UNEXPLAINED, exit code 4",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstvarrpRun",
+              "path": {},
+              "body": {
+                "CO": "STC"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "status": 202
+            },
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 4
+            },
+            {
+              "on": "run",
+              "spoolContains": "LC270620"
+            },
+            {
+              "on": "run",
+              "spoolContains": "UNEXPLAINED"
+            },
+            {
+              "on": "run",
+              "spoolContains": "Variances reported:          7"
+            }
+          ],
+          "derivation": "FR-STERP-CST-042 AC1: rows without owner and disposal flagged UNEXPLAINED and RC 4 (cobol/batch/cst/CSTVARRP.cob:430-437,500-506) over the seven variances of db/seed/94-cst-demo.sql:140-159, counted on the 'Variances reported:' footing (:153-161).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-042-AC2",
+          "ac": 2,
+          "title": "CSTVARRP MODE=UNDISPOSED omits rows with a disposal (only LC270620 remains)",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstvarrpRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "UNDISPOSED"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 4
+            },
+            {
+              "on": "run",
+              "spoolContains": "LC270620"
+            },
+            {
+              "on": "run",
+              "spoolContains": "Variances reported:          1"
+            }
+          ],
+          "derivation": "FR-STERP-CST-042 AC2: UNDISPOSED skips rows whose disposal is not blank (cobol/batch/cst/CSTVARRP.cob:416-418); only the LANDED row of db/seed/94-cst-demo.sql:155 has none.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-043",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-043-AC1",
+          "ac": 1,
+          "title": "CSTSETCM FY2027STD defaults to FY2026STD: one line per band (2 over, 1 under, 1 new, 1 dropped), exit 0",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstsetcmRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "COSTSET": "FY2027STD"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "status": 202
+            },
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 0
+            },
+            {
+              "on": "run",
+              "spoolContains": "FY2027STD (REVIEW) against FY2026STD (ACTIVE)"
+            },
+            {
+              "on": "run",
+              "spoolContains": "CHANGE AT OR OVER THRESHOLD"
+            },
+            {
+              "on": "run",
+              "spoolContains": "CHANGE UNDER THRESHOLD"
+            },
+            {
+              "on": "run",
+              "spoolContains": "NOT IN THE PREVIOUS SET"
+            },
+            {
+              "on": "run",
+              "spoolContains": "DROPPED FROM THE PROPOSAL"
+            },
+            {
+              "on": "run",
+              "spoolContains": "BATTERY-36V-14AH"
+            },
+            {
+              "on": "run",
+              "spoolContains": "BB-SHELL-BSA68"
+            },
+            {
+              "on": "run",
+              "spoolContains": "over threshold:         2"
+            }
+          ],
+          "derivation": "FR-STERP-CST-043 AC1: COMPARETO falls back to ComparedToSetCode (cobol/batch/cst/CSTSETCM.cob:262-266), bands of :505-523 at the default 5 per cent and the subtitle of :388-392 over db/seed/94-cst-demo.sql:161-187 (8.00 and 9.35 per cent over, 1.00 under).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-043-AC2",
+          "ac": 2,
+          "title": "CSTSETCM without COSTSET ends with exit 12 and STERP-E-0151",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstsetcmRun",
+              "path": {},
+              "body": {
+                "CO": "STC"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "status": 202
+            },
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 12
+            },
+            {
+              "on": "run",
+              "run": {
+                "messageContains": "STERP-E-0151"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-043 AC2: validation after JOBLOG START refuses a blank COSTSET with RC 12 and 'STERP-E-0151 CST0401 COSTSET= is required' (cobol/batch/cst/CSTSETCM.cob:178-181,245-250).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-044",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-044-AC1",
+          "ac": 1,
+          "title": "CSTWIPRF CALC 202607 prints CST27000 33985.00 = 33985.00, rolls one job (U-CST-01), writes nothing, exit 0",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "report",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstwiprfRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "PERIOD": "202607",
+                "MODE": "CALC"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "status": 202
+            },
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 0
+            },
+            {
+              "on": "run",
+              "spoolContains": "CST27000"
+            },
+            {
+              "on": "run",
+              "spoolContains": "33985.00"
+            },
+            {
+              "on": "run",
+              "spoolContains": "Jobs rolled            1"
+            },
+            {
+              "on": "run",
+              "spoolContains": "With residual          1"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.WipBalance WHERE CompanyCode = 'STC' AND FiscalYear = 2026 AND PeriodNo = 7",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-044 AC1: first non-closed job in FinancialStatus, JobRef order and the U-CST-01 continuation rule (c/sterpsql.c:37,151-152; D-CST-10, BC-CST-04 rejected) with the CSTWIPRF footing (cobol/batch/cst/CSTWIPRF.cob:178-196) for the 2026/03 balance of db/seed/94-cst-demo.sql:120-135.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-CST-044-AC2",
+          "ac": 2,
+          "title": "CSTWIPRF MODE=POST 202607 JOB=CST27000 writes one cst.WipBalance row with closing 33985.00",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstwiprfRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "PERIOD": "202607",
+                "JOB": "CST27000",
+                "MODE": "POST"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.WipBalance WHERE CompanyCode = 'STC' AND FiscalYear = 2026 AND PeriodNo = 7 AND JobRef = 'CST27000'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT ClosingValueGBP FROM cst.WipBalance WHERE CompanyCode = 'STC' AND JobRef = 'CST27000' AND FiscalYear = 2026 AND PeriodNo = 7",
+              "equals": 33985
+            }
+          ],
+          "derivation": "FR-STERP-CST-044 AC2: POST runs WIPCALC POST (UPDATE else INSERT, autocommit) per job (cobol/online/cst/WIPCALC.cob:302-387; cobol/batch/cst/CSTWIPRF.cob:246-248) with closing = opening 33985.00 of db/seed/94-cst-demo.sql:120-135.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-CST-044-AC3",
+          "ac": 3,
+          "title": "CSTWIPRF with PERIOD blank: STERP-W-0151, every job refused with CST0903 text, no job lines, exit 0",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "cst_submitCstwiprfRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "MODE": "CALC"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "json": "$.run.execution.exitCode",
+              "equals": 0
+            },
+            {
+              "on": "run",
+              "run": {
+                "messageContains": "STERP-W-0151"
+              }
+            },
+            {
+              "on": "run",
+              "run": {
+                "messageContains": "STERP-W-1101"
+              }
+            },
+            {
+              "on": "run",
+              "run": {
+                "messageContains": "A fiscal year and period are required"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.WipBalance WHERE CompanyCode = 'STC' AND FiscalYear = 2026 AND PeriodNo = 7",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-044 AC3: blank PERIOD queries the absent core.FiscalPeriod (cobol/batch/cst/CSTWIPRF.cob:268-293, SME-832), year/period stay 0 so WIPCALC refuses CST0903 (WIPCALC.cob:133-137) and each job gives STERP-W-1101 (CSTWIPRF.cob:459-465) without lines; refusals keep RC 0.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-CST-044-AC4",
+          "ac": 4,
+          "title": "CSTWIPRF MODE=PREVIEW and lower-case post write nothing",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "prev",
+              "job": "cst_submitCstwiprfRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "PERIOD": "202607",
+                "JOB": "CST27000",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "lower",
+              "job": "cst_submitCstwiprfRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "PERIOD": "202607",
+                "JOB": "CST27000",
+                "MODE": "post"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "prev",
+              "status": 202
+            },
+            {
+              "on": "lower",
+              "status": 202
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.WipBalance WHERE CompanyCode = 'STC' AND FiscalYear = 2026 AND PeriodNo = 7",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-044 AC4 (F-CSTWIPRF-23): only the literal POST sets the write flag (cobol/batch/cst/CSTWIPRF.cob:246-248); PREVIEW and 'post' calculate only, so no 2026/07 cst.WipBalance row appears.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-050",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-050-AC1",
+          "ac": 1,
+          "title": "Costing > Work Centre Rates lists STC work centres with the seeded columns and retires a row via IsActive",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Costing",
+                    "Work Centre Rates..."
+                  ]
+                },
+                {
+                  "click": "ASSY-01"
+                },
+                {
+                  "click": "Retire"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "title": "Work centre rates"
+            },
+            {
+              "on": "page",
+              "text": "MACH-01"
+            },
+            {
+              "on": "page",
+              "text": "Normal hours"
+            },
+            {
+              "on": "page",
+              "text": "Setup rate"
+            },
+            {
+              "on": "page",
+              "notText": "ASSY-02"
+            },
+            {
+              "sql": "SELECT CAST(IsActive AS int) FROM cst.WorkCentre WHERE CompanyCode = 'STC' AND WorkCentreCode = 'ASSY-01'",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-050 AC1: MaintDef CST.RATES -> cst.WorkCentre, company scoped, RetireColumn IsActive and its 13 MaintColumn rows (db/seed/42-cst-eventmap.sql:110-118,135-188) through menu row CST.RATES (41-cst-menu.sql:25), RETIRE of core.usp_UiMaintSave (usp_UiMaintSave.sql:84-92); ASSY-02 belongs to BRS (40-cst-elements.sql:86-91).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-050-AC2",
+          "ac": 2,
+          "title": "Saving cost policy method LIFO is refused by CK_CstPol_M and nothing is written",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "save",
+              "call": "platform_saveMaintenanceRow",
+              "path": {
+                "maintCode": "CST.POLICY"
+              },
+              "body": {
+                "mode": "CHANGE",
+                "values": {
+                  "CompanyCode": "STC",
+                  "ValuationGroup": "PURCHASED",
+                  "EffectiveFrom": "2026-01-01",
+                  "CostMethod": "LIFO",
+                  "PoolBySite": "0",
+                  "PoolByRevision": "0",
+                  "IncludeLandedCost": "1"
+                }
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "save",
+              "bodyContains": "CK_CstPol_M"
+            },
+            {
+              "sql": "SELECT CostMethod FROM cst.CostPolicy WHERE CompanyCode = 'STC' AND ValuationGroup = 'PURCHASED' AND EffectiveFrom = '2026-01-01'",
+              "equals": "MWA"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM cst.CostPolicy WHERE CostMethod NOT IN ('MWA','FIFO','STD')",
+              "equals": 0
+            }
+          ],
+          "derivation": "FR-STERP-CST-050 AC2: CHECK CK_CstPol_M (CostMethod IN ('MWA','FIFO','STD'), db/tables/40-cst/01-CostElement.sql:11) refuses the update inside core.usp_UiMaintSave with XACT_ABORT ON (usp_UiMaintSave.sql:17,97-120), so the PURCHASED policy of db/seed/40-cst-elements.sql:54 keeps MWA.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-CST-060",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-060-AC1",
+          "ac": 1,
+          "title": "SQL failure inside STDCOST IMPACT answers 500 severe, returnCode 12, CST9001 with the driver message",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE cst.StandardCost SET TotalUnitCost = 9999999999999.000000 WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027STD' AND ItemCode = 'BATTERY-36V-14AH'; INSERT cst.ItemCost (CompanyCode, ItemCode, Revision, SiteCode, CostMethod, QtyOnHand, CarryingValueGBP, AverageUnitCost, LastUpdatedAt, LastUpdatedBy) SELECT TOP (300) 'STC', 'BATTERY-36V-14AH', '', 'Z' + RIGHT('000' + CAST(ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS varchar(3)), 3), 'FIFO', 9999999999999.000000, 0.00, 0.000000, SYSDATETIME(), 'A07' FROM sys.all_objects"
+            },
+            {
+              "save": "r",
+              "call": "cst_previewCostSetImpact",
+              "path": {
+                "costSet": "FY2027STD"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 500,
+                "type": "severe",
+                "reasonCode": "CST9001",
+                "returnCode": 12,
+                "detailContains": "Arithmetic overflow"
+              }
+            }
+          ],
+          "derivation": "FR-STERP-CST-060 AC1: an SQL error becomes RC 12, CST9001 and the driver message (cobol/online/cst/STDCOST.cob:660-666) mapped to 500 severe (contracts 4.6); injected by 300 maximal pools whose IMPACT SUM (STDCOST.cob:429-436) overflows decimal(38,10); text compared after driver-prefix normalization (spec 10).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-CST-060-AC2",
+          "ac": 2,
+          "title": "Two refusal conditions (lot -1 and boundary X): only the first in coded order, CST0602, is reported",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "cst_rollUpItemCost",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": -1,
+                "boundary": "X"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "CST0602",
+                "returnCode": 8,
+                "detailContains": "The costing lot size must be positive"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.messageCount",
+              "equals": 1
+            }
+          ],
+          "derivation": "FR-STERP-CST-060 AC2: COSTROLL 0200 checks CST0601, CST0602 then CST0606 and leaves at the first refusal with CA-MSG-COUNT 1 (cobol/online/cst/COSTROLL.cob:119-143, 9000-REJECT).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-CST-060-AC3",
+          "ac": 3,
+          "title": "Input with extra decimals is rounded half away from zero (780.0000005 -> 780.000001); results truncated without ROUNDED",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "COSTACC",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-01"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT inv.Item (CompanyCode, ItemCode, Description, ItemClass, StockUomCode, CreatedBy) VALUES ('STC', 'A07-SCALE-ITEM', 'A07 scale test item', 'BOUGHT', 'EA', 'A07'); INSERT cst.ItemCost (CompanyCode, ItemCode, Revision, SiteCode, CostMethod, QtyOnHand, CarryingValueGBP, AverageUnitCost, LastUpdatedAt, LastUpdatedBy) VALUES ('STC', 'A07-SCALE-ITEM', '', '*', 'MWA', 3.000000, 0.00, 0.000000, SYSDATETIME(), 'A07'); INSERT cst.StandardCost (CompanyCode, CostSetCode, ItemCode, Revision, CostingLotSize, TotalUnitCost, Completeness) VALUES ('STC', 'FY2027DRAFT', 'A07-SCALE-ITEM', '', 1, 0.333333, 'COMPLETE')"
+            },
+            {
+              "save": "imp",
+              "call": "cst_previewCostSetImpact",
+              "path": {
+                "costSet": "FY2027DRAFT"
+              },
+              "body": {}
+            },
+            {
+              "save": "wi",
+              "call": "cst_runWhatIf",
+              "path": {
+                "itemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "costSet": "BOMDEMO",
+                "lotSize": 10,
+                "targetPrice": 780.0000005,
+                "materialFactor": 1,
+                "rateFactor": 1
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "imp",
+              "status": 200
+            },
+            {
+              "on": "imp",
+              "json": "$.data.itemCount",
+              "equals": 1
+            },
+            {
+              "on": "imp",
+              "json": "$.data.revalGbp",
+              "equals": 0.99
+            },
+            {
+              "on": "wi",
+              "status": 200
+            },
+            {
+              "on": "wi",
+              "json": "$.data.targetPrice",
+              "equals": 780.000001
+            }
+          ],
+          "derivation": "FR-STERP-CST-060 AC3 with contracts 4.4/7.1: WI-TARGET-PRICE PIC S9(11)V9(6) rounds half away from zero (dotnet/STERP.CobolInterop/CobolCodec.cs:24-29) and SC-REVAL-GBP takes 3 x 0.333333 = 0.999999 by MOVE without ROUNDED (cobol/online/cst/STDCOST.cob:448) = 0.99. Observed in legacy run RG-010-CST-060-AC3-freshc-legacy-route (IMPACT 1 item 0.99; WHATIF WI-TARGET-PRICE 780.000001). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-010: arrangement made FK-consistent: the inv.Item row is inserted first (FK_ItemCost_Item, db/tables/99-fk/01-ForeignKeys.sql:35)]",
+          "confidence": "observed"
+        }
+      ]
+    }
+  ]
+}

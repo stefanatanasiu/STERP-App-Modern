@@ -1,0 +1,92 @@
+@using System.Text.Json.Nodes
+@using Sterp.Web.Framework.Format
+@* A legacy DataGridView with MultiSelect = True (frmBankRecon.Side): GridHelper style, full-row selection, a plain click
+   selects one row, Ctrl+click adds or removes rows, Shift+click selects a range; arrows move the current row. StGrid of the
+   framework selects a single row only, so the reconciliation grids use this page-library grid. *@
+<div class="st-gridbox st-sunken" id="@Id" style="@Style">
+    <table class="st-grid" role="grid" aria-multiselectable="true" aria-rowcount="@(Data.Count + 1)" tabindex="0" style="user-select:none" @onkeydown="OnKeyDown">
+        <thead>
+            <tr role="row">
+                <th class="st-rowhead" role="columnheader"><span class="st-sr">Row</span></th>
+                @for (var c = 0; c < _visible.Count; c++)
+                {
+                    var col = _visible[c];
+                    var last = c == _visible.Count - 1;
+                    <th role="columnheader" class="@(last ? "st-fill" : null)">@col.Caption</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @for (var r = 0; r < Data.Rows.Count; r++)
+            {
+                var index = r;
+                var row = Data.Rows[r];
+                var selected = Selection.Contains(index);
+                <tr role="row" @key="index" class="@(selected ? "st-sel" : null)" aria-selected="@(selected ? "true" : "false")" id="@($"{Id}-r{index}")"
+                    @onclick="e => ClickAsync(index, e)">
+                    <td class="st-rowhead" role="rowheader"></td>
+                    @for (var c = 0; c < _visible.Count; c++)
+                    {
+                        var col = _visible[c];
+                        var last = c == _visible.Count - 1;
+                        if (string.Equals(col.Kind, "BOOL", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var flag = row[col.Name] is JsonValue v && v.TryGetValue<bool>(out var b) && b;
+                            <td role="gridcell" class="st-c @(last ? "st-fill" : null)"><input type="checkbox" checked="@flag" disabled tabindex="-1" /></td>
+                        }
+                        else
+                        {
+                            <td role="gridcell" class="@UkFormat.Alignment(col.Kind) @(last ? "st-fill" : null)">@Data.Cell(row, col)</td>
+                        }
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (Data.Rows.Count == 0)
+    {
+        <div class="st-empty">(no records - press F5 to refresh)</div>
+    }
+</div>
+
+@code {
+    private List<GridColumn> _visible = [];
+
+    [Parameter, EditorRequired] public GridData Data { get; set; } = GridData.Empty;
+
+    [Parameter, EditorRequired] public MultiSelection Selection { get; set; } = new();
+
+    [Parameter] public EventCallback SelectionChanged { get; set; }
+
+    [Parameter] public string Id { get; set; } = "grid-" + Guid.NewGuid().ToString("N")[..8];
+
+    [Parameter] public string? Style { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _visible = Data.Columns.Where(c => c.Visible).ToList();
+    }
+
+    private Task ClickAsync(int index, MouseEventArgs e)
+    {
+        Selection.Click(index, e.CtrlKey || e.MetaKey, e.ShiftKey);
+        return SelectionChanged.InvokeAsync();
+    }
+
+    private Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (Data.Rows.Count == 0) return Task.CompletedTask;
+        var current = Selection.Current;
+        var next = e.Key switch
+        {
+            "ArrowDown" => Math.Min(Data.Rows.Count - 1, current + 1),
+            "ArrowUp" => Math.Max(0, current - 1),
+            "Home" when e.CtrlKey => 0,
+            "End" when e.CtrlKey => Data.Rows.Count - 1,
+            _ => current,
+        };
+        if (next == current || next < 0) return Task.CompletedTask;
+        Selection.Click(next, false, e.ShiftKey);
+        return SelectionChanged.InvokeAsync();
+    }
+}

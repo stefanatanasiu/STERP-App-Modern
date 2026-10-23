@@ -1,0 +1,25 @@
+# bom-gaps
+ok 1 - a zero quantity basis is refused -- REQ: BOM-001  AC: AC-085
+ok 2 - a negative quantity basis is refused -- REQ: BOM-001
+ok 3 - a zero yield is refused -- REQ: BOM-001  AC: AC-085
+ok 4 - a yield above one is refused -- REQ: BOM-001
+ok 5 - a zero production quantum is refused -- REQ: BOM-001
+ok 6 - an effectivity that ends where it starts is refused -- REQ: BOM-001
+ok 7 - a purpose outside standard, job and order is refused -- REQ: BOM-001
+ok 8 - a reference and revision identify one definition -- REQ: BOM-001
+ok 9 - the header states its purpose, basis, yield and effective scope -- REQ: BOM-001
+ok 10 - a released revision is reported as frozen -- REQ: BOM-001
+ok 11 - the copy records what it came from, who made it and what for -- REQ: BOM-022  AC: AC-094
+ok 12 - the copy inherits no reviewer, release or validation of the source -- REQ: BOM-022  AC: AC-094
+ok 13 - what was left out is counted and written down, not assumed -- REQ: BOM-022
+ok 14 - only a governed derivation type may be recorded -- REQ: BOM-022
+ok 15 - A to B reports three differences and not the renumbered line -- REQ: BOM-025  AC: AC-094
+ok 16 - a line that only moved in the sequence is not a material change -- REQ: BOM-025  AC: AC-094
+ok 17 - a changed quantity is named as a quantity change of two -- REQ: BOM-025
+ok 18 - the calculated cost impact of the change is 5.00 -- REQ: BOM-025
+ok 19 - a dropped component is removed and a new one is added -- REQ: BOM-025
+ok 20 - a bill that was only renumbered produces no differences -- REQ: BOM-025  AC: AC-094
+ok 21 - asked for them, the renumbered lines are listed as unchanged -- REQ: BOM-025
+ok 22 - quantities are compared per nominal basis, not as written -- REQ: BOM-025
+ok 23 - comparing a revision with itself is refused -- REQ: BOM-025
+# bom-gaps done

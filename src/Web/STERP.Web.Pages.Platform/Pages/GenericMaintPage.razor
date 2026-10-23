@@ -1,0 +1,326 @@
+@inherits StPage
+@* frmGenericMaint (page:platform/generic-maintenance, FR-STERP-PLATFORM-042): metadata-driven maintenance of a core.MaintDef
+   definition - title '<Title>  [<MaintCode>]', Find box, list grid, edit panel of IsInEdit columns in columns of eight;
+   New, Save (F10), Retire, Find (F2), Refresh (F5), Close (F3). Add, change and retire only (COM-013). *@
+<div class="st-page">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="New" Glyph="NEW" OnClick="NewClicked" />
+        <StToolButton Text="Save (F10)" Glyph="SAVE" OnClick="OnConfirmAsync" />
+        <StToolButton Text="Retire" Glyph="RETIRE" OnClick="RetireAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Find (F2)" Glyph="FIND" OnClick="FindClicked" />
+        <StToolButton Text="Refresh (F5)" Glyph="REFRESH" OnClick="LoadListAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <div class="st-filters" style="flex-wrap:nowrap" data-sterp-field="$find">
+        <label for="@Uid("find")"><u>F</u>ind:</label>
+        <input id="@Uid("find")" class="st-input" style="width:180px" aria-label="Find" value="@_search" @oninput="e => _search = e.Value?.ToString() ?? string.Empty" />
+        <button type="button" class="st-button" style="min-width:70px; height:22px" @onclick="LoadListAsync"><u>S</u>earch</button>
+        <span class="st-help">@_help</span>
+    </div>
+    <StGrid Id="@Uid("grid")" Data="_data" Selected="_selected" SelectedChanged="RowSelected" Label="@Window.Title" />
+    <fieldset class="st-sunken" disabled="@(!_editEnabled)" style="height:180px; overflow:auto; margin:4px 0 0; padding:4px 8px; min-inline-size:0; border-width:1px">
+        <legend class="st-sr">Record</legend>
+        <div style="display:grid; grid-auto-flow:column; grid-template-rows:repeat(8, 25px); grid-auto-columns:390px; column-gap:0">
+            @foreach (var ed in _editors)
+            {
+                var e = ed;
+                var id = Uid("e-" + e.Column);
+                <div style="display:flex; align-items:center; gap:4px" data-sterp-field="@e.Column">
+                    <label for="@id" style="width:118px; flex:0 0 118px; overflow:hidden; white-space:nowrap">@(e.Caption):</label>
+                    @switch (e.DataType)
+                    {
+                        case "BOOL":
+                            <input type="checkbox" id="@id" aria-label="@e.Caption" checked="@(e.Value == "1")" disabled="@(!e.Enabled(_mode))"
+                                   @onchange="ch => SetBool(e, ch)" />
+                            break;
+                        case "DATE":
+                            <input type="checkbox" title="@($"{e.Caption} has a value")" checked="@e.HasDate" disabled="@(!e.Enabled(_mode))"
+                                   @onchange="ch => e.HasDate = ch.Value is true" />
+                            <input id="@id" class="st-input" style="width:84px" aria-label="@e.Caption" value="@e.Value" disabled="@(!e.Enabled(_mode) || !e.HasDate)"
+                                   @oninput="v => e.Value = v.Value?.ToString() ?? string.Empty" />
+                            break;
+                        default:
+                            <input id="@id" class="st-input @(e.RightAligned ? "st-right" : null)" style="width:@(e.Width)px" aria-label="@e.Caption" value="@e.Value"
+                                   maxlength="@(e.MaxLength > 0 ? e.MaxLength : null)" disabled="@(!e.Enabled(_mode))" autocomplete="off" spellcheck="false"
+                                   @oninput="v => e.Value = v.Value?.ToString() ?? string.Empty" />
+                            if (e.LookupCode.Length > 0)
+                            {
+                                <button type="button" class="st-button st-small" style="height:21px" title="@($"Lookup - {e.Caption}")" @onclick="() => LookupAsync(e)">F2</button>
+                            }
+                            break;
+                    }
+                </div>
+            }
+        </div>
+    </fieldset>
+</div>
+
+@code {
+    private sealed class Editor
+    {
+        public string Column { get; init; } = "";
+        public string Caption { get; init; } = "";
+        public string DataType { get; init; } = "TEXT";
+        public bool IsKey { get; init; }
+        public bool IsRequired { get; init; }
+        public bool IsReadOnly { get; init; }
+        public int MaxLength { get; init; }
+        public string LookupProc { get; init; } = "";
+        public string LookupCode { get; init; } = "";
+        public string DefaultValue { get; init; } = "";
+        public string Value { get; set; } = "";
+        public bool HasDate { get; set; }
+
+        public int Width => DataType == "TEXT" ? 200 : 120;
+
+        public bool RightAligned => DataType is not ("TEXT" or "CODE");
+
+        /// <summary>frmGenericMaint.SetEditEnabled: read-only never, keys only when adding.</summary>
+        public bool Enabled(string mode) => !IsReadOnly && (!IsKey || mode == "ADD");
+    }
+
+    private JsonObject? _definition;
+    private JsonArray _columns = [];
+    private List<Editor> _editors = [];
+    private GridData _data = GridData.Empty;
+    private int _selected = -1;
+    private string _mode = "";
+    private string _retireColumn = "";
+    private string _help = "";
+    private string _search = "";
+    private bool _editEnabled;
+    private bool _loaded;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Window.SetTitle("File maintenance");
+        if (!await GuardAsync(LoadDefinitionAsync) || !_loaded) return;
+        await LoadListAsync();
+    }
+
+    /// <summary>frmGenericMaint.LoadDefinition: title '&lt;Title&gt;  [&lt;MaintCode&gt;]', retire column, help text, editors.</summary>
+    private async Task LoadDefinitionAsync()
+    {
+        if (FormArgument.Trim().Length == 0) throw new InvalidOperationException("No maintenance code was supplied for this menu entry.");
+        var r = await Api.GetAsync($"/api/platform/v1/maintenance-definitions/{Query.Path(FormArgument.Trim())}");
+        if (r.Status == 404) throw new InvalidOperationException("Maintenance definition " + FormArgument + " is not registered.");
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        _definition = r.Json as JsonObject;
+        Window.SetTitle(Json.Str(_definition?["title"]) + "  [" + FormArgument + "]");
+        _retireColumn = Json.Str(_definition?["retireColumn"]);
+        _help = Json.Str(_definition?["helpText"]);
+        _columns = _definition?["columns"] as JsonArray ?? [];
+        _editors = _columns.Where(c => Json.Bool(c?["isInEdit"])).Select(c => new Editor
+        {
+            Column = Json.Str(c?["columnName"]),
+            Caption = Json.Str(c?["caption"]),
+            DataType = Json.Str(c?["dataType"]).ToUpperInvariant(),
+            IsKey = Json.Bool(c?["isKey"]),
+            IsRequired = Json.Bool(c?["isRequired"]),
+            IsReadOnly = Json.Bool(c?["isReadOnly"]),
+            MaxLength = Json.Int(c?["maxLength"]),
+            LookupProc = Json.Str(c?["lookupProc"]),
+            LookupCode = Json.Str(c?["lookupProc"]).Length > 0 ? Json.Str(c?["lookupArg"]) is { Length: > 0 } arg ? arg : FormArgument : "",
+            DefaultValue = Json.Str(c?["defaultValue"]),
+        }).ToList();
+        _loaded = true;
+        SetEditEnabled(false);
+    }
+
+    /// <summary>frmGenericMaint.LoadList: rows with the registered captions, data types and widths; '&lt;n&gt; record(s).'.</summary>
+    private Task LoadListAsync() => !_loaded ? Task.CompletedTask : GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync($"/api/platform/v1/maintenance-definitions/{Query.Path(FormArgument.Trim())}/rows" + Query.Build(("search", _search.Trim())));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        _mode = "";
+        SetEditEnabled(false);
+        var data = GridData.FromResultSet(r.Json);
+        foreach (var c in _columns)
+        {
+            var name = Json.Str(c?["columnName"]);
+            data.Decorate(name, Json.Str(c?["caption"]), Json.Str(c?["dataType"]), Json.Int(c?["width"]));
+            if (!Json.Bool(c?["isInList"]) && !Json.Bool(c?["isKey"])) data.Hide(name);
+        }
+        _data = data;
+        _selected = data.Count > 0 ? 0 : -1;
+        SelectionChanged();
+        SetStatus(data.Count + " record(s).", "");
+    });
+
+    private void RowSelected(int index)
+    {
+        _selected = index;
+        SelectionChanged();
+    }
+
+    /// <summary>frmGenericMaint.grdList_SelectionChanged: the current row is loaded for CHANGE (not while adding).</summary>
+    private void SelectionChanged()
+    {
+        if (_mode == "ADD") return;
+        if (_data.Count == 0 || _selected < 0)
+        {
+            _mode = "";
+            foreach (var e in _editors) SetValue(e, null);
+            SetEditEnabled(false);
+            StateHasChanged();
+            return;
+        }
+        var row = _data.Rows[_selected];
+        foreach (var e in _editors)
+        {
+            var key = row.Select(p => p.Key).FirstOrDefault(k => string.Equals(k, e.Column, StringComparison.OrdinalIgnoreCase));
+            if (key is not null) SetValue(e, row[key]);
+        }
+        _mode = "CHANGE";
+        SetEditEnabled(true);
+        StateHasChanged();
+    }
+
+    private void SetEditEnabled(bool enabled) => _editEnabled = enabled;
+
+    private static void SetBool(Editor e, ChangeEventArgs ch) => e.Value = ch.Value is true ? "1" : "0";
+
+    private static void SetValue(Editor e, JsonNode? value)
+    {
+        switch (e.DataType)
+        {
+            case "BOOL":
+                e.Value = value is JsonValue v && ((v.TryGetValue<bool>(out var b) && b) || Json.Raw(v) is "1" or "true" or "True") ? "1" : "0";
+                break;
+            case "DATE":
+                var text = Json.Raw(value);
+                if (value is null || text.Trim().Length == 0)
+                {
+                    e.HasDate = false;
+                    e.Value = UkFormat.Date(DateTime.Today);
+                }
+                else
+                {
+                    e.HasDate = true;
+                    e.Value = UkFormat.DateText(text, "dd/MM/yyyy");
+                }
+                break;
+            default:
+                e.Value = Json.Raw(value);
+                break;
+        }
+    }
+
+    /// <summary>frmGenericMaint.GetValue: BOOL '1'/'0'; DATE yyyy-MM-dd or null; empty numeric null; other text trimmed.</summary>
+    private static string? GetValue(Editor e)
+    {
+        switch (e.DataType)
+        {
+            case "BOOL":
+                return e.Value == "1" ? "1" : "0";
+            case "DATE":
+                return e.HasDate && UkFormat.ParseDate(e.Value) is { } d ? d.ToString("yyyy-MM-dd", UkFormat.Culture) : null;
+        }
+        var text = e.Value.Trim();
+        if (text.Length == 0 && e.DataType is "INT" or "DEC" or "DECIMAL" or "MONEY" or "PCT" or "QTY" or "RATE") return null;
+        return text;
+    }
+
+    private void NewClicked()
+    {
+        _mode = "ADD";
+        foreach (var e in _editors)
+        {
+            var dflt = e.DefaultValue;
+            if (e.Column == "CompanyCode" && dflt.Length == 0) dflt = Session.CompanyCode;
+            SetValue(e, JsonValue.Create(dflt));
+        }
+        SetEditEnabled(true);
+        SetStatus("Enter the new record and press F10 to save.", "ADD");
+    }
+
+    /// <summary>frmGenericMaint.OnConfirm (Save, F10).</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        if (!_loaded) return;
+        if (_mode == "")
+        {
+            SetStatus("Select a record or press New first.", "");
+            return;
+        }
+        var values = new JsonObject();
+        foreach (var e in _editors)
+        {
+            if (e.IsReadOnly) continue;
+            var v = GetValue(e);
+            if (e.IsRequired && string.IsNullOrEmpty(v))
+            {
+                await ShowErrorAsync("Enter a value for " + e.Caption + ".", "UI0001");
+                await Browser.FocusAsync(Uid("e-" + e.Column));
+                return;
+            }
+            values[e.Column] = v;
+        }
+        await SaveAsync(_mode, values);
+    }
+
+    private Task SaveAsync(string mode, JsonObject values) => GuardAsync(async () =>
+    {
+        var r = await Api.PostAsync($"/api/platform/v1/maintenance-definitions/{Query.Path(FormArgument.Trim())}/save",
+            new JsonObject { ["mode"] = mode, ["values"] = values }, Instruction.New().Options());
+        if (!r.IsSuccess)
+        {
+            // MaintService.Save returned the refusal text: '<text>  (<code>)' for business rules, the message otherwise
+            var p = r.Problem!;
+            await ShowErrorAsync(p.Kind == "business-rule" && p.ReasonCode.Length > 0 ? p.Detail + "  (" + p.ReasonCode + ")" : p.Detail, "");
+            return;
+        }
+        if (mode == "RETIRE")
+        {
+            await LoadListAsync();
+            return;
+        }
+        SetStatus("Record saved.", CueOk);
+        await LoadListAsync();
+    });
+
+    private async Task RetireAsync()
+    {
+        if (!_loaded) return;
+        if (_retireColumn.Length == 0)
+        {
+            await ShowErrorAsync("Records on this file cannot be withdrawn.", "UI0002");
+            return;
+        }
+        if (_selected < 0) return;
+        if (!await ConfirmAsync("Withdraw the selected record from use?\nExisting documents that refer to it are not affected.")) return;
+        var values = new JsonObject();
+        foreach (var e in _editors.Where(e => e.IsKey)) values[e.Column] = GetValue(e);
+        await SaveAsync("RETIRE", values);
+    }
+
+    /// <summary>The F2 button of a field with a LookupProc (frmGenericMaint.LookupClicked).</summary>
+    private async Task LookupAsync(Editor e)
+    {
+        var code = await Dialogs.LookupAsync("master", e.LookupCode, e.Caption);
+        if (code.Length > 0) e.Value = code;
+        StateHasChanged();
+    }
+
+    /// <summary>F2 (frmGenericMaint.OnLookup): the lookup of the focused field, else the BaseForm message.</summary>
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        var e = _editors.FirstOrDefault(x => x.Column == key.TargetField);
+        if (e is not null && e.LookupProc.Length > 0)
+        {
+            await LookupAsync(e);
+            return;
+        }
+        await base.OnLookupAsync(key);
+    }
+
+    private Task FindClicked() => Browser.SelectAllAsync(Uid("find")).AsTask();
+
+    protected override Task OnRefreshKeyAsync() => LoadListAsync();
+
+    /// <summary>Enter in the Find box reloads the list (txtSearch_KeyDown).</summary>
+    protected override Task? OnKey(KeyInfo key) =>
+        key.Is("Enter") && key.TargetId == Uid("find") ? LoadListAsync() : null;
+}

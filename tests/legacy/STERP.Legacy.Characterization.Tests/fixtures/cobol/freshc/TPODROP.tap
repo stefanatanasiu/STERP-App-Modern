@@ -1,0 +1,39 @@
+# suite po RECEIPT dropship and subcon
+ok 1 - PO-018 a drop-ship line needs no put-away location
+ok 2 - PO-018 and the line is accepted, not held
+ok 3 - PO-018 the ownership basis is kept as given
+ok 4 - PO-018 a drop-ship receipt is not stock in transit
+ok 5 - PO-018 an owned receipt still needs its location
+ok 6 - PO-018 and it is refused
+ok 7 - PO-018 ten of the thirty are still outstanding
+ok 8 - PO-018 the delivery is valued like any other
+ok 9 - PO-018 all twenty are accepted
+ok 10 - PO-018 nothing is quarantined on the way through
+ok 11 - PO-019 a subcontract receipt validates
+ok 12 - PO-019 the job reference survives the call
+ok 13 - PO-019 the subcontract charge is valued
+not ok 14 - PO-018 a drop-ship receipt confirms
+#   expected 0.000000 got 8.000000
+not ok 15 - PO-018 and the receipt is CONFIRMED
+#   expected [CONFIRMED] got [REJECTED]
+ok 16 - PO-018 no stock movement is made for a drop-ship
+not ok 17 - PO-018 the ownership basis is on the file
+#   expected [DROPSHIP] got []
+not ok 18 - PO-018 the goods are not ours in transit either
+#   expected [0] got []
+not ok 19 - PO-018 the arrival is still recorded as a line
+#   expected [20.000000] got []
+not ok 20 - PO-018 a drop-ship receipt is not a subcontract one
+#   expected [(none)] got []
+not ok 21 - PO-019 a subcontract receipt confirms
+#   expected 0.000000 got 8.000000
+not ok 22 - PO-019 and the receipt is CONFIRMED
+#   expected [CONFIRMED] got [REJECTED]
+not ok 23 - PO-019 the job reference is on the file
+#   expected [ZZ-TEST-JOB1] got []
+ok 24 - PO-019 a subcontract charge is not taken into stock
+not ok 25 - PO-019 the receipt is owned on a receipt basis
+#   expected [RECEIPT] got []
+1..25
+# po RECEIPT dropship and subcon passed 00015 failed 00010
+# exit 10

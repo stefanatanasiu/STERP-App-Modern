@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Client</RootNamespace>
+    <AssemblyName>STERP.Web.Client</AssemblyName>
+    <Description>STERP-WEB shell (Interactive WebAssembly): start-up, sign-on, menu bar, toolbar, status bar, MDI-like workspace and the page registry composed from the slice page libraries.</Description>
+    <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+    <StaticWebAssetProjectMode>Default</StaticWebAssetProjectMode>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Web\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Platform\STERP.Web.Pages.Platform.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Itm\STERP.Web.Pages.Itm.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Ar\STERP.Web.Pages.Ar.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.So\STERP.Web.Pages.So.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Xmd\STERP.Web.Pages.Xmd.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Fin\STERP.Web.Pages.Fin.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Po\STERP.Web.Pages.Po.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Ap\STERP.Web.Pages.Ap.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Bom\STERP.Web.Pages.Bom.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Kit\STERP.Web.Pages.Kit.csproj" />
+    <ProjectReference Include="..\..\Web\STERP.Web.Pages.Cst\STERP.Web.Pages.Cst.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,163 @@
+@inherits StListPage
+@* frmKitExecution (page:kit/kit-execution, FR-STERP-KIT-051): the requirement lines of one kit, a check pass, component
+   issue (F10, confirmation), backflush (confirmation) and the cost position (frmKitExecution.vb:12-156). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Kit:" Inline="true" Width="150" @bind-Value="_kit" Id="@Uid("kit")" />
+        <StTextField Caption="&Qty:" Inline="true" Width="70" @bind-Value="_qty" Id="@Uid("qty")" />
+        <StTextField Caption="&Lot/serial:" Inline="true" Width="110" @bind-Value="_lot" Id="@Uid("lot")" />
+        <StTextField Caption="&Reason:" Inline="true" Width="150" @bind-Value="_reason" Id="@Uid("reason")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Check" Glyph="FIND" OnClick="CheckAsync" />
+        <StToolButton Text="Issue (F10)" Glyph="RUN" OnClick="IssueAsync" />
+        <StToolButton Text="Backflush" Glyph="ENGINE" OnClick="BackflushAsync" />
+        <StToolButton Text="Cost" Glyph="ENGINE" OnClick="CostAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private string _kit = "";
+    private string _qty = "";
+    private string _lot = "";
+    private string _reason = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Kit Execution");
+        if (FormArgument != "") _kit = FormArgument;
+    }
+
+    /// <summary>LoadData: KitService.Enquire of the typed kit; the lines are bound before the outcome is shown.</summary>
+    protected override async Task LoadDataAsync()
+    {
+        if (Code(_kit) == "")
+        {
+            SetStatus("Enter a kit reference and press Refresh (F5).", "");
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/kit/v1/kits/" + Query.Path(Code(_kit)));
+            var data = KitLegacy.Payload(r);
+            Populate(KitLegacy.Table(KitLegacy.LineSpec, data?["lines"]));
+            if (await ShowResultAsync(r))
+            {
+                SetStatus("Kit " + Code(_kit) + " - " + KitLegacy.Text(data, "status") + ", " + KitLegacy.Text(data, "completeness") +
+                          ", " + KitLegacy.Count(data, "shortageCnt") + " shortage(s), WIP " + KitLegacy.Money(KitLegacy.Num(data, "wipValue")),
+                          KitLegacy.Num(data, "shortageCnt") == 0m ? CueOk : CueWarning);
+            }
+        });
+    }
+
+    protected override Task OnConfirmAsync() => IssueAsync();
+
+    /// <summary>A check pass posts nothing - it only reports what an issue would do (KIT-010).</summary>
+    private Task CheckAsync() => PostAsync(true, false);
+
+    /// <summary>Issue of one component; an overissue is offered only with a reason (KIT-011, KIT-012).</summary>
+    private async Task IssueAsync()
+    {
+        if (!HasLine()) return;
+        if (!await ConfirmAsync("Issue " + _qty + " of " + Item() + " to " + Code(_kit) + "?")) return;
+        await PostAsync(false, _reason.Trim() != "");
+    }
+
+    private async Task PostAsync(bool checkOnly, bool allowOver)
+    {
+        if (!HasLine()) return;
+        await GuardAsync(async () =>
+        {
+            var body = new JsonObject
+            {
+                ["lineNum"] = KitLegacy.Int(SelectedText("LineNum")),
+                ["itemCode"] = Item(),
+                ["lotCode"] = Code(_lot),
+                ["serialNo"] = "",
+                ["quantity"] = Qty(),
+                ["location"] = SelectedText("Location").TrimEnd(),
+                ["reasonCode"] = allowOver ? "OVERISSUE" : "",
+                ["reasonText"] = _reason.Trim(),
+                ["allowOver"] = allowOver ? "Y" : "N",
+            };
+            var kit = Query.Path(Code(_kit));
+            var r = checkOnly
+                ? await Api.PostAsync("/api/kit/v1/kits/" + kit + "/issues/check", body)
+                : await Api.PostAsync("/api/kit/v1/kits/" + kit + "/issues", body, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            var data = r.Data;
+            SetStatus((checkOnly ? "Check: " : "Issued: ") + Item() +
+                      " | line " + KitLegacy.Text(data, "lineStatus") +
+                      " | outstanding " + KitLegacy.Qty(KitLegacy.Num(data, "lineRemaining")) +
+                      " | excess " + KitLegacy.Qty(KitLegacy.Num(data, "lineExcess")) +
+                      " | shortage " + KitLegacy.Qty(KitLegacy.Num(data, "shortageQty")) +
+                      " | WIP " + KitLegacy.Money(KitLegacy.Num(data, "wipValue")),
+                      KitLegacy.Num(data, "shortageQty") == 0m ? CueOk : CueWarning);
+            if (!checkOnly) await LoadDataAsync();
+        });
+    }
+
+    /// <summary>Backflush runs a full check pass first, so it cannot half succeed (KIT-010).</summary>
+    private async Task BackflushAsync()
+    {
+        if (Code(_kit) == "")
+        {
+            SetStatus("Enter a kit reference first.", CueWarning);
+            return;
+        }
+        if (!await ConfirmAsync("Backflush " + _qty + " good output on " + Code(_kit) + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/kit/v1/kits/" + Query.Path(Code(_kit)) + "/backflush",
+                new JsonObject { ["goodQty"] = Qty() }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            var data = r.Data;
+            var failedItem = KitLegacy.Text(data, "failedItem");
+            SetStatus("Backflush: " + KitLegacy.Count(data, "linesDone") + " line(s) done, " +
+                      KitLegacy.Count(data, "linesFailed") + " failed" +
+                      (failedItem != "" ? " (" + failedItem + ")" : ""),
+                      KitLegacy.Num(data, "linesFailed") == 0m ? CueOk : CueError);
+            await LoadDataAsync();
+        });
+    }
+
+    /// <summary>Planned against actual, element by element (KIT-020).</summary>
+    private async Task CostAsync()
+    {
+        if (Code(_kit) == "")
+        {
+            SetStatus("Enter a kit reference first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/kit/v1/kits/" + Query.Path(Code(_kit)) + "/cost" + Query.Build(("costSet", "STANDARD"), ("varianceOnly", "N")));
+            var data = KitLegacy.Payload(r);
+            Populate(KitLegacy.Table(KitLegacy.CostSpec, r.IsSuccess ? data?["elements"] : null));
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Planned " + KitLegacy.Money(KitLegacy.Num(data, "plannedGbp")) +
+                      " | issued " + KitLegacy.Money(KitLegacy.Num(data, "issuedGbp")) +
+                      " | completed " + KitLegacy.Money(KitLegacy.Num(data, "completedGbp")) +
+                      " | residual " + KitLegacy.Money(KitLegacy.Num(data, "residualGbp")) +
+                      " | variance " + KitLegacy.Money(KitLegacy.Num(data, "varianceGbp")),
+                      KitLegacy.Text(data, "reconciled") == "Y" ? CueOk : CueWarning);
+        });
+    }
+
+    private bool HasLine()
+    {
+        if (Code(_kit) != "" && Item() != "") return true;
+        SetStatus("Enter a kit reference and select a component line.", CueWarning);
+        return false;
+    }
+
+    private string Item() => SelectedText("Item").TrimEnd();
+
+    /// <summary>Decimal.TryParse of the Qty box; anything else is 0.</summary>
+    private decimal Qty() => KitLegacy.TryDecimal(_qty, out var q) ? q : 0m;
+
+    private static string Code(string text) => KitLegacy.Code(text);
+}

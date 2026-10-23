@@ -1,0 +1,20 @@
+# po-gaps
+ok 1 - a source is APPROVED, CONDITION, UNAPPROVED or SUSPENDED and nothing else -- REQ: PO-002
+ok 2 - the item/supplier reference carries approval, quote, lead time and order rules -- REQ: PO-002
+ok 3 - the cheapest quotation is ranked first but is not the automatic winner -- REQ: PO-002, AC: AC-050
+ok 4 - the chosen source costs 100.00 more than the cheapest quotation -- REQ: PO-002, AC: AC-050
+ok 5 - an unapproved source records its authoriser and reason -- REQ: PO-002, AC: AC-050
+ok 6 - a line is STOCK, NONSTOCK, SERVICE, SUBCON, CHARGE or TEXT and nothing else -- REQ: PO-003
+ok 7 - currency, delivery terms, ownership point and conditions version are captured -- REQ: PO-003
+ok 8 - a coded free-text service line creates no stocked catalogue item -- REQ: PO-003, AC: AC-050
+ok 9 - a repeated call-off above the blanket balance issues no second obligation -- REQ: PO-021, AC: AC-058
+ok 10 - the blanket is drawn down to its agreed ceiling and then closed -- REQ: PO-021, AC: AC-058
+ok 11 - a copied order retains a reference to its source order -- REQ: PO-021
+ok 12 - repeating an accepted import raises no duplicate duty or VAT obligation -- REQ: PO-021, AC: AC-058
+ok 13 - a sanctions name match leaves the supplier undecided and blocked -- REQ: PO-026, AC: AC-114
+ok 14 - the match raises an owned HOLD exception rather than a silent flag -- REQ: PO-026, AC: AC-114
+ok 15 - a supplier with no match screens clear and may trade -- REQ: PO-026, AC: AC-114
+ok 16 - sanctions, Companies House, VAT, size, slavery, bribery, insurance and quality are all held -- REQ: PO-026
+ok 17 - due diligence evidence outside the policy set is refused -- REQ: PO-026, D-29
+ok 18 - supplier onboarding records Companies House, HMRC VAT and business size evidence -- REQ: PO-026, D-29
+ok 19 - due diligence keeps the history of what was known when -- REQ: PO-026, D-29

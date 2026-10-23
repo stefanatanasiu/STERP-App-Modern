@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>STERP.Target.Gui.Parity</RootNamespace>
+    <Description>Tier 2 - target parity: GUI journeys of STERP-WEB (Playwright, installed Edge channel). Expected red until Agent 08 delivers the pages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Microsoft.Playwright" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\STERP.Testing\STERP.Testing.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

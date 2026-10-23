@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.So</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.So</AssemblyName>
+    <Description>STERP-SO pages (wave W3): Sales Order Entry, Despatch Confirmation and Sales Invoice Run - the legacy frmSalesOrderEntry, frmDespatchConfirm and frmSalesInvoiceRun (STERP-SO FR-020 to FR-022).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

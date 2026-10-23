@@ -1,0 +1,151 @@
+@inherits SoPageBase
+@* frmSalesInvoiceRun (page:so/sales-invoice-run, FR-STERP-SO-022; frmSalesInvoiceRun.vb:11-86, .Designer.vb:26-81): the page
+   only collects the company, the site, the despatch date range and the mode and submits SOINVRUN (so_submitSoinvrunRun), then
+   follows the run to its end, shows the run log (SYSOUT) with the STERP-I-SPOOL line, the job status and opens the spool
+   viewer. PREVIEW has no business effect; only COMMIT bills anything. *@
+<div class="st-page" style="overflow:auto">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Run SOINVRUN (F10)" Glyph="RUN" OnClick="OnConfirmAsync" />
+        <StToolButton Text="Open spool file" Glyph="PRINT" OnClick="SpoolClickedAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <fieldset class="st-group" style="flex:0 0 auto; margin:4px 4px 2px; padding:2px 6px 4px">
+        <legend>Sales invoice run - batch program SOINVRUN</legend>
+        <div style="@RowStyle">
+            <StTextField Caption="&Company:" Inline="true" LabelWidth="100" Width="94" MaxLength="10" Field="Company" @bind-Value="_company" Id="@Uid("co")" />
+            <StTextField Caption="&Site:" Inline="true" LabelWidth="100" Width="94" MaxLength="10" Field="Site" @bind-Value="_site" Id="@Uid("site")" />
+            <StSelectField Caption="&Mode:" Inline="true" LabelWidth="100" Width="140" Field="Mode" Items="Modes" Value="@_mode" ValueChanged="v => _mode = v" Id="@Uid("mode")" />
+        </div>
+        <div style="@RowStyle">
+            <StTextField Caption="Despatched &from:" Inline="true" LabelWidth="100" Width="94" MaxLength="10" Field="From" @bind-Value="_from" Id="@Uid("from")" />
+            <StTextField Caption="Despatched &to:" Inline="true" LabelWidth="100" Width="94" MaxLength="10" Field="To" @bind-Value="_to" Id="@Uid("to")" />
+            <span class="st-filter">Dates are dd/MM/yyyy</span>
+        </div>
+        <div style="padding:3px 0">PREVIEW lists what would be billed and has no business effect; only COMMIT raises invoices.</div>
+        <div style="@RowStyle">
+            <span class="st-filter"><span style="display:inline-block; white-space:nowrap; width:100px">Job status:</span><span style="white-space:pre">@_jobStatus</span></span>
+        </div>
+    </fieldset>
+    <div style="padding:2px 6px; white-space:pre; overflow:hidden; text-overflow:ellipsis">@_spoolLabel</div>
+    <div style="padding:2px 6px">Run log - the last STERP-I-SPOOL line names the spool file:</div>
+    <pre class="st-pre st-sunken" id="@Uid("log")" tabindex="0" style="font-size:11px; margin:0 4px 4px">@_log</pre>
+</div>
+
+@code {
+    private const string RowStyle = "display:flex; flex-wrap:nowrap; align-items:center; gap:2px 12px; padding:1px 0";
+
+    private static readonly IReadOnlyList<(string Value, string Text)> Modes = StSelectField.Of("PREVIEW", "COMMIT");
+
+    private string _company = "";
+    private string _site = "";
+    private string _mode = "PREVIEW";
+    private string _from = "";
+    private string _to = "";
+    private string _jobStatus = "(not run)";
+    private string _spoolLabel = "Spool file: (none yet)";
+    private string _log = "";
+    private string _spoolFile = "";
+
+    [Inject] private JobRunner Jobs { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        SoWindow.Size(Window, Browser, 760, 460);
+    }
+
+    /// <summary>frmSalesInvoiceRun.OnLoad: session company and site, the business month to date, PREVIEW (COMMIT with argument COMMIT).</summary>
+    protected override Task OnInitializedAsync()
+    {
+        var s = Session;
+        _company = s.CompanyCode;
+        _site = s.SiteCode;
+        _from = SoFmt.Date(new DateOnly(s.BusinessDate.Year, s.BusinessDate.Month, 1));
+        _to = SoFmt.Date(s.BusinessDate);
+        _mode = FormArgument == "COMMIT" ? "COMMIT" : "PREVIEW";
+        SetStatus("Check the range and the mode, then press F10 to run SOINVRUN.");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>frmSalesInvoiceRun.Stamp: dd/MM/yyyy, an unparsable date becomes the business date.</summary>
+    private DateOnly Stamp(string text) => SoFmt.ParseDate(text) ?? Session.BusinessDate;
+
+    /// <summary>ReportService.JobStatus: the core.JobRun status a batch return code stands for.</summary>
+    private static string JobStatus(int returnCode) =>
+        returnCode <= 0 ? "OK" : returnCode <= 4 ? "WARNING" : returnCode < 16 ? "FAILED" : "ABENDED";
+
+    /// <summary>ReportService.ParseSpool: the path of the last "STERP-I-SPOOL &lt;path&gt;" line of the console log.</summary>
+    private static string ParseSpool(string consoleOutput)
+    {
+        var found = "";
+        foreach (var line in consoleOutput.Split('\n'))
+        {
+            var t = line.Trim();
+            if (t.Length > 13 && t.StartsWith("STERP-I-SPOOL", StringComparison.OrdinalIgnoreCase) && char.IsWhiteSpace(t[13]))
+            {
+                var path = t[13..].Trim();
+                if (path.Length > 0) found = path;
+            }
+        }
+        return found;
+    }
+
+    /// <summary>F10 - SalesOrderService.InvoiceRun: SOINVRUN with CO, SITE, FROM, TO and MODE (USER is the job host's).</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        var mode = _mode;
+        if (mode == "COMMIT" && !await ConfirmAsync("COMMIT raises the sales invoices for " + _company.Trim() + " / " + _site.Trim() + ".  Run it now?")) return;
+        await GuardAsync(async () =>
+        {
+            _spoolFile = "";
+            var body = new JsonObject
+            {
+                ["CO"] = _company.Trim().ToUpperInvariant(),
+                ["SITE"] = _site.Trim().ToUpperInvariant(),
+                ["FROM"] = SoFmt.Yyyymmdd(Stamp(_from)),
+                ["TO"] = SoFmt.Yyyymmdd(Stamp(_to)),
+                ["MODE"] = mode == "" ? "PREVIEW" : mode,
+            };
+            var run = await Jobs.RunAsync(() => Api.PostAsync(ApiHost.Jobs, "/api/so/v1/jobs/SOINVRUN/runs", body));
+            if (!run.Accepted) throw new ApiFailure(run.Submit);
+            var log = "";
+            if (run.JobRunId > 0)
+            {
+                var sysout = await Api.GetAsync(ApiHost.Jobs, "/api/jobs/v1/runs/" + run.JobRunId.ToString(System.Globalization.CultureInfo.InvariantCulture) + "/sysout");
+                log = sysout.IsSuccess ? sysout.Text : "";
+            }
+            var rc = run.ReturnCode ?? 12;
+            _log = log.Replace("\r\n", "\n", StringComparison.Ordinal);
+            _spoolFile = ParseSpool(_log) is { Length: > 0 } spool ? spool : run.SpoolFile;
+            _spoolLabel = "Spool file: " + (_spoolFile == "" ? "(none produced)" : _spoolFile);
+            _jobStatus = JobStatus(rc) + " - return code " + rc + ", job run " + run.JobRunId + ", mode " + mode;
+            if (rc > 4)
+            {
+                await ShowErrorAsync("SOINVRUN ended with return code " + rc + ".  Nothing has been billed by this run.",
+                                     "SOI" + rc.ToString("0000", System.Globalization.CultureInfo.InvariantCulture));
+                return;
+            }
+            SetStatus("SOINVRUN " + mode + " finished, return code " + rc + ".  " + (_spoolFile == "" ? "No spool file was produced." : _spoolFile),
+                      rc == 0 ? CueOk : CueWarning);
+            OpenSpool();
+        });
+    }
+
+    private void OpenSpool()
+    {
+        if (_spoolFile == "") return;
+        OpenForm("frmSpoolViewer", _spoolFile);
+    }
+
+    private Task SpoolClickedAsync()
+    {
+        if (_spoolFile == "")
+        {
+            SetStatus("This run produced no spool file.", CueWarning);
+            return Task.CompletedTask;
+        }
+        OpenSpool();
+        return Task.CompletedTask;
+    }
+}

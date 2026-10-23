@@ -1,0 +1,21 @@
+# suite TSOREBAT rebate accrual and se
+ok 1 - AC-130 2% on 120,000.00 accrues 2,400.00
+ok 2 - 90,000.00 is below the threshold, nothing accrues
+ok 3 - A first period posts the whole 2,400.00
+ok 4 - A later period posts only the movement
+ok 5 - Rerunning the same period posts no movement
+ok 6 - AC-130 settlement VAT is 480.00
+ok 7 - The credit note settles 2,400.00 net
+ok 8 - The credit note gross is 2,880.00
+ok 9 - Settling twice leaves nothing to settle
+ok 10 - Settling twice raises no second VAT adjustment
+ok 11 - The total reduction of revenue stays at 2,400.00
+ok 12 - The accrual debits the sales rebate account
+ok 13 - The accrual credits the accrued rebate liability
+ok 14 - SO.REBATE.ACCRUAL is mapped DR 4120 CR 2090
+ok 15 - the credit leg is the accrued rebate 2090
+ok 16 - account 4120 is a turnover account
+ok 17 - no accrual is settled beyond what was accrued
+1..17
+# TSOREBAT rebate accrual and se passed 00017 failed 00000
+# exit 0

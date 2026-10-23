@@ -1,0 +1,134 @@
+@inherits StPage
+@* frmCreditOverride (page:ar/credit-override, FR-STERP-AR-024; frmCreditOverride.vb:1-103): order-scoped override requests and
+   the independent CREDCHK approval. Argument REQUEST (Sales > Request Credit Override...) = request mode: Approve selected is
+   disabled and only the user's own requests are listed; F10 requests in request mode and approves otherwise. *@
+<div class="st-page">
+    <div style="display:grid; grid-template-columns:160px 1fr; row-gap:4px; padding:8px; flex:0 0 auto; align-items:center">
+        <label for="@Uid("customer")">Customer account</label>
+        <input id="@Uid("customer")" class="st-input" aria-label="Customer account" maxlength="20" value="@_customer" autocomplete="off" spellcheck="false"
+               @oninput="e => _customer = e.Value?.ToString() ?? string.Empty" />
+        <label for="@Uid("document")">Order reference (scope ORDER)</label>
+        <input id="@Uid("document")" class="st-input" aria-label="Order reference (scope ORDER)" maxlength="40" value="@_document" autocomplete="off" spellcheck="false"
+               @oninput="e => _document = e.Value?.ToString() ?? string.Empty" />
+        <label for="@Uid("amount")">Override amount GBP</label>
+        <input id="@Uid("amount")" class="st-input" aria-label="Override amount GBP" value="@_amountText" autocomplete="off" spellcheck="false"
+               @oninput="e => _amountText = e.Value?.ToString() ?? string.Empty" @onblur="ValidateAmount" />
+        <label for="@Uid("reason")">Reason</label>
+        <input id="@Uid("reason")" class="st-input" aria-label="Reason" maxlength="300" value="@_reason" autocomplete="off" spellcheck="false"
+               @oninput="e => _reason = e.Value?.ToString() ?? string.Empty" />
+        <span></span>
+        <div style="display:flex; gap:6px; padding-top:2px">
+            <button type="button" class="st-button" style="width:150px" disabled="@(!_requestEnabled)" @onclick="RequestOverrideAsync"><StMnemonic Text="&Request override" /></button>
+            <button type="button" class="st-button" style="width:150px" disabled="@(!_approveEnabled)" @onclick="ApproveOverrideAsync"><StMnemonic Text="&Approve selected" /></button>
+        </div>
+    </div>
+    <StGrid Id="@Uid("grid")" Data="_data" Selected="_selected" SelectedChanged="i => _selected = i" Label="Credit overrides" />
+</div>
+
+@code {
+    private const decimal Minimum = 0.01m;
+    private const decimal Maximum = 99999999999.99m;
+
+    private static readonly string[] Columns =
+    [
+        "OverrideId", "CustomerCode", "Scope", "DocumentRef", "OverrideAmountGBP", "Reason", "RequestedBy", "ApprovedBy", "ValidFrom", "ExpiresOn", "Status",
+    ];
+
+    private string _customer = "";
+    private string _document = "";
+    private string _reason = "";
+    private decimal _amount = Minimum;
+    private string _amountText = Format(Minimum);
+    private bool _requestEnabled;
+    private bool _approveEnabled;
+    private GridData _data = GridData.Empty;
+    private int _selected = -1;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ArWindow.Size(Window, Browser, 1060, 540);
+    }
+
+    /// <summary>frmCreditOverride.OnLoad: button enabling from the session permission answers, then the list.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _requestEnabled = await ArPermissions.HasAsync(Api, SessionService, "SO.ORDER.ENTER") ||
+                          await ArPermissions.HasAsync(Api, SessionService, "AR.CREDIT.OVERRIDE");
+        _approveEnabled = FormArgument != "REQUEST" && await ArPermissions.HasAsync(Api, SessionService, "AR.CREDIT.OVERRIDE");
+        await LoadDataAsync();
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadDataAsync();
+
+    /// <summary>DebtorsService.CreditOverrides(requestsOnly = Approve selected disabled).</summary>
+    private Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/ar/v1/credit-overrides" + Query.Build(("requestsOnly", _approveEnabled ? "false" : "true")));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        _data = ArFmt.Grid(r.Json?["items"], Columns);
+        _selected = _data.Count > 0 ? 0 : -1;
+    });
+
+    protected override Task OnConfirmAsync() => FormArgument == "REQUEST" ? RequestOverrideAsync() : ApproveOverrideAsync();
+
+    /// <summary>NumericUpDown (two decimals, thousands separator, 0.01 to 99,999,999,999.99): typed text that parses becomes the value.</summary>
+    private void ValidateAmount()
+    {
+        var text = _amountText.Trim();
+        if (text.Length > 0 && text != "-" &&
+            decimal.TryParse(text, System.Globalization.NumberStyles.Number, UkFormat.Culture, out var v))
+        {
+            _amount = Math.Min(Math.Max(v, Minimum), Maximum);
+        }
+        _amountText = Format(_amount);
+    }
+
+    private static string Format(decimal v) => v.ToString("#,##0.00", UkFormat.Culture);
+
+    private async Task RequestOverrideAsync()
+    {
+        if (!_requestEnabled) return;
+        ValidateAmount();
+        if (_customer.Trim() == "" || _document.Trim() == "" || _reason.Trim() == "")
+        {
+            SetStatus("Enter customer, order reference, GBP amount and reason.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/ar/v1/credit-overrides",
+                new JsonObject
+                {
+                    ["customer"] = _customer.Trim().ToUpperInvariant(),
+                    ["documentRef"] = _document.Trim().ToUpperInvariant(),
+                    ["overrideAmt"] = _amount,
+                    ["overrideReason"] = _reason.Trim(),
+                }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            await LoadDataAsync();
+            SetStatus("Override " + ArFmt.Int(ArFmt.Col(r.Data, "overrideId")) + " PENDING; " + (r.Outcome?.Message ?? "") +
+                      ". Switch user for independent approval.", CueOk);
+        });
+    }
+
+    private async Task ApproveOverrideAsync()
+    {
+        if (!_approveEnabled) return;
+        if (_selected < 0 || _selected >= _data.Count)
+        {
+            SetStatus("Select a pending override first.", CueWarning);
+            return;
+        }
+        var row = _data.Rows[_selected];
+        await GuardAsync(async () =>
+        {
+            var id = ArFmt.Int(ArFmt.Col(row, "OverrideId"));
+            var r = await Api.PostAsync($"/api/ar/v1/credit-overrides/{id}/approve",
+                new JsonObject { ["customer"] = ArFmt.Str(ArFmt.Col(row, "CustomerCode")) }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            await LoadDataAsync();
+            SetStatus((r.Outcome?.Message ?? "") + ". Return to Sales Order Entry for normal accept/release.", CueOk);
+        });
+    }
+}

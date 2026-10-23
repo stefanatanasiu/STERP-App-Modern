@@ -1,0 +1,30 @@
+# suite TKITCLS kit close and reopen
+ok 1 - KITCLOSE refuses an unknown function with KIT0002
+ok 2 - A refused close changes no status
+ok 3 - The partly issued kit was built
+ok 4 - One line still has material on the job
+ok 5 - Seven issued less two returned leaves five on the job
+ok 6 - All ten frames are still uncompleted
+ok 7 - The residual work in progress is stated
+ok 8 - A kit with material on it is not ready to close
+ok 9 - A readiness check changes no status
+ok 10 - A cancellation without a reason is refused
+ok 11 - A refused cancellation leaves the kit alone
+ok 12 - Cancelling a kit with material on it needs authority
+ok 13 - The cancellation still reports the material on the job
+ok 14 - Cancelling returns nothing to stores by itself
+ok 15 - No return movement is invented by the cancellation
+ok 16 - The kit stays as it was until somebody may act
+ok 17 - An unissued kit is cancelled without special authority
+ok 18 - Nothing was on the job to account for
+ok 19 - The unissued kit really is cancelled
+ok 20 - Reopening without a reason is refused
+ok 21 - Reopening needs authority or an open period, and says so
+ok 22 - Force does not buy authority or an open period
+ok 23 - A refused reopen leaves the kit closed
+ok 24 - A refused reopen deletes no history
+ok 25 - The status history can be read back
+ok 26 - Reading the history changes no status
+1..26
+# TKITCLS kit close and reopen passed 00026 failed 00000
+# exit 0

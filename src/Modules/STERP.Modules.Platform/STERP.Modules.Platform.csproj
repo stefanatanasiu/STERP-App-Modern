@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Modules.Platform</RootNamespace>
+    <Description>STERP-PLATFORM slice (wave W0): session, menu, lookups, approvals, exceptions, audit, generic maintenance, report catalogue, job run resources, stream engine, operator console and service diagnostics.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Platform\STERP.Platform.Hosting\STERP.Platform.Hosting.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,228 @@
+@inherits StListPage
+@* frmPaymentRun (page:ap/payment-run, FR-STERP-AP-038): the proposals, what each one selected and excluded, the independent
+   approval and the instructions the run produced. A proposal may never be approved by the person who prepared it; the
+   engine refuses and the refusal is shown as an error (frmPaymentRun.vb:11-222). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Proposal:" Inline="true" Width="150" Field="PROPOSAL" @bind-Value="_proposal" Id="@Uid("proposal")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Build proposal" Glyph="RUN" OnClick="BuildAsync" />
+        <StToolButton Text="Totals (F10)" Glyph="ENGINE" OnClick="TotalsAsync" />
+        <StToolButton Text="Lines" Glyph="FIND" OnClick="LinesAsync" />
+        <StToolButton Text="Reserve" Glyph="RUN" OnClick="() => ReservationAsync(false)" />
+        <StToolButton Text="Release reservations" Glyph="REJECT" OnClick="() => ReservationAsync(true)" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Request approval" Glyph="RUN" OnClick="RequestAsync" />
+        <StToolButton Text="Approve" Glyph="POST" OnClick="ApproveAsync" />
+        <StToolButton Text="Reject" Glyph="REJECT" OnClick="RejectAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Create instructions" Glyph="RUN" OnClick="CreateAsync" />
+        <StToolButton Text="Bacs file" Glyph="PRINT" OnClick="BacsAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private string _proposal = "";
+    private bool _showingLines;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Payment Run");
+        if (FormArgument != "") _proposal = FormArgument;
+    }
+
+    /// <summary>frmPaymentRun.LoadData: PaymentService.Proposals (ap.usp_ListProposals).</summary>
+    protected override Task LoadDataAsync()
+    {
+        _showingLines = false;
+        return GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/ap/v1/payment-proposals");
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(GridData.FromItems(r.Json));
+            SetStatus(Data.Count + " payment proposal(s).", "");
+        });
+    }
+
+    protected override Task OnConfirmAsync() => TotalsAsync();
+
+    /// <summary>frmPaymentRun.BuildClicked: APPAYPRP SELECT builds a DRAFT preview from the keyed cutoff, date, method and bank.</summary>
+    private async Task BuildAsync()
+    {
+        var today = UkFormat.Date(Session.BusinessDate);
+        var v = await ApInput.CollectAsync(Dialogs, "Build new payment proposal (preview)",
+            new ApInputField("CUTOFF", "Due-date cutoff (dd/MM/yyyy)", today, 10),
+            new ApInputField("PAYDATE", "Requested payment date (dd/MM/yyyy)", today, 10),
+            new ApInputField("METHOD", "Method (BACS/FPS/CHAPS/SWIFT/SEPA)", "BACS", 10),
+            new ApInputField("BANK", "Company bank account", "GBP1", 20));
+        if (v is null) return;
+        if (!DateOnly.TryParseExact(v["CUTOFF"], "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var cutoff) ||
+            !DateOnly.TryParseExact(v["PAYDATE"], "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out var payDate))
+        {
+            await ShowErrorAsync("Enter valid dates in dd/MM/yyyy format.", "APPINPUT");
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/ap/v1/payment-proposals/select", new JsonObject
+            {
+                ["cutoffDate"] = cutoff.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                ["payDate"] = payDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                ["method"] = v["METHOD"].ToUpperInvariant(),
+                ["bankAccount"] = v["BANK"].ToUpperInvariant(),
+            }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            var p = LegacyResult.From(r);
+            var pref = p.Str("proposalRef").TrimEnd();
+            _proposal = pref;
+            await LoadDataAsync();
+            SetStatus(pref + ": preview built, " + p.Int("selectedCount") + " selected, " + p.Int("excludedCount") +
+                      " excluded. Reserve before requesting approval.", CueOk);
+        });
+    }
+
+    /// <summary>frmPaymentRun.ReservationClicked: APPAYPRP RESERVE / RELEASE (reservations, not payment authority).</summary>
+    private async Task ReservationAsync(bool release)
+    {
+        var pref = Proposal();
+        if (pref == "") return;
+        if (!await ConfirmAsync((release ? "Release the reservations (not payment authority) for " : "Reserve the selected items for ") + pref + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/payment-proposals/{Query.Path(pref)}/{(release ? "release" : "reserve")}",
+                new JsonObject(), Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            var note = LegacyResult.From(r).Str("note").TrimEnd();
+            await LoadDataAsync();
+            SetStatus(pref + (release ? ": reservations released." : ": items reserved. Request approval next.") + " " + note, CueOk);
+        });
+    }
+
+    /// <summary>frmPaymentRun.BacsClicked: a new report launcher on APBACS with RUN already filled in.</summary>
+    private async Task BacsAsync()
+    {
+        var pref = Proposal();
+        if (pref == "") return;
+        await GuardAsync(() =>
+        {
+            Shell.OpenNew("frmReportLauncher", "APBACS", new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["RUN"] = pref });
+            SetStatus("Bacs launcher opened for " + pref + ". Run creates a local Standard 18 file; no bank transmission.", "");
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>frmPaymentRun.LinesClicked: the lines of one proposal, an excluded line naming its reason.</summary>
+    private async Task LinesAsync()
+    {
+        var pref = Proposal();
+        if (pref == "") return;
+        await GuardAsync(async () =>
+        {
+            _proposal = pref;
+            _showingLines = true;
+            var r = await Api.GetAsync($"/api/ap/v1/payment-proposals/{Query.Path(pref)}/lines");
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(GridData.FromItems(r.Json));
+            SetStatus("Lines of " + pref + ". An excluded line names its reason; press F5 for the proposal list.", "");
+        });
+    }
+
+    /// <summary>frmPaymentRun.TotalsClicked: APPAYPRP TOTALS re-totals the proposal without changing it.</summary>
+    private async Task TotalsAsync()
+    {
+        var pref = Proposal();
+        if (pref == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await TotalsCallAsync(pref);
+            if (!await ShowResultAsync(r)) return;
+            var t = LegacyResult.From(r);
+            SetStatus(pref + ": " + t.Int("selectedCount") + " line(s) " + UkFormat.Money(t.Dec("cashPrincipal")) + " less credits " +
+                      UkFormat.Money(t.Dec("creditsApplied")) + " = " + UkFormat.Money(t.Dec("totalOutflow")) + " | " +
+                      t.Int("excludedCount") + " excluded | status " + t.Str("status").TrimEnd(), CueOk);
+        });
+    }
+
+    private Task<ApiResponse> TotalsCallAsync(string pref) => Api.GetAsync($"/api/ap/v1/payment-proposals/{Query.Path(pref)}/totals");
+
+    /// <summary>frmPaymentRun.RequestClicked: the totals first, then APPAYAPR REQUEST for the total outflow.</summary>
+    private async Task RequestAsync()
+    {
+        var pref = Proposal();
+        if (pref == "") return;
+        await GuardAsync(async () =>
+        {
+            var totals = await TotalsCallAsync(pref);
+            if (!await ShowResultAsync(totals)) return;
+            var amount = LegacyResult.From(totals).Dec("totalOutflow");
+            var r = await Api.PostAsync($"/api/ap/v1/payment-proposals/{Query.Path(pref)}/request-approval",
+                new JsonObject { ["amountGbp"] = amount }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Approval requested for " + pref + ". " + LegacyResult.From(r).Str("note").TrimEnd(), CueOk);
+        });
+    }
+
+    private Task ApproveAsync() => DecideAsync("APPROVE", "Approved from the payment run screen");
+
+    private Task RejectAsync() => DecideAsync("REJECT", "Rejected from the payment run screen");
+
+    /// <summary>
+    /// frmPaymentRun.Decide: approving a run you prepared yourself is refused by the engine; the message is shown as a proper
+    /// error, never swallowed (AP-012, D-07).
+    /// </summary>
+    private async Task DecideAsync(string decision, string comment)
+    {
+        var pref = Proposal();
+        if (pref == "") return;
+        if (!await ConfirmAsync(decision + " payment proposal " + pref + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var totals = await TotalsCallAsync(pref);
+            if (!await ShowResultAsync(totals)) return;
+            var amount = LegacyResult.From(totals).Dec("totalOutflow");
+            var r = await Api.PostAsync($"/api/ap/v1/payment-proposals/{Query.Path(pref)}/decide",
+                new JsonObject { ["decision"] = decision, ["comment"] = comment, ["amountGbp"] = amount }, Instruction.New().Options());
+            if (!await ShowResultAsync(r))
+            {
+                SetStatus(decision + " refused: " + LegacyResult.From(r).Display, CueError);
+                return;
+            }
+            var a = LegacyResult.From(r);
+            await LoadDataAsync();
+            SetStatus(pref + " is now " + a.Str("status").TrimEnd() + ". " + a.Str("note").TrimEnd(), CueOk);
+        });
+    }
+
+    /// <summary>frmPaymentRun.CreateClicked: APPAYRUN CREATE turns the approved proposal into bank instructions.</summary>
+    private async Task CreateAsync()
+    {
+        var pref = Proposal();
+        if (pref == "") return;
+        if (!await ConfirmAsync("Create the bank instructions for " + pref + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/payment-proposals/{Query.Path(pref)}/create-instructions", new JsonObject(),
+                Instruction.New().Options());
+            if (!await ShowResultAsync(r))
+            {
+                SetStatus("Payment run refused: " + LegacyResult.From(r).Display, CueError);
+                return;
+            }
+            SetStatus(LegacyResult.From(r).Int("createdCount") + " instruction(s) created for " + pref +
+                      ". Run the BACS report to produce the Standard 18 file.", CueOk);
+        });
+    }
+
+    /// <summary>frmPaymentRun.Proposal: the typed reference, else the selected proposal of the list.</summary>
+    private string Proposal()
+    {
+        var pref = _proposal.Trim().ToUpperInvariant();
+        if (pref == "" && !_showingLines) pref = Json.Str(SelectedValue("proposalRef")).TrimEnd();
+        if (pref == "") SetStatus("Select a proposal, or type its reference.", CueWarning);
+        return pref;
+    }
+}

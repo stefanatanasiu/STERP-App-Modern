@@ -1,0 +1,9 @@
+ok - cst: a comparison window is copied into the display table with its own types  # REQ: CST-012
+ok - cst: a roll-up states its completeness and prices the tree it explains  # REQ: CST-010,CST-024
+ok - cst: a what-if prices variants beside the base case and writes nothing  # REQ: CST-023
+ok - cst: an item cost enquiry answers every basis we hold, or none at all  # REQ: CST-001,CST-026
+ok - cst: the COMMAREA layouts of every costing program parse and carry their windows  # REQ: CST-007,CST-010,CST-016,CST-018,CST-023
+ok - cst: the cost set worklist states preparer and approver side by side  # REQ: CST-007,CST-012
+ok - cst: the job worklist keeps sub-jobs under their parent and counted once  # REQ: CST-014,CST-016
+ok - cst: the scenario window keeps each variant beside the base case  # REQ: CST-023
+ok - cst: the work in progress roll-forward proves opening + additions - deductions = closing  # REQ: CST-018

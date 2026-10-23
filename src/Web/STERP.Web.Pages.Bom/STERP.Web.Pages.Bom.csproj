@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Bom</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Bom</AssemblyName>
+    <Description>STERP-BOM pages (STERP-WEB 7.2): frmBomEditor, frmBomExplosion, frmBomWhereUsed, frmBomBulkPreview.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

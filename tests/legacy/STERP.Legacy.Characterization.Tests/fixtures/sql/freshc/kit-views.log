@@ -1,0 +1,17 @@
+# kit-views
+ok 1 - the kit execution view presents the full execution list shape -- REQ: KIT-022
+ok 2 - the shortage view presents one pickable line, not a kit level summary -- REQ: KIT-009, KIT-022
+ok 3 - the genealogy view presents the fitted part, its lot and the part planned -- REQ: KIT-012, KIT-019
+ok 4 - a cancelled line is left out of the execution list and a short line keeps the kit open and not ready -- REQ: KIT-005, KIT-022
+ok 5 - the execution row reports the engine's own issued, returned, scrapped and outstanding quantities -- REQ: KIT-022
+ok 6 - a financially closed kit is no longer an open kit -- REQ: KIT-017, KIT-024
+ok 7 - every short line is listed on its own with the quantity still to find -- REQ: KIT-009, KIT-022
+ok 8 - a covered line, a cancelled line and an unreleased kit are not on the picking list -- REQ: KIT-009, KIT-022
+ok 9 - a line keeps its own need date and otherwise inherits the kit's -- REQ: KIT-009, KIT-022
+ok 10 - the execution and shortage views answer for one company and site only -- REQ: KIT-022, COM-001
+ok 11 - where nothing was substituted the planned part is the part fitted -- REQ: KIT-019
+ok 12 - a substitution is shown as evidence: the part fitted beside the part planned -- REQ: KIT-012, KIT-019  AC: AC-083
+ok 13 - the genealogy line carries the movement that put the part there, or says it was consumed -- REQ: KIT-019
+ok 14 - a recall trace walks a lot up through the subassembly to the finished parent -- REQ: KIT-019  AC: AC-083
+ok 15 - the trace stops at the depth it was asked for -- REQ: KIT-019
+ok 16 - the trace answers for the stated lot and company only -- REQ: KIT-019, COM-001

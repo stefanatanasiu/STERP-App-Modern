@@ -1,0 +1,13 @@
+ok - fin: a box drills down to the records behind it  # REQ: FIN-018,FIN-026 AC: AC-017
+ok - fin: a date outside the open calendar refuses a posting  # REQ: FIN-010,FIN-012 AC: AC-012
+ok - fin: a grouped bank match needs equal totals or a written explanation  # REQ: FIN-013,FIN-014,FIN-015 AC: AC-014
+ok - fin: a journal COMMAREA round-trips its header and every line  # REQ: FIN-004 AC: AC-004
+ok - fin: an unbalanced journal is refused and the balance is reported  # REQ: FIN-002,FIN-003,FIN-004 AC: AC-004
+not ok - fin: the MTD submission is written to a file, not sent to HMRC  # REQ: FIN-018 AC: AC-018
+#   InvalidOperationException: No prepared VAT return exists for STC/26Q3.
+#      at STERP.Business.VatService.LoadReturn(String periodKey) in <legacy-root>\dotnet\STERP.Business\Finance\VatService.vb:line 84
+#      at STERP.Business.VatService.WriteSubmissionFile(String periodKey) in <legacy-root>\dotnet\STERP.Business\Finance\VatService.vb:line 139
+#      at STERP.Tests.FinanceTests.VatSubmissionFile() in <legacy-root>\dotnet\STERP.Tests\Finance\FinanceTests.cs:line 153
+ok - fin: the close checklist identifies the steps that block a hard close  # REQ: FIN-008,FIN-010,FIN-011 AC: AC-013
+ok - fin: the journal enquiry reads posted headers with their reversal link  # REQ: FIN-006,FIN-023
+ok - fin: the nine boxes obey box 3 = 1 + 2 and box 5 = 3 - 4  # REQ: FIN-018,FIN-025,FIN-026 AC: AC-016

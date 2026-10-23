@@ -1,0 +1,740 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-API",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-API-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-001-AC1",
+          "ac": 1,
+          "title": "Online host readiness runs the drift check against the isolated database and reports no difference",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "health"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "api_getReadiness"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.status",
+              "equals": "Healthy"
+            },
+            {
+              "on": "r",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "r",
+              "json": "$.driftDifferences",
+              "count": 0
+            },
+            {
+              "on": "r",
+              "json": "$.deliveredSlices[*]",
+              "equals": "PLATFORM"
+            }
+          ],
+          "derivation": "AC 'removed column in isolated DB makes /health/ready Unhealthy; SQL trace shows no DDL' with the api_getReadiness 200 example and contracts 6.11 (db/00-create-database.sql:5-12); removing a column needs DDL, which the DSL forbids, and the SQL trace is outside the DSL, so only the unmodified-schema half (Healthy, no differences) is pinned and the Unhealthy half is unknown.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-API-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-002-AC1",
+          "ac": 1,
+          "title": "An SO operation of the undelivered SO slice returns 501 API0501 naming the slice",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "so_acceptSalesOrder",
+              "path": {
+                "orderNumber": "SOS900008"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 501,
+                "type": "not-implemented",
+                "reasonCode": "API0501",
+                "detailContains": "STERP-SO"
+              }
+            }
+          ],
+          "derivation": "AC 'with PLATFORM and ITM only, SO operations return 501 API0501' with STERP-API.md FR-STERP-API-002 (501 naming the slice and wave) and contracts 5.10 (c/sterpbrg.c:101-118 legacy bridge); precondition: only PLATFORM and ITM delivered.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-API-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-010-AC1",
+          "ac": 1,
+          "title": "Unknown identity gets 403 API0010 with the legacy text; RESTRICT asking CAL/LIV gets 403 API0002; business date defaults",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "nouser",
+              "call": "platform_getSession",
+              "as": "NOSUCHUSER"
+            },
+            {
+              "save": "restrict",
+              "call": "platform_signOn",
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "LIV"
+              },
+              "body": {
+                "companyCode": "CAL",
+                "siteCode": "LIV",
+                "businessDate": "2026-10-07"
+              },
+              "as": "RESTRICT"
+            },
+            {
+              "save": "date",
+              "call": "platform_getSession"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "nouser",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "API0010",
+                "detailContains": "No STERP user is mapped to"
+              }
+            },
+            {
+              "on": "restrict",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "API0002"
+              }
+            },
+            {
+              "on": "date",
+              "status": 200
+            },
+            {
+              "on": "date",
+              "json": "$.businessDate",
+              "equals": "2026-10-20",
+              "normalize": "timestamp"
+            }
+          ],
+          "derivation": "AC 'unmapped login 403 API0010 with legacy text; RESTRICT to CAL/LIV 403 API0002; missing business date defaults to server date' with contracts 5.2-5.3/4.5, LoginService.vb:11-60 and CobolGateway.cs:77 (DateTime.Today); the DSL binds one Windows identity per scenario, so the API0010 resolution is driven through an unknown run-as code (platform_continueAsUser: 'No STERP user is mapped to <code>.') while FR-STERP-PORTAL-014 exercises the unmapped login itself, and the server date is compared by format.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-API-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-011-AC1",
+          "ac": 1,
+          "title": "COMMAREA input normalization (X(20) truncation, scale-2 rounding, unsigned absolute value) and empty-string-to-NULL",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "text-normalization",
+            "numeric-scale",
+            "unsigned"
+          ],
+          "steps": [
+            {
+              "save": "x20",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": -1,
+                "uomCode": "EA",
+                "reasonCode": "COUNTCHECK1234567890ABCDE",
+                "reason": "A07 normalization check",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-API-011-X20"
+            },
+            {
+              "save": "scale",
+              "call": "ar_checkCustomerCredit",
+              "path": {
+                "customerCode": "C0090"
+              },
+              "body": {
+                "orderValue": 10.005,
+                "currency": "GBP",
+                "checkPoint": "ORDER",
+                "documentRef": ""
+              }
+            },
+            {
+              "save": "unsigned",
+              "call": "cst_calculateCostJobWip",
+              "path": {
+                "jobRef": "CST27000"
+              },
+              "body": {
+                "fiscalYear": 2026,
+                "periodNo": -5,
+                "includeSubJobs": "Y"
+              }
+            },
+            {
+              "save": "nulls",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "NUT-M6-NYLOC",
+                "siteCode": "",
+                "condition": "ALL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "x20",
+              "status": 200
+            },
+            {
+              "sql": "SELECT ReasonCode FROM inv.StockMovement WHERE CorrelationId = 'A07-API-011-X20'",
+              "equals": "COUNTCHECK1234567890"
+            },
+            {
+              "on": "scale",
+              "status": 200
+            },
+            {
+              "on": "scale",
+              "json": "$.data.orderValue",
+              "equals": 10.01
+            },
+            {
+              "on": "unsigned",
+              "status": 200
+            },
+            {
+              "on": "unsigned",
+              "json": "$.data.periodNo",
+              "equals": 5
+            },
+            {
+              "on": "nulls",
+              "status": 200
+            },
+            {
+              "on": "nulls",
+              "json": "$.items[*].siteCode",
+              "equals": "RDG"
+            }
+          ],
+          "derivation": "AC '25 chars into X(20) keeps first 20; 10.005 scale 2 becomes 10.01; -5 unsigned becomes 5; empty string to proc parameter is NULL' with contracts 4.4 (CobolCodec.cs:15-100 right truncation, half-away-from-zero, unsigned absolute value; SqlHelper.cs:33) applied to SM-REASON-CODE PIC X(20), CK-ORDER-VALUE PIC S9(11)V99, WC-PERIOD-NO PIC 9(2) and inv.usp_StockEnquiry @SiteCode; precondition: AR and CST slices delivered.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-API-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-012-AC1",
+          "ac": 1,
+          "title": "Legacy RC 04/06/08/12/16 and a procedure THROW map to 200 WARNING, 202 HOLD, 422, 500, 404 and 422 E-xxxx",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "rc04",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-ERR-TOP"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            },
+            {
+              "sql": "UPDATE inv.Item SET LifecycleStatus = 'BLOCKED', StatusReason = 'A07 blocked for RC 06 mapping' WHERE CompanyCode = 'STC' AND ItemCode = 'WASHER-M6-SS'"
+            },
+            {
+              "save": "rc06",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "WASHER-M6-SS",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": 10,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-API-012-RC06"
+            },
+            {
+              "save": "rc08",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": 0,
+                "uomCode": "EA",
+                "reasonCode": "COUNT",
+                "reason": "zero",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-API-012-RC08"
+            },
+            {
+              "save": "rc12",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": 999999999999,
+                "unitCost": 99999,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-API-012-RC12"
+            },
+            {
+              "save": "rc16",
+              "call": "itm_traceItemLotSerial",
+              "path": {
+                "itemCode": "NUT-M6-NYLOC"
+              },
+              "query": {
+                "lotCode": "A07-NO-SUCH-LOT"
+              }
+            },
+            {
+              "save": "throw",
+              "call": "itm_recordCountedQuantity",
+              "path": {
+                "countId": 999999,
+                "lineNum": 1
+              },
+              "body": {
+                "countedQty": "1"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rc04",
+              "status": 200
+            },
+            {
+              "on": "rc04",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "BOM0512"
+              }
+            },
+            {
+              "on": "rc06",
+              "status": 202
+            },
+            {
+              "on": "rc06",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "STK0001"
+              }
+            },
+            {
+              "on": "rc08",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0003"
+              }
+            },
+            {
+              "on": "rc08",
+              "outcome": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "rc12",
+              "problem": {
+                "status": 500,
+                "type": "severe",
+                "reasonCode": "SQL0001",
+                "detailContains": "Arithmetic overflow"
+              }
+            },
+            {
+              "on": "rc16",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "LOT0006"
+              }
+            },
+            {
+              "on": "throw",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-0098",
+                "detailContains": "The record was not found"
+              }
+            }
+          ],
+          "derivation": "AC 'RC04->200 WARNING; RC06->202 HOLD; RC08->422; RC12->500 with legacy message; RC16->404; THROW STERP-E-x->422 E-x' with contracts 4.6 (CobolResult.cs:6-56, BusinessRuleException.cs:9-41) using one-window INCOMPLETE BOM0512 (seed BOM-DEMO-ERR/DEMO-NOBOM DRAFT), BLOCKED RECEIPT STK0001, zero quantity STK0003, a decimal(18,2) valuation overflow in inv.usp_PostStockMovement (RC 12 SQL0001), LOTSER TRACE RC 16 LOT0006 and core.usp_UiMaintSave THROW 50098 'STERP-E-0098'.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-API-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-013-AC1",
+          "ac": 1,
+          "title": "Autocommitted work outside a COBOL-style unit survives that unit's rollback (BOMBULK preview header and lines)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "prev",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-A07-UOW"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-PIN-HD",
+                "effectiveDate": "2026-11-01",
+                "scope": "ITEM",
+                "scopeItem": "",
+                "includeDraft": true
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "prev",
+              "problem": {
+                "status": 422,
+                "reasonCode": "BOM1411"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM bom.BomChange WHERE CompanyCode = 'STC' AND ChangeRef = 'ECO-A07-UOW'",
+              "equals": "PREVIEW"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomChangeLine l JOIN bom.BomChange c ON c.ChangeId = l.ChangeId WHERE c.ChangeRef = 'ECO-A07-UOW'",
+              "equals": 7
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BOM-DEMO-FRAME' AND BomRevision <> 'A'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC 'callee commit commits caller work in COBOL-style scope; procedure-backed call unaffected by later rollback' read through BOMBULK (STERP-BOM.md FR-STERP-BOM-018 steps 5-8: header in autocommit, proposals in an SQLIO BEGN..ROLB unit, lines in autocommit; c/sterpsql.c:256-273, SqlHelper.cs:56-120) with the ECO demo targets (7 bills, BOM1411); the callee-COMT-commits-caller clause has no binding observable surface (SME-013/SME-014 open), so the expected outcome is unknown.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-API-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-014-AC1",
+          "ac": 1,
+          "title": "OpenAPI index lists the delivered slice documents and serves the binding PLATFORM document",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "idx",
+              "call": "api_listOpenApiDocuments"
+            },
+            {
+              "save": "doc",
+              "call": "api_getOpenApiDocument",
+              "path": {
+                "documentName": "STERP-PLATFORM",
+                "format": "json"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "idx",
+              "status": 200
+            },
+            {
+              "on": "idx",
+              "json": "$.documents[*].name",
+              "equals": "STERP-PLATFORM"
+            },
+            {
+              "on": "doc",
+              "status": 200
+            },
+            {
+              "on": "doc",
+              "json": "$.info.version",
+              "equals": "1.0.0+a06-20261020T112437Z-034eff00"
+            }
+          ],
+          "derivation": "AC 'index lists one document per delivered slice; contract test passes' with STERP-API.md FR-STERP-API-014, the OpenApiIndex schema (documents[name,title,slice,wave,yaml,json]) and contracts 4.11 (info.version 1.0.0+a06-20261020T112437Z-034eff00); the endpoint-versus-document contract test is a build-time test outside the DSL.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-API-015",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-015-AC1",
+          "ac": 1,
+          "title": "Liveness, service diagnostics and trace correlation of a refused request (log content not observable)",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "health",
+            "observability"
+          ],
+          "steps": [
+            {
+              "save": "live",
+              "call": "api_getLiveness"
+            },
+            {
+              "save": "diag",
+              "call": "platform_getServiceDiagnostics"
+            },
+            {
+              "save": "traced",
+              "call": "itm_getItem",
+              "path": {
+                "itemCode": "NO-SUCH-ITEM"
+              },
+              "headers": {
+                "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "live",
+              "status": 200
+            },
+            {
+              "on": "live",
+              "json": "$.status",
+              "equals": "Healthy"
+            },
+            {
+              "on": "diag",
+              "status": 200
+            },
+            {
+              "on": "diag",
+              "json": "$.status",
+              "equals": "ONLINE"
+            },
+            {
+              "on": "diag",
+              "json": "$.readiness",
+              "equals": "Healthy"
+            },
+            {
+              "on": "traced",
+              "problem": {
+                "status": 404,
+                "type": "not-found"
+              }
+            },
+            {
+              "on": "traced",
+              "json": "$.traceId",
+              "contains": "4bf92f3577b34da6a3ce929d0e0e4736"
+            }
+          ],
+          "derivation": "AC 'each request logs traceId,user,company,site,operation,return/reason code; bank fields never logged' with contracts 5.9/10 and the platform_getServiceDiagnostics example (ONLINE, Healthy; PING.cob:1-55); structured log content is not observable through the DSL, so the scenario pins the health probes and the W3C trace id carried into the problem traceId that keys each log entry; the logging and redaction obligation stays unknown.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-API-016",
+      "scenarios": [
+        {
+          "id": "FR-STERP-API-016-AC1",
+          "ac": 1,
+          "title": "Portal Try it out reaches STERP-API with the signed-on Windows user (credentialed CORS from the portal origin)",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "tryit",
+              "gui": "/",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Select a definition",
+                    "value": "STERP-PLATFORM"
+                  }
+                },
+                {
+                  "click": "platform_getSession"
+                },
+                {
+                  "click": "Try it out"
+                },
+                {
+                  "click": "Execute"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "tryit",
+              "text": "200"
+            },
+            {
+              "on": "tryit",
+              "text": "\"userCode\": \"SYSADM\""
+            },
+            {
+              "on": "tryit",
+              "notText": "Failed to fetch"
+            }
+          ],
+          "derivation": "AC 'portal Try it out succeeds for signed-in user; other origins refused' with contracts 5.7-5.8 and HD-02/HD-06; page = portal API Console https://localhost:7103/ (route '/'); a request from another origin cannot be issued through the DSL (no Origin/pre-flight control), so the refusal half is unknown.",
+          "confidence": "unknown"
+        }
+      ]
+    }
+  ]
+}

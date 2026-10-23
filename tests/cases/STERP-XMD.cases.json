@@ -1,0 +1,5537 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-XMD",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-XMD-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-001-AC1",
+          "ac": 1,
+          "title": "Readiness of STERP-API and STERP-JOBS is Healthy with no schema drift on the repository deploy",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "covers": [
+            "health"
+          ],
+          "steps": [
+            {
+              "save": "api",
+              "call": "api_getReadiness",
+              "body": null
+            },
+            {
+              "save": "jobs",
+              "call": "jobs_getReadiness",
+              "body": null
+            }
+          ],
+          "assertions": [
+            {
+              "on": "api",
+              "status": 200
+            },
+            {
+              "on": "api",
+              "json": "$.status",
+              "equals": "Healthy"
+            },
+            {
+              "on": "api",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "api",
+              "json": "$.driftDifferences",
+              "count": 0
+            },
+            {
+              "on": "jobs",
+              "status": 200
+            },
+            {
+              "on": "jobs",
+              "json": "$.status",
+              "equals": "Healthy"
+            },
+            {
+              "on": "jobs",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "jobs",
+              "json": "$.driftDifferences",
+              "count": 0
+            }
+          ],
+          "derivation": "AC1 with contracts 6.11 and spec section 9 (drift check of the 7 rpt/stg objects of db/tables/95-xmd and db/procs/rpt on /health/ready, Health example of api_getReadiness/jobs_getReadiness): an unaltered repository deploy must read Healthy with no differences; the Unhealthy branch needs DDL, which scenarios may not execute.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-001-AC2",
+          "ac": 2,
+          "title": "XMD job and online operations execute no DDL and re-run no 96/97 seed statement",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "trace",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900008"
+              }
+            },
+            {
+              "save": "list",
+              "call": "xmd_listBusinessChainSteps",
+              "body": {
+                "docType": "ORDER",
+                "reference": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "trace",
+              "status": 200
+            },
+            {
+              "on": "list",
+              "status": 200
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.objects o CROSS JOIN (SELECT MIN(j.StartedAt) AS t FROM core.JobRun j WHERE j.JobName = 'RECONCTL') s WHERE o.is_ms_shipped = 0 AND (o.create_date >= s.t OR o.modify_date >= s.t)",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ReportDef d WHERE d.ModifiedAt >= (SELECT MIN(j.StartedAt) FROM core.JobRun j WHERE j.JobName = 'RECONCTL')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC2 and contracts 6.1/6.2 (no DDL, no seeding): no user object is created or altered and no core.ReportDef row is re-merged (96-xmd-jobs.sql and 97-xmd-reports.sql set ModifiedAt on every matched row) after the first XMD run of the scenario starts.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-001-AC3",
+          "ac": 3,
+          "title": "XMD writes only legacy values in stg.ImportBatch, stg.ImportRow and rpt.ReconciliationRun",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "steps": [
+            {
+              "save": "conv",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              }
+            },
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "CAL",
+                "ASAT": "20261031",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT CASE WHEN COUNT(*) > 0 AND SUM(CASE WHEN Status IN ('OPEN','COMMITTED','PARTIAL') AND Mode = 'COMMIT' THEN 0 ELSE 1 END) = 0 THEN 1 ELSE 0 END FROM stg.ImportBatch",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT CASE WHEN COUNT(*) > 0 AND SUM(CASE WHEN ValidationOutcome IN ('VALID','INVALID','DUPLICATE') THEN 0 ELSE 1 END) = 0 THEN 1 ELSE 0 END FROM stg.ImportRow",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT CASE WHEN COUNT(*) > 0 AND SUM(CASE WHEN Status IN ('OPEN','ACCEPTED') THEN 0 ELSE 1 END) = 0 THEN 1 ELSE 0 END FROM rpt.ReconciliationRun",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC3 and the FR-001 writer table (CONVLOAD MERGE/UPDATE CONVLOAD.cob:339-387,1058-1117,1258-1292; RECONCTL INSERT of ACCEPTED or OPEN, RECONCTL.cob:575-642); the fresh deploy holds no rpt/stg rows, so every row is an XMD write.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-001-AC4",
+          "ac": 4,
+          "title": "rpt.vw_ControlBalance and rpt.vw_ExceptionAgeing are neither read nor changed by RECONCTL or EXCPAGE",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "excp",
+              "job": "xmd_submitExcpageRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT COUNT(*) FROM sys.dm_exec_query_stats qs CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) t WHERE qs.last_execution_time >= (SELECT MIN(j.StartedAt) FROM core.JobRun j WHERE j.JobName = 'RECONCTL') AND t.text NOT LIKE '%sys.%' AND (t.text LIKE '%vw' + '[_]ControlBalance%' OR t.text LIKE '%vw' + '[_]ExceptionAgeing%')",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.views v WHERE v.object_id IN (OBJECT_ID('rpt.vw' + '_ControlBalance'), OBJECT_ID('rpt.vw' + '_ExceptionAgeing')) AND v.modify_date < (SELECT MIN(j.StartedAt) FROM core.JobRun j WHERE j.JobName = 'RECONCTL')",
+              "equals": 2
+            }
+          ],
+          "derivation": "AC4 and the FR-001 table (db/views/rpt/vw_ControlBalance.sql and vw_ExceptionAgeing.sql have no production reader; RECONCTL and EXCPAGE read base tables, RECONCTL.cob:274-534, EXCPAGE.cob:240-290): no cached statement executed during the runs names a view and both views keep their definition date.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-002-AC1",
+          "ac": 1,
+          "title": "FINCTRL on STC/RDG sees the 7 Controls and reconciliation rows returned by usp_UiMenuLoad",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "menu",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation"
+                  ]
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "menu",
+              "text": "Control account reconciliation"
+            },
+            {
+              "on": "menu",
+              "text": "Exception ageing and escalation"
+            },
+            {
+              "on": "menu",
+              "text": "Statutory obligations register"
+            },
+            {
+              "on": "menu",
+              "text": "On time in full (KPI)"
+            },
+            {
+              "on": "menu",
+              "text": "Business chain trace"
+            },
+            {
+              "on": "menu",
+              "text": "Chain trace report"
+            },
+            {
+              "on": "menu",
+              "text": "Legacy conversion load"
+            }
+          ],
+          "derivation": "AC1 with the seeded rows of db/seed/97-xmd-reports.sql:215-222 (captions shown without the access-key ampersand) filtered by core.usp_UiMenuLoad; FINCTRL holds FIN.ENQUIRY.VIEW and FIN.JOURNAL.POST (db/seed/03-core-roles-users.sql), so all 7 entries show (frmMain.vb:39-78).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-002-AC2",
+          "ac": 2,
+          "title": "No conversion row without FIN.JOURNAL.POST; chain page re-activated; RPT-015 launcher pre-filled; Job streams",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "TREASURY",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation",
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "branch",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation"
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "chain",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Business chain trace"
+                  ]
+                },
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Business chain trace"
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "launcher",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Reports",
+                    "Controls and reconciliation",
+                    "Control account reconciliation"
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "jobs",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "System",
+                    "Job streams"
+                  ]
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "branch",
+              "notText": "Legacy conversion load"
+            },
+            {
+              "on": "branch",
+              "text": "Control account reconciliation"
+            },
+            {
+              "on": "chain",
+              "text": "Business Chain Trace"
+            },
+            {
+              "on": "chain",
+              "text": "Enter a document reference, then Trace (F10)."
+            },
+            {
+              "on": "launcher",
+              "text": "1 report(s) available."
+            },
+            {
+              "on": "launcher",
+              "text": "RPT-015"
+            },
+            {
+              "on": "launcher",
+              "text": "TOL:"
+            },
+            {
+              "on": "launcher",
+              "text": "PREVIEW"
+            },
+            {
+              "on": "launcher",
+              "text": "20261019"
+            },
+            {
+              "on": "jobs",
+              "text": "Command  is not available."
+            }
+          ],
+          "derivation": "AC2 with TREASURY (FIN.ENQUIRY.VIEW without FIN.JOURNAL.POST, 03-core-roles-users.sql), menu rows 97-xmd-reports.sql:216-222 and 96-xmd-jobs.sql:86-94 (parent inferred SYSTEM), single-instance OpenForm frmMain.vb:81-90, launcher pre-fill frmReportLauncher.vb:44-66 (ASAT = business date 20261019, MODE PREVIEW) and the empty shell command text of frmMain.vb:139.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-010-AC1",
+          "ac": 1,
+          "title": "Blank docRef is refused 422 XMD0002 'A document reference is required.'",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": ""
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "XMD0002",
+                "detailContains": "A document reference is required."
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.returnCode",
+              "equals": 8
+            }
+          ],
+          "derivation": "AC1 and OpenAPI 422 example noReference: CHAINTRC 0100-INITIALISE refuses a blank CT-DOC-REF with RC 8 XMD0002 before any SQL (CHAINTRC.cob:109-114), mapped to 422 by contracts 4.6.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC2",
+          "ac": 2,
+          "title": "docType INVOICE with SI-26-1001 is refused 422 XMD0003",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "INVOICE",
+                "docRef": "SI-26-1001"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "XMD0003",
+                "detailContains": "Document type must be ORDER, PO or KIT."
+              }
+            }
+          ],
+          "derivation": "AC2 with request and 422 examples unsupportedType: CHAINTRC.cob:116-134 refuses any type outside ORDER/SALESORDER/PO/PURCHASE/KIT with RC 8 XMD0003.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC3",
+          "ac": 3,
+          "title": "Lower-case docType 'order' is upper-cased and traced as an order-to-cash chain",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "order",
+                "docRef": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.chainType",
+              "equals": "O2C"
+            },
+            {
+              "on": "r",
+              "json": "$.data.chainName",
+              "equals": "Order to cash"
+            }
+          ],
+          "derivation": "AC3: CHAINTRC moves FUNCTION UPPER-CASE(CT-DOC-TYPE) before mapping ORDER to O2C 'Order to cash' (CHAINTRC.cob:115-122); SOS900008 has seeded schedules (db/seed/93-so-demo.sql:115,174-175).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC4",
+          "ac": 4,
+          "title": "SOS900008 traces as O2C with the Sales order schedules head step (ORDER, ACCEPTED, OPERATION, 0.00)",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.chainType",
+              "equals": "O2C"
+            },
+            {
+              "on": "r",
+              "json": "$.data.chainName",
+              "equals": "Order to cash"
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].stage",
+              "equals": "Sales order schedules"
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].docType",
+              "equals": "ORDER"
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].reference",
+              "equals": "SOS900008"
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].status",
+              "equals": "ACCEPTED"
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].kind",
+              "equals": "OPERATION"
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].valueGbp",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].quantity",
+              "equals": 24
+            }
+          ],
+          "derivation": "AC4 and named example salesOrder: head-step fields of CHAINTRC.cob:156-185 with SUM(Quantity) 24 from the two seeded lines of SOS900008 (8 frames, 16 tyres, 93-so-demo.sql:174-175); despatch party C0090 and journal steps exist only after workflow 1 steps 3-4, which need a generated pick list the DSL cannot pass, so they stay parity-only (SME-684).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC5",
+          "ac": 5,
+          "title": "Unknown order ZZ-NO-SUCH-ORDER answers 404 XMD0016 'No sales order schedule carries that number.'",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "ZZ-NO-SUCH-ORDER"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "XMD0016",
+                "detailContains": "No sales order schedule carries that number."
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.returnCode",
+              "equals": 16
+            }
+          ],
+          "derivation": "AC5 with the legacy oracle cobol/tests/xmd/TXMDCTL.cob:167-187 (ZZ-NO-SUCH-ORDER answers 16 and broken) and the OpenAPI 404 example; CHAINTRC.cob:186-193.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC6",
+          "ac": 6,
+          "title": "Operational steps without a journal give 200 WARNING XMD0004, broken Y, complete N (SOS900006)",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900006"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "XMD0004",
+                "messageContains": "The chain has no posted financial effect yet."
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.broken",
+              "equals": "Y"
+            },
+            {
+              "on": "r",
+              "json": "$.data.complete",
+              "equals": "N"
+            }
+          ],
+          "derivation": "AC6 and judgement J3 of spec 4.1 (CHAINTRC.cob:385-413): SOS900006 has seeded schedules and despatch DNS900001 (93-so-demo.sql:446-482) and no fin.Journal of the seeds carries that SourceRef.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC7",
+          "ac": 7,
+          "title": "A chain of more than 24 steps returns 24 steps, truncated Y and 200 WARNING XMD0005",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "UPDATE j SET j.SourceRef = 'SOS900008' FROM fin.Journal j WHERE j.JournalId IN (SELECT TOP (25) x.JournalId FROM fin.Journal x WHERE x.CompanyCode = 'STC' ORDER BY x.JournalId);"
+            },
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "XMD0005",
+                "messageContains": "More steps exist than the enquiry can return."
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.truncated",
+              "equals": "Y"
+            },
+            {
+              "on": "r",
+              "json": "$.data.stepCount",
+              "equals": 24
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps",
+              "count": 24
+            }
+          ],
+          "derivation": "AC7 with CHAINTRC.cob:343-345,371-374 and J4 of spec 4.1: the schedule head step plus 25 journals whose SourceRef is SOS900008 (arranged on existing STC journals) fill 24 slots and the next fetched journal sets truncated.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC8",
+          "ac": 8,
+          "title": "Response docType is DESPATCH for an order and KITLINE for a kit once the head step was found",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "order",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900008"
+              }
+            },
+            {
+              "save": "kit",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "KIT",
+                "docRef": "KIT0001001"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "order",
+              "status": 200
+            },
+            {
+              "on": "order",
+              "json": "$.data.docType",
+              "equals": "DESPATCH"
+            },
+            {
+              "on": "kit",
+              "status": 200
+            },
+            {
+              "on": "kit",
+              "json": "$.data.docType",
+              "equals": "KITLINE"
+            }
+          ],
+          "derivation": "AC8 and carried defect BRF-CHAINTRC-07 (CT-DOC-TYPE overwritten before the list, CHAINTRC.cob:204,307); seed order SOS900008 (93-so-demo.sql) and seed kit KIT0001001 (95-kit-demo.sql:58).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC9",
+          "ac": 9,
+          "title": "A trace changes no table and claims no idempotency key",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900008"
+              },
+              "idempotencyKey": "A07-XMD-010-AC9"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.IdempotencyKey WHERE CorrelationId = 'A07-XMD-010-AC9'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT CONCAT(SUM(Quantity), '|', SUM(DespatchedQty)) FROM so.DeliverySchedule WHERE CompanyCode = 'STC' AND OrderNumber = 'SOS900008'",
+              "equals": "24.000000|0.000000"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.Journal WHERE CompanyCode = 'STC' AND SourceRef = 'SOS900008'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC9 and spec FR-010 item 8 (CHAINTRC issues SELECT statements only, CHAINTRC.cob:529-535; x-sterp-uow read-only, Idempotency-Key only echoed): the traced rows keep their seeded values and no IDEMPOT row exists for the key.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-010-AC10",
+          "ac": 10,
+          "title": "O2C head note is cut to 60 characters: 'Scheduled 24.000000    despatched 24.000000    cancelled lin'",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "UPDATE so.DeliverySchedule SET DespatchedQty = Quantity WHERE CompanyCode = 'STC' AND OrderNumber = 'SOS900008';"
+            },
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].note",
+              "equals": "Scheduled 24.000000    despatched 24.000000    cancelled lin"
+            }
+          ],
+          "derivation": "AC10 literal and spec FR-010 item 9: the note is a STRING of 12-character slices cut to 60 (CHAINTRC.cob:178-182); SOS900008 schedules sum 24 and are arranged fully despatched so both quantities print as 24.000000.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-010-EDGE-DOCREF-OVERLENGTH",
+          "ac": null,
+          "title": "A docRef longer than 40 characters is right-truncated to CT-DOC-REF X(40)",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900008                               OVERFLOW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.docRef",
+              "equals": "SOS900008"
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].reference",
+              "equals": "SOS900008"
+            }
+          ],
+          "derivation": "Contracts 4.4 alphanumeric rule (CobolCodec.cs:37-43: right-truncate to the field length, BC-001 rejected) applied to CT-DOC-REF X(40) (CHAINTRCCA.cpy:20): the 48-character reference keeps 'SOS900008' plus 31 spaces, which matches the seeded order.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-010-EDGE-QTY-TRUNCATION",
+          "ac": null,
+          "title": "Head step quantity is truncated, not rounded, to 3 decimals (24.123956 gives 24.123)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "UPDATE so.DeliverySchedule SET Quantity = 8.123956 WHERE CompanyCode = 'STC' AND OrderNumber = 'SOS900008' AND LineNum = 1;"
+            },
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "ORDER",
+                "docRef": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[0].quantity",
+              "equals": 24.123
+            }
+          ],
+          "derivation": "Spec FR-010 'quantities truncated to 3 decimals' and section 4.1 numeric conversion (NUMVAL without ROUNDED into CT-QTY S9(11)V9(3), BR-CHAINTRC-013); the arranged schedule makes SUM(Quantity) 24.123956.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-010-EDGE-KIT-WITHOUT-LINES",
+          "ac": null,
+          "title": "A kit without component lines but with a journal lists Material issue and is complete",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "INSERT kit.ExecutionKit (CompanyCode, SiteCode, KitRef, ParentItemCode, PlannedGoodQty, CreatedBy) SELECT k.CompanyCode, k.SiteCode, 'A07-KIT-NOLINES', k.ParentItemCode, 5, 'A07' FROM kit.ExecutionKit k WHERE k.CompanyCode = 'STC' AND k.KitRef = 'KIT0001004'; UPDATE fin.Journal SET SourceRef = 'A07-KIT-NOLINES' WHERE CompanyCode = 'STC' AND SourceRef = 'SALES-P01';"
+            },
+            {
+              "save": "r",
+              "call": "xmd_traceBusinessChain",
+              "body": {
+                "docType": "KIT",
+                "docRef": "A07-KIT-NOLINES"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.complete",
+              "equals": "Y"
+            },
+            {
+              "on": "r",
+              "json": "$.data.stepCount",
+              "equals": 3
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[1].stage",
+              "equals": "Material issue"
+            },
+            {
+              "on": "r",
+              "json": "$.data.steps[1].reference",
+              "equals": "Component issues"
+            }
+          ],
+          "derivation": "Section 10 edge 'kit without lines + journal -> complete' and BRF-CHAINTRC-05: the ungrouped component aggregate of CHAINTRC.cob:296-307 always returns one row, so the header, Material issue and the linked seed journal SALES-P01 (91-fin-demo.sql:74-77) give complete Y.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-011-AC1",
+          "ac": 1,
+          "title": "Whole chain of SOS900008 starts with the Sales order schedules row; despatch rows carry 'Customer <code>'",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "r8",
+              "call": "xmd_listBusinessChainSteps",
+              "body": {
+                "docType": "ORDER",
+                "reference": "SOS900008"
+              }
+            },
+            {
+              "save": "r6",
+              "call": "xmd_listBusinessChainSteps",
+              "body": {
+                "docType": "ORDER",
+                "reference": "SOS900006"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r8",
+              "status": 200
+            },
+            {
+              "on": "r8",
+              "json": "$.deployed",
+              "equals": true
+            },
+            {
+              "on": "r8",
+              "json": "$.count",
+              "lte": 24
+            },
+            {
+              "on": "r8",
+              "json": "$.items[0].stage",
+              "equals": "Sales order schedules"
+            },
+            {
+              "on": "r8",
+              "json": "$.items[0].stepKind",
+              "equals": "OPERATION"
+            },
+            {
+              "on": "r8",
+              "json": "$.items[0].documentType",
+              "equals": "ORDER"
+            },
+            {
+              "on": "r8",
+              "json": "$.items[0].status",
+              "equals": "ACCEPTED"
+            },
+            {
+              "on": "r8",
+              "json": "$.items[0].amountGbp",
+              "equals": 0
+            },
+            {
+              "on": "r6",
+              "status": 200
+            },
+            {
+              "on": "r6",
+              "json": "$.items[1].stage",
+              "equals": "Despatch"
+            },
+            {
+              "on": "r6",
+              "json": "$.items[1].note",
+              "equals": "Customer C0003"
+            }
+          ],
+          "derivation": "AC1 and named example salesOrder: rpt.usp_ChainTrace result set 1 (usp_ChainTrace.sql:66-70,166-171) ordered by SortGroup; SOS900008 has seeded schedules and SOS900006 the seeded despatch DNS900001 of customer C0003 (93-so-demo.sql:111,446-482), whose note is 'Customer ' + CustomerCode.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-011-AC2",
+          "ac": 2,
+          "title": "docType INVOICE is refused 422 E-0803 by rpt.usp_ChainTrace",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_listBusinessChainSteps",
+              "body": {
+                "docType": "INVOICE",
+                "reference": "SI-26-1001"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-0803",
+                "detailContains": "Document type must be ORDER, PO or KIT."
+              }
+            }
+          ],
+          "derivation": "AC2 with THROW 50803 'STERP-E-0803: Document type must be ORDER, PO or KIT.' (usp_ChainTrace.sql:43-44) mapped by contracts 4.6 to 422 with reasonCode E-0803.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-011-AC3",
+          "ac": 3,
+          "title": "A blank reference is refused 422 E-0802 (empty string sent as NULL)",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_listBusinessChainSteps",
+              "body": {
+                "docType": "ORDER",
+                "reference": ""
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-0802",
+                "detailContains": "A document reference is required"
+              }
+            }
+          ],
+          "derivation": "AC3 with SqlHelper empty string -> NULL (SqlHelper.cs:33) and THROW 50802 'STERP-E-0802: A document reference is required for a chain trace.' (usp_ChainTrace.sql:30-31).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-011-AC4",
+          "ac": 4,
+          "title": "A chain of more than 24 steps returns exactly 24 items",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "UPDATE j SET j.SourceRef = 'SOS900008' FROM fin.Journal j WHERE j.JournalId IN (SELECT TOP (25) x.JournalId FROM fin.Journal x WHERE x.CompanyCode = 'STC' ORDER BY x.JournalId);"
+            },
+            {
+              "save": "r",
+              "call": "xmd_listBusinessChainSteps",
+              "body": {
+                "docType": "ORDER",
+                "reference": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.items",
+              "count": 24
+            },
+            {
+              "on": "r",
+              "json": "$.count",
+              "equals": 24
+            }
+          ],
+          "derivation": "AC4 with SELECT TOP (@MaxSteps) and @MaxSteps defaulting to 24 because the facade never passes it (usp_ChainTrace.sql:166-171, XmdService.vb:77-78); head step plus 25 journals arranged on SourceRef SOS900008.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-011-AC5",
+          "ac": 5,
+          "title": "A kit without component lines yields no Material issue row",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "INSERT kit.ExecutionKit (CompanyCode, SiteCode, KitRef, ParentItemCode, PlannedGoodQty, CreatedBy) SELECT k.CompanyCode, k.SiteCode, 'A07-KIT-NOLINES', k.ParentItemCode, 5, 'A07' FROM kit.ExecutionKit k WHERE k.CompanyCode = 'STC' AND k.KitRef = 'KIT0001004';"
+            },
+            {
+              "save": "r",
+              "call": "xmd_listBusinessChainSteps",
+              "body": {
+                "docType": "KIT",
+                "reference": "A07-KIT-NOLINES"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.items",
+              "count": 1
+            },
+            {
+              "on": "r",
+              "json": "$.items[0].stage",
+              "equals": "Execution kit"
+            }
+          ],
+          "derivation": "AC5 with HAVING COUNT(*) > 0 on the component aggregate (usp_ChainTrace.sql:107-114): a kit header copied from seed KIT0001004 without lines and without journals returns only its Execution kit row.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-011-AC6",
+          "ac": 6,
+          "title": "Absent rpt.usp_ChainTrace returns items empty, count 0, deployed false",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "xmd_listBusinessChainSteps",
+              "body": {
+                "docType": "ORDER",
+                "reference": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.deployed",
+              "exists": true
+            },
+            {
+              "on": "r",
+              "json": "$.items",
+              "exists": true
+            }
+          ],
+          "derivation": "AC6 and OpenAPI example notDeployed (XmdService.vb:76, ServiceBase.vb:59-61): the precondition needs a database without rpt.usp_ChainTrace, which only DDL can produce and both datasets deploy the procedure, so only the binding 200 response shape is pinned and the deployed=false values cannot be asserted here.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-012-AC1",
+          "ac": 1,
+          "title": "Opened without argument the page asks for a reference and makes no call",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/xmd/chain-trace",
+              "actions": []
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "text": "Business Chain Trace"
+            },
+            {
+              "on": "page",
+              "text": "Enter a document reference, then Trace (F10)."
+            }
+          ],
+          "derivation": "AC1 with frmChainTrace.LoadData (frmChainTrace.vb:38-45) and caption 'Business Chain Trace' (frmChainTrace.Designer.vb:23).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-012-AC2",
+          "ac": 2,
+          "title": "F10 on ORDER SOS900008 fills the grid and shows the Describe status line",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "traced",
+              "gui": "/xmd/chain-trace",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Document type",
+                    "value": "ORDER"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reference",
+                    "value": "SOS900008"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "OK"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "traced",
+              "text": "Sales order schedules"
+            },
+            {
+              "on": "traced",
+              "text": "Order to cash: 1 step(s), party , value £0.00, 0 reversal(s), *** BROKEN CHAIN"
+            }
+          ],
+          "derivation": "AC2 with TraceClicked and Describe (frmChainTrace.vb:52-62,88-98; Fmt.Money '£#,##0.00' Fmt.cs:57): on the fresh deploy SOS900008 has one schedule step and no journal, so after the XMD0004 warning dialog the status reads 1 step, blank party, £0.00 and the broken marker (', complete' applies only to complete chains).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-012-AC3",
+          "ac": 3,
+          "title": "F10 with the blank document type shows the XMD0003 error dialog and an empty grid",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "typeBlank",
+              "gui": "/xmd/chain-trace",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Reference",
+                    "value": "SOS900008"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "typeBlank",
+              "text": "Document type must be ORDER, PO or KIT."
+            },
+            {
+              "on": "typeBlank",
+              "text": "Reason code: XMD0003"
+            },
+            {
+              "on": "typeBlank",
+              "notText": "Sales order schedules"
+            }
+          ],
+          "derivation": "AC3 with the blank first picker item sent as docType '' (frmChainTrace.vb:23-24,107-109), CHAINTRC XMD0003 (CHAINTRC.cob:131-134) and the error dialog text 'Reason code: <code>' of BaseForm.vb:239-242.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-012-AC4",
+          "ac": 4,
+          "title": "Whole chain with type INVOICE shows the warning status without any call",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "whole",
+              "gui": "/xmd/chain-trace",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Document type",
+                    "value": "INVOICE"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reference",
+                    "value": "SI-26-1001"
+                  }
+                },
+                {
+                  "click": "Whole chain"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "whole",
+              "text": "The whole chain is walked from an ORDER, a PO or a KIT - choose one."
+            }
+          ],
+          "derivation": "AC4 with ListClicked and XmdService.IsSetTraceable (frmChainTrace.vb:66-76, XmdService.vb:142-148).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-012-AC5",
+          "ac": 5,
+          "title": "A truncated trace shows a XMD0005 warning dialog, then the WARNING cue; F5, F3 and Esc work",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "keys",
+            "accessibility"
+          ],
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "UPDATE j SET j.SourceRef = 'SOS900008' FROM fin.Journal j WHERE j.JournalId IN (SELECT TOP (25) x.JournalId FROM fin.Journal x WHERE x.CompanyCode = 'STC' ORDER BY x.JournalId);"
+            },
+            {
+              "save": "dialog",
+              "gui": "/xmd/chain-trace",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Document type",
+                    "value": "ORDER"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reference",
+                    "value": "SOS900008"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "status",
+              "gui": "/xmd/chain-trace",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Document type",
+                    "value": "ORDER"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reference",
+                    "value": "SOS900008"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "OK"
+                }
+              ]
+            },
+            {
+              "save": "refresh",
+              "gui": "/xmd/chain-trace",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Document type",
+                    "value": "ORDER"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reference",
+                    "value": "SOS900008"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "closeF3",
+              "gui": "/xmd/chain-trace",
+              "actions": [
+                {
+                  "press": "F3"
+                }
+              ]
+            },
+            {
+              "save": "closeEsc",
+              "gui": "/xmd/chain-trace",
+              "actions": [
+                {
+                  "press": "Esc"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "dialog",
+              "text": "Reason code: XMD0005"
+            },
+            {
+              "on": "status",
+              "text": "*** TRUNCATED AT 24 STEPS"
+            },
+            {
+              "on": "status",
+              "text": "!  WARNING"
+            },
+            {
+              "on": "refresh",
+              "text": "Reason code: XMD0005"
+            },
+            {
+              "on": "closeF3",
+              "notText": "Enter a document reference, then Trace (F10)."
+            },
+            {
+              "on": "closeEsc",
+              "notText": "Enter a document reference, then Trace (F10)."
+            }
+          ],
+          "derivation": "AC5 with ShowResult RC 4 warning dialog then Describe/StatusTag (BaseForm.vb:202-218, frmChainTrace.vb:56-61,88-104), F5 LoadData re-tracing a filled reference (frmChainTrace.vb:38-45) and F3/Esc close (BaseForm.vb:77-110, contracts 9.4); the chain is made longer than 24 steps by linking 25 STC journals to SOS900008.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-013-AC1",
+          "ac": 1,
+          "title": "A job without CO, USER, MODE and ASAT runs for STC, the caller and PREVIEW and writes nothing",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "recon",
+              "json": "$.result.mode",
+              "equals": "PREVIEW"
+            },
+            {
+              "sql": "SELECT CASE WHEN EXISTS (SELECT 1 FROM core.JobRun j WHERE j.JobName = 'RECONCTL' AND j.CompanyCode = 'STC' AND j.Arguments LIKE '%USER=FINCTRL%') THEN 1 ELSE 0 END",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM rpt.ReconciliationRun",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE Category = 'RECONCILIATION DIFFERENCE'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC1 with 9500-STD-ARGS defaults (XMDBATPR.cpy:190-224: CO STC, MODE PREVIEW, ASAT host date) and spec 7.3 translation rules (CO = X-STERP-Company, USER = effective user FINCTRL); PREVIEW writes neither rpt.ReconciliationRun nor exceptions.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-013-AC2",
+          "ac": 2,
+          "title": "MODE=commit is upper-cased and treated as COMMIT",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "commit"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "recon",
+              "json": "$.result.mode",
+              "equals": "COMMIT"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM rpt.ReconciliationRun WHERE CompanyCode = 'STC' AND AsOfDate = '2026-10-31' AND RunBy = 'FINCTRL'",
+              "equals": 8
+            }
+          ],
+          "derivation": "AC2 with FUNCTION UPPER-CASE(CM-MODE) and 88 XB-COMMIT (XMDBATPR.cpy:208, XMDBATWK.cpy:30-32): the COMMIT branch of RECONCTL inserts one rpt.ReconciliationRun row per family (RECONCTL.cob:575-642).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-013-AC3",
+          "ac": 3,
+          "title": "MODE=YES behaves as a preview and writes nothing",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "YES"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "recon",
+              "json": "$.result.mode",
+              "equals": "YES"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM rpt.ReconciliationRun",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE Category = 'RECONCILIATION DIFFERENCE'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC3: only the exact value COMMIT enables writes (XMDBATWK.cpy:30-32); S-MODE prints the upper-cased argument (RECONCTL.cob:249).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-013-AC4",
+          "ac": 4,
+          "title": "core.JobRun holds the program's own row with status, return code, rows and RECONCTL-STC-<stamp>.lst",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "observability"
+          ],
+          "steps": [
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'RECONCTL' AND CompanyCode = 'STC' AND RowsProcessed = 8 AND SpoolFile LIKE '%RECONCTL-STC-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].lst' AND Status = CASE ReturnCode WHEN 0 THEN 'OK' WHEN 4 THEN 'WARNING' ELSE 'FAILED' END",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC4 with 9100-JOB-START/9150-JOB-END (XMDBATPR.cpy:28-58: COMPLETE stored OK, WARNING, FAILED; rows = XB-ROWS-OUT, 8 control families in RECONCTL.cob:340-378) and 9200-OPEN-SPOOL file <PROGRAM>-<CO>-<yyyyMMddHHmmss>.lst (:60-82).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-013-AC5",
+          "ac": 5,
+          "title": "PREVIEW counts the raised exceptions on the report and writes no core.ExceptionItem row",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "WITH latest AS (SELECT TOP (1) r.ClosingStatementBalance FROM fin.BankRecon r WHERE r.CompanyCode = 'STC' AND r.BankAccountCode = 'GBP1' AND r.ToDate <= '2026-10-31' ORDER BY r.ToDate DESC) UPDATE latest SET ClosingStatementBalance = ClosingStatementBalance + 100.00;"
+            },
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "recon",
+              "json": "$.result.families[6].status",
+              "equals": "DIFFERENCE"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.exceptionCount",
+              "gte": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE Category = 'RECONCILIATION DIFFERENCE'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC5 with 9700-RAISE-EXCEPTION (XMDBATPR.cpy:291-316: outside COMMIT only ADD 1 TO XB-RAISED); the BANK family is made to differ by raising the latest saved GBP1 bank reconciliation at or before the cutoff by 100.00.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-014-AC1",
+          "ac": 1,
+          "title": "FINCTRL's full catalogue lists the rows core.usp_UiReportList returns (RPT-005, JOB.MONTHEND, RPT-010)",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "cat",
+              "call": "platform_listReportCatalogue",
+              "body": null
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cat",
+              "status": 200
+            },
+            {
+              "on": "cat",
+              "json": "$.items[*].reportCode",
+              "equals": "RPT-005"
+            },
+            {
+              "on": "cat",
+              "json": "$.items[*].reportCode",
+              "equals": "JOB.MONTHEND"
+            },
+            {
+              "on": "cat",
+              "json": "$.items[*].reportCode",
+              "equals": "RPT-010"
+            },
+            {
+              "on": "cat",
+              "json": "$.items[*].reportCode",
+              "equals": "RPT-004"
+            }
+          ],
+          "derivation": "AC1 and spec FR-014 examples: RPT-005 (FIN.ENQUIRY.VIEW), RPT-010 (ITM.STOCK.VIEW) and RPT-004 (FIN.BANK.RECONCILE) are granted to FINCTRL (03-core-roles-users.sql) and JOB.MONTHEND has no PermissionCode (96-xmd-jobs.sql:47-49), so usp_UiReportList.sql:18-39 returns them.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-014-AC2",
+          "ac": 2,
+          "title": "JOB.MONTHEND with YEAR=2026 PERIOD=7 MODE=PREVIEW resolves to stream MONTHEND",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "platform_launchCatalogueReport",
+              "path": {
+                "reportCode": "JOB.MONTHEND"
+              },
+              "body": {
+                "parameters": [
+                  {
+                    "key": "CO",
+                    "value": "STC"
+                  },
+                  {
+                    "key": "YEAR",
+                    "value": "2026"
+                  },
+                  {
+                    "key": "PERIOD",
+                    "value": "7"
+                  },
+                  {
+                    "key": "MODE",
+                    "value": "PREVIEW"
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "MONTHEND"
+            }
+          ],
+          "derivation": "AC2 with the JOB. prefix selecting the stream ProgramName MONTHEND (ReportService.vb:86-88,94-96; seed 96-xmd-jobs.sql:47-49) registered under @JobName = ProgramName; this is the delivered-application answer, before STERP-FIN (W5) is delivered the launch answers 501 API0501 naming STERP-FIN.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-014-AC3",
+          "ac": 3,
+          "title": "RPT-010 runs program STKSTAT of STERP-ITM with the typed parameters and USER = the signed-on user",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "run",
+              "job": "platform_launchCatalogueReport",
+              "path": {
+                "reportCode": "RPT-010"
+              },
+              "body": {
+                "parameters": [
+                  {
+                    "key": "CO",
+                    "value": "STC"
+                  },
+                  {
+                    "key": "SITE",
+                    "value": "RDG"
+                  },
+                  {
+                    "key": "ITEM",
+                    "value": "BAR-AL6082-25MM"
+                  },
+                  {
+                    "key": "ASAT",
+                    "value": "20261031"
+                  },
+                  {
+                    "key": "MODE",
+                    "value": "PREVIEW"
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "json": "$.run.jobName",
+              "equals": "STKSTAT"
+            },
+            {
+              "on": "run",
+              "json": "$.run.execution.slice",
+              "equals": "STERP-ITM"
+            },
+            {
+              "on": "run",
+              "json": "$.run.execution.commandLine",
+              "equals": "CO=STC SITE=RDG ITEM=BAR-AL6082-25MM ASAT=20261031 MODE=PREVIEW USER=FINCTRL"
+            }
+          ],
+          "derivation": "AC3 with seed row RPT-010 (STKSTAT, ParamSpec CO,SITE,ITEM,ASAT,MODE, 97-xmd-reports.sql:50-52) and the launcher argument rule (ParamSpec order, USER always the caller appended, frmReportLauncher.vb:94-96, ReportService.vb:51-63).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-014-AC4",
+          "ac": 4,
+          "title": "Without AR.ENQUIRY, RPT-001 is neither in the caller's catalogue nor launchable",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "APMGR",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "params",
+              "call": "platform_getReportParameters",
+              "path": {
+                "reportCode": "RPT-001"
+              },
+              "body": null
+            },
+            {
+              "save": "launch",
+              "call": "platform_launchCatalogueReport",
+              "path": {
+                "reportCode": "RPT-001"
+              },
+              "body": {
+                "parameters": [
+                  {
+                    "key": "CO",
+                    "value": "STC"
+                  },
+                  {
+                    "key": "ASAT",
+                    "value": "20261031"
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "params",
+              "problem": {
+                "status": 403,
+                "reasonCode": "API0020"
+              }
+            },
+            {
+              "on": "launch",
+              "problem": {
+                "status": 403
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'AGEDDEBT'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC4 with RPT-001 PermissionCode AR.ENQUIRY (97-xmd-reports.sql:29-31) filtered by core.usp_UiReportList through core.usp_UiCheckAccess (usp_UiReportList.sql:18-39); db/seed/52-ar-menu.sql:43-55 grants AR.ENQUIRY to every role holding AR.ENQUIRY.VIEW (ARCLERK, AUDITOR, CREDMGR, DIRECTOR, FINCTRL, SYSADM, VATOWNER), so the actor is APMGR, who uses the catalogue (RPT-002) but lacks AR.ENQUIRY: on restored freshc core.fn_HasPermission('APMGR', 'AR.ENQUIRY', 'STC', NULL) = 0 and EXEC core.usp_UiReportList 'APMGR', 'STC' lists no RPT-001 (FINCTRL: 1 and listed). The launch refusal reason differs between the XMD (PRM0006) and PLATFORM (API0020) specifications, so only 403 and the absent run are pinned for the launch. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-042: actor without AR.ENQUIRY (APMGR) instead of FINCTRL, who holds it (dataset query, legacy procedure execution)]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-020",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-020-AC1",
+          "ac": 1,
+          "title": "Workflow 1 step 8: after the C0001 8,196.00 receipt, STC is UNRECONCILED on BANK only, RC 4, nothing written",
+          "layer": "api-journey",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "rcpt",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-07",
+                "currency": "GBP",
+                "gross": 8196.0,
+                "bankRef": "PENNINE OCT 26",
+                "externalRef": ""
+              },
+              "as": "ARCLERK",
+              "idempotencyKey": "A07-XMD-020-AC1-RCPT"
+            },
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rcpt",
+              "status": 200
+            },
+            {
+              "on": "recon",
+              "run": {
+                "status": "WARNING",
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families",
+              "count": 8
+            },
+            {
+              "on": "recon",
+              "json": "$.result.runStatus",
+              "equals": "UNRECONCILED"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].code",
+              "equals": "BANK"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].status",
+              "equals": "DIFFERENCE"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].differenceGbp",
+              "equals": -8196.0
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].ownerRole",
+              "equals": "TREASURY"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.unreconciledCount",
+              "equals": 1
+            },
+            {
+              "on": "recon",
+              "json": "$.result.exceptionCount",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM rpt.ReconciliationRun r WHERE r.CompanyCode = 'STC' AND r.RunAt >= (SELECT MAX(j.StartedAt) FROM core.JobRun j WHERE j.JobName = 'RECONCTL')",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem e WHERE e.CompanyCode = 'STC' AND e.Category = 'RECONCILIATION DIFFERENCE' AND e.RaisedAt >= (SELECT MAX(j.StartedAt) FROM core.JobRun j WHERE j.JobName = 'RECONCTL')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC1 with named examples workflow1Step8 and ar_recordReceipt demo (docs/DEMO-WORKFLOWS.md workflow 1 steps 6 and 8: all families agree except BANK, whose saved DEMO-20261031-GBP1 bank reconciliation predates the receipt; FUNCTIONAL-QA-LEDGER.md: STC BANK -8,196.00, RC 4); PREVIEW writes nothing (RECONCTL.cob:575-578).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-020-AC2",
+          "ac": 2,
+          "title": "COMMIT deletes OPEN rows, keeps ACCEPTED rows, inserts 8 rows and raises one WARNING per non-agreed family",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "WITH latest AS (SELECT TOP (1) r.ClosingStatementBalance FROM fin.BankRecon r WHERE r.CompanyCode = 'STC' AND r.BankAccountCode = 'GBP1' AND r.ToDate <= '2026-10-31' ORDER BY r.ToDate DESC) UPDATE latest SET ClosingStatementBalance = ClosingStatementBalance + 100.00; INSERT rpt.ReconciliationRun (CompanyCode, ControlType, AsOfDate, ControlBalanceGBP, DetailBalanceGBP, DifferenceGBP, Status, Note, RunBy) VALUES ('STC','BANK','2026-10-31',0,0,0,'ACCEPTED','A07 earlier accepted row','A07'), ('STC','BANK','2026-10-31',0,0,0,'OPEN','A07 earlier open row','A07');"
+            },
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "COMMIT",
+                "TOL": "0.01"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT COUNT(*) FROM rpt.ReconciliationRun WHERE CompanyCode = 'STC' AND Note = 'A07 earlier open row'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM rpt.ReconciliationRun WHERE CompanyCode = 'STC' AND Note = 'A07 earlier accepted row'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM rpt.ReconciliationRun WHERE CompanyCode = 'STC' AND AsOfDate = '2026-10-31' AND RunBy = 'FINCTRL'",
+              "equals": 8
+            },
+            {
+              "sql": "SELECT CONCAT(Status, '|', OwnerUser, '|', DifferenceGBP) FROM rpt.ReconciliationRun WHERE CompanyCode = 'STC' AND AsOfDate = '2026-10-31' AND ControlType = 'BANK' AND RunBy = 'FINCTRL'",
+              "equals": "OPEN|TREASURY|100.00"
+            },
+            {
+              "sql": "SELECT CONCAT(Severity, '|', OwnerRole, '|', Priority, '|', AmountGBP) FROM core.ExceptionItem WHERE CompanyCode = 'STC' AND Category = 'RECONCILIATION DIFFERENCE' AND DocumentRef = 'STC/BANK/20261031'",
+              "equals": "WARNING|TREASURY|2|100.00"
+            },
+            {
+              "sql": "SELECT CASE WHEN (SELECT COUNT(*) FROM core.ExceptionItem WHERE CompanyCode = 'STC' AND Category = 'RECONCILIATION DIFFERENCE' AND DocumentRef LIKE 'STC/%/20261031') = (SELECT COUNT(*) FROM rpt.ReconciliationRun WHERE CompanyCode = 'STC' AND AsOfDate = '2026-10-31' AND RunBy = 'FINCTRL' AND Status = 'OPEN') THEN 1 ELSE 0 END",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC2 with named example commit, 2300-RAISE (owner role of the family, priority 2, amount = difference, reference CO/CODE/cutoff, RECONCTL.cob:543-567) and 2400-WRITE-RUN (DELETE OPEN then INSERT, ACCEPTED when AGREED, RECONCTL.cob:575-642, SME-670); BANK is arranged 100.00 above the ledger.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-020-AC3",
+          "ac": 3,
+          "title": "CAL at 20261031: WIP and ACCRUAL without a posted control account are NO CONTROL and raise exceptions",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "steps": [
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "CAL",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "recon",
+              "json": "$.result.families[3].code",
+              "equals": "WIP"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[3].status",
+              "equals": "NO CONTROL"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[7].code",
+              "equals": "ACCRUAL"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[7].status",
+              "equals": "NO CONTROL"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.exceptionCount",
+              "gte": 2
+            }
+          ],
+          "derivation": "AC3 with named example workflow4Step7 (docs/DEMO-WORKFLOWS.md workflow 4 step 7: CAL WIP/ACCRUAL have no configured control account) and the NO CONTROL rule when no posted account of the type exists (RECONCTL.cob:363-366); other CAL figures are parity-only.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-020-AC4",
+          "ac": 4,
+          "title": "TOL=0.004 truncates to a 0.00 tolerance so a 0.01 difference is DIFFERENCE",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "WITH latest AS (SELECT TOP (1) r.ClosingStatementBalance FROM fin.BankRecon r WHERE r.CompanyCode = 'STC' AND r.BankAccountCode = 'GBP1' AND r.ToDate <= '2026-10-31' ORDER BY r.ToDate DESC) UPDATE latest SET ClosingStatementBalance = ClosingStatementBalance + 0.01;"
+            },
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW",
+                "TOL": "0.004"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "recon",
+              "json": "$.result.tolerance",
+              "equals": 0
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].differenceGbp",
+              "equals": 0.01
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].status",
+              "equals": "DIFFERENCE"
+            }
+          ],
+          "derivation": "AC4 with COMPUTE XB-TOLERANCE = NUMVAL(TOL) into S9(9)V99 (2-decimal truncation, RECONCTL.cob:236-243) and the DIFFERENCE test D-DIFF > tolerance (RECONCTL.cob:355-363); BANK is arranged 0.01 above the ledger.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-020-AC5",
+          "ac": 5,
+          "title": "A difference exactly equal to the tolerance (0.01) is AGREED",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "WITH latest AS (SELECT TOP (1) r.ClosingStatementBalance FROM fin.BankRecon r WHERE r.CompanyCode = 'STC' AND r.BankAccountCode = 'GBP1' AND r.ToDate <= '2026-10-31' ORDER BY r.ToDate DESC) UPDATE latest SET ClosingStatementBalance = ClosingStatementBalance + 0.01;"
+            },
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW",
+                "TOL": "0.01"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "recon",
+              "json": "$.result.tolerance",
+              "equals": 0.01
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].differenceGbp",
+              "equals": 0.01
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].status",
+              "equals": "AGREED"
+            }
+          ],
+          "derivation": "AC5 with the strict comparison D-DIFF > XB-TOLERANCE OR D-DIFF < 0 - XB-TOLERANCE (RECONCTL.cob:355-363, decision table 4.4 'equal is AGREED'); BANK is arranged 0.01 above the ledger.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-020-AC6",
+          "ac": 6,
+          "title": "A cutoff outside every period prints UNDATED and ends with RC at least 4",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20200131",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "recon",
+              "json": "$.result.period",
+              "equals": "UNDATED"
+            },
+            {
+              "on": "recon",
+              "json": "$.run.returnCode",
+              "gte": 4
+            },
+            {
+              "on": "recon",
+              "json": "$.sysout",
+              "contains": "STERP-W-0101 no accounting period covers 20200131"
+            }
+          ],
+          "derivation": "AC6 with 0100-READ-ARGS (RECONCTL.cob:252-256: XB-FY 0 -> S-PERIOD UNDATED, RC 4, STERP-W-0101) and 9600-RESOLVE-PERIOD (XMDBATPR.cpy:238-267); no fin.Period of the seeds covers January 2020.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-021",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-021-AC1",
+          "ac": 1,
+          "title": "Workflow 6 step 5 PREVIEW at 20261031 lists the open exceptions, writes nothing and ends RC 0",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "excp",
+              "job": "xmd_submitExcpageRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "excp",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "excp",
+              "json": "$.result.asAt",
+              "equals": "2026-10-31"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.mode",
+              "equals": "PREVIEW"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.owner",
+              "equals": "ALL"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.escalationDays",
+              "equals": 30
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE Category = 'EXCEPTION ESCALATION'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE EscalatedAt >= (SELECT MAX(j.StartedAt) FROM core.JobRun j WHERE j.JobName = 'EXCPAGE')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC1 with named example workflow6Step5: OWNER default ALL and DAYS from XMD.EXCEPTION.ESCALATE.DAYS = 30 (EXCPAGE.cob:209-234, 97-xmd-reports.sql parameters), RC 0 unless spool or listing fail and escalations only counted outside COMMIT (XMDBATPR.cpy:291-316); listed rows and buckets are parity-only on the demo state.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-021-AC2",
+          "ac": 2,
+          "title": "COMMIT DAYS=30 escalates old and unowned items and stamps EscalatedAt/AgeDays only where it was NULL",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "INSERT core.ExceptionItem (CompanyCode, Module, Severity, Category, DocumentType, DocumentRef, Message, AmountGBP, OwnerUser, OwnerRole, Priority, RaisedAt, DueAt, Status) VALUES ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-E1','A07 owned item 60 days old',100.00,NULL,'CREDMGR',3,'2019-12-02T09:00:00',NULL,'OPEN'), ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-E2','A07 unowned item past its due date',200.00,NULL,NULL,3,'2020-01-21T09:00:00','2020-01-25T00:00:00','OPEN'), ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-E3','A07 unowned item without a due date',300.00,NULL,NULL,3,'2020-01-29T09:00:00',NULL,'OPEN'), ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-E4','A07 owned item escalated earlier',400.00,NULL,'CREDMGR',3,'2019-11-01T09:00:00',NULL,'OPEN'); UPDATE core.ExceptionItem SET EscalatedAt = '2019-12-15T00:00:00', AgeDays = 45 WHERE DocumentRef = 'A07-E4';"
+            },
+            {
+              "save": "excp",
+              "job": "xmd_submitExcpageRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20200131",
+                "MODE": "COMMIT",
+                "DAYS": "30"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "excp",
+              "json": "$.result.escalated",
+              "equals": 3
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem e JOIN core.ExceptionItem x ON e.DocumentRef = 'EXC' + RIGHT('000000000' + CONVERT(varchar(12), x.ExceptionId), 9) WHERE e.Category = 'EXCEPTION ESCALATION' AND x.DocumentRef IN ('A07-E1', 'A07-E3', 'A07-E4')",
+              "equals": 3
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem e JOIN core.ExceptionItem x ON e.DocumentRef = 'EXC' + RIGHT('000000000' + CONVERT(varchar(12), x.ExceptionId), 9) WHERE e.Category = 'EXCEPTION ESCALATION' AND x.DocumentRef IN ('A07-E2')",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT CONCAT(ISNULL(CONVERT(varchar(12), AgeDays), 'NULL'), '|', CASE WHEN EscalatedAt IS NULL THEN 'N' ELSE 'Y' END) FROM core.ExceptionItem WHERE DocumentRef = 'A07-E1'",
+              "equals": "60|Y"
+            },
+            {
+              "sql": "SELECT CONCAT(ISNULL(CONVERT(varchar(12), AgeDays), 'NULL'), '|', CASE WHEN EscalatedAt IS NULL THEN 'N' ELSE 'Y' END) FROM core.ExceptionItem WHERE DocumentRef = 'A07-E3'",
+              "equals": "2|Y"
+            },
+            {
+              "sql": "SELECT CONCAT(ISNULL(CONVERT(varchar(12), AgeDays), 'NULL'), '|', CASE WHEN EscalatedAt IS NULL THEN 'N' ELSE 'Y' END) FROM core.ExceptionItem WHERE DocumentRef = 'A07-E2'",
+              "equals": "NULL|N"
+            },
+            {
+              "sql": "SELECT CONCAT(AgeDays, '|', CONVERT(char(10), EscalatedAt, 120)) FROM core.ExceptionItem WHERE DocumentRef = 'A07-E4'",
+              "equals": "45|2019-12-15"
+            }
+          ],
+          "derivation": "AC2 with the flag rules of EXCPAGE.cob:313-349 (ESCALATE when age > DAYS, NO OWNER escalated, PAST DUE not), 1200-ESCALATE reference EXC + 9-digit id and 1300 stamp WHERE EscalatedAt IS NULL (EXCPAGE.cob:357-407); items are arranged with ages 60, 10 (past due), 2 and 91 (already stamped) at ASAT 20200131 so no seeded exception is listed.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-021-AC3",
+          "ac": 3,
+          "title": "DAYS=0 flags every item older than 0 days ESCALATE and leaves an item raised on ASAT unflagged",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "INSERT core.ExceptionItem (CompanyCode, Module, Severity, Category, DocumentType, DocumentRef, Message, AmountGBP, OwnerUser, OwnerRole, Priority, RaisedAt, DueAt, Status) VALUES ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-D1','A07 owned item one day old',10.00,NULL,'CREDMGR',3,'2020-01-30T09:00:00',NULL,'OPEN'), ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-D0','A07 owned item raised on the as-at date',20.00,NULL,'CREDMGR',3,'2020-01-31T09:00:00',NULL,'OPEN');"
+            },
+            {
+              "save": "excp",
+              "job": "xmd_submitExcpageRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20200131",
+                "MODE": "PREVIEW",
+                "DAYS": "0"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "excp",
+              "json": "$.result.escalationDays",
+              "equals": 0
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions",
+              "count": 2
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions[0].documentRef",
+              "equals": "A07-D1"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions[0].flag",
+              "equals": "ESCALATE"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions[1].documentRef",
+              "equals": "A07-D0"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions[1].flag",
+              "equals": ""
+            },
+            {
+              "on": "excp",
+              "json": "$.result.escalated",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC3 (DAYS=0, the XMDCLOSE default D-XMD-07) with IF D-AGE > S-DAYS -> ESCALATE (EXCPAGE.cob:342-344) and the listing order shown owner then RaisedAt (EXCPAGE.cob:240-262); ages 1 and 0 at ASAT 20200131.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-021-AC4",
+          "ac": 4,
+          "title": "An unowned item past its due date with age <= DAYS is flagged PAST DUE and not escalated",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "INSERT core.ExceptionItem (CompanyCode, Module, Severity, Category, DocumentType, DocumentRef, Message, AmountGBP, OwnerUser, OwnerRole, Priority, RaisedAt, DueAt, Status) VALUES ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-P1','A07 unowned item past its due date',50.00,NULL,NULL,3,'2020-01-21T09:00:00','2020-01-25T00:00:00','OPEN');"
+            },
+            {
+              "save": "excp",
+              "job": "xmd_submitExcpageRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20200131",
+                "MODE": "COMMIT",
+                "DAYS": "30"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "excp",
+              "json": "$.result.exceptions",
+              "count": 1
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions[0].flag",
+              "equals": "PAST DUE"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.escalated",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem e JOIN core.ExceptionItem x ON e.DocumentRef = 'EXC' + RIGHT('000000000' + CONVERT(varchar(12), x.ExceptionId), 9) WHERE e.Category = 'EXCEPTION ESCALATION' AND x.DocumentRef IN ('A07-P1')",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT CONCAT(ISNULL(CONVERT(varchar(12), AgeDays), 'NULL'), '|', CASE WHEN EscalatedAt IS NULL THEN 'N' ELSE 'Y' END) FROM core.ExceptionItem WHERE DocumentRef = 'A07-P1'",
+              "equals": "NULL|N"
+            }
+          ],
+          "derivation": "AC4 and BRF-EXCPAGE-01: NO OWNER is replaced by PAST DUE (due 25/01/2020 before ASAT) and only final ESCALATE or NO OWNER escalate (EXCPAGE.cob:327-349); age 10 does not exceed DAYS 30.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-021-AC5",
+          "ac": 5,
+          "title": "RPT-016 counts use the date bound left by the last listed exception (legacy quirk reproduced)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "INSERT core.ExceptionItem (CompanyCode, Module, Severity, Category, DocumentType, DocumentRef, Message, AmountGBP, OwnerUser, OwnerRole, Priority, RaisedAt, DueAt, Status) VALUES ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-E1','A07 owned item 60 days old',100.00,NULL,'CREDMGR',3,'2019-12-02T09:00:00',NULL,'OPEN'), ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-E2','A07 unowned item past its due date',200.00,NULL,NULL,3,'2020-01-21T09:00:00','2020-01-25T00:00:00','OPEN'), ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-E3','A07 unowned item without a due date',300.00,NULL,NULL,3,'2020-01-29T09:00:00',NULL,'OPEN'), ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-E4','A07 owned item escalated earlier',400.00,NULL,'CREDMGR',3,'2019-11-01T09:00:00',NULL,'OPEN'); UPDATE core.ExceptionItem SET EscalatedAt = '2019-12-15T00:00:00', AgeDays = 45 WHERE DocumentRef = 'A07-E4';"
+            },
+            {
+              "save": "excp",
+              "job": "xmd_submitExcpageRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20200131",
+                "MODE": "PREVIEW",
+                "DAYS": "30"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "excp",
+              "json": "$.result.categories",
+              "count": 1
+            },
+            {
+              "on": "excp",
+              "json": "$.result.categories[0].category",
+              "equals": "A07 AGEING TEST"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.categories[0].count",
+              "equals": 2
+            },
+            {
+              "on": "excp",
+              "json": "$.result.approvalsOlderThan5Days",
+              "equals": 0
+            },
+            {
+              "on": "excp",
+              "json": "$.result.auditedWithAuthority",
+              "equals": 0
+            },
+            {
+              "on": "excp",
+              "json": "$.result.restrictedAuditRows",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC5 and SME-1986/BRF-EXCPAGE-02: 9450-FORMAT-DATE leaves XB-DATE-ED at the last listed exception's date (XMDBATPR.cpy:143-155), here A07-E1 raised 02/12/2019 without due date, so the category, approval and audit sections (EXCPAGE.cob:416-531) count only rows dated on or before 20191202: E4 and E1.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-021-EDGE-DAYS-UNSIGNED",
+          "ac": null,
+          "title": "A negative DAYS argument is held unsigned: DAYS=-30 gives escalation age 30",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "unsigned"
+          ],
+          "steps": [
+            {
+              "save": "excp",
+              "job": "xmd_submitExcpageRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20200131",
+                "MODE": "PREVIEW",
+                "DAYS": "-30"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "excp",
+              "json": "$.result.escalationDays",
+              "equals": 30
+            }
+          ],
+          "derivation": "Spec FR-021 'DAYS held unsigned 9(4)' (S-DAYS PIC 9(4), EXCPAGE.cob:92,218) with contracts 4.4 unsigned rule (absolute value stored, BC-003 rejected); job values are passed unvalidated (spec 7.3).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-021-EDGE-DUE-ON-ASAT",
+          "ac": null,
+          "title": "An item raised and due on ASAT is listed with age 0, bucket 0-7 and no PAST DUE flag",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "INSERT core.ExceptionItem (CompanyCode, Module, Severity, Category, DocumentType, DocumentRef, Message, AmountGBP, OwnerUser, OwnerRole, Priority, RaisedAt, DueAt, Status) VALUES ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-B0','A07 item raised and due on the as-at date',30.00,NULL,'CREDMGR',3,'2020-01-31T08:00:00','2020-01-31T00:00:00','OPEN'), ('STC','XMD','WARNING','A07 AGEING TEST','TEST','A07-B1','A07 item raised after the as-at date',40.00,NULL,'CREDMGR',3,'2020-02-01T08:00:00',NULL,'OPEN');"
+            },
+            {
+              "save": "excp",
+              "job": "xmd_submitExcpageRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20200131",
+                "MODE": "PREVIEW",
+                "DAYS": "30"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "excp",
+              "json": "$.result.exceptions",
+              "count": 1
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions[0].documentRef",
+              "equals": "A07-B0"
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions[0].ageDays",
+              "equals": 0
+            },
+            {
+              "on": "excp",
+              "json": "$.result.exceptions[0].flag",
+              "equals": ""
+            },
+            {
+              "on": "excp",
+              "json": "$.result.count0to7",
+              "equals": 1
+            }
+          ],
+          "derivation": "Date boundaries of EXCPAGE.cob:240-262,327-344: RaisedAt on or before ASAT is listed (<=), PAST DUE needs a due date strictly before ASAT (<) and age = DATEDIFF(day, RaisedAt, ASAT) = 0 falls in bucket <= 7.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-022",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-022-AC1",
+          "ac": 1,
+          "title": "ARD 03-31 at 20261031: period ends 20260331/20250331 and the derived LTD due dates",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "ob",
+              "job": "xmd_submitObligregRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ob",
+              "json": "$.result.accountingPeriodEnd",
+              "equals": "2026-03-31"
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].dueDate",
+              "equals": "2025-12-31"
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].dueDate",
+              "equals": "2026-12-31"
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].dueDate",
+              "equals": "2026-01-01"
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].dueDate",
+              "equals": "2026-03-31"
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].dueDate",
+              "equals": "2026-04-14"
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].period",
+              "equals": "PE20250331"
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].period",
+              "equals": "PE20260331"
+            }
+          ],
+          "derivation": "AC1 literal due dates with named example workflow6Step5: STC is LTD with ARD 03-31 (db/seed/01-core-companies.sql:9), 0250-PERIOD-ENDS (OBLIGREG.cob:255-270) and the derivation table of spec 4.4 (ANNUALACCTS +9 months, CORPTAXPAY +9 months +1 day, CORPTAX +12 months, CONFSTMT +14 days).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-022-AC2",
+          "ac": 2,
+          "title": "PREVIEW counts the flagged obligations and leaves core.StatutoryObligation unchanged",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "ob",
+              "job": "xmd_submitObligregRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ob",
+              "json": "$.result.escalatedCount",
+              "gte": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.StatutoryObligation WHERE CompanyCode = 'STC' AND PeriodKey IN ('PE20260331','PE20250331','26A2','26A1','25A4','25A3','25A2','25A1')",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE Category = 'STATUTORY OBLIGATION'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC2 with 3100 raise-or-count (OBLIGREG.cob:580-607 through XMDBATPR.cpy:291-316) and the COMMIT-only MERGE (OBLIGREG.cob:611-660); the seeded register uses other period keys (07-core-numbering-terms.sql:80-101) and open obligations such as last year's ANNUALACCTS are overdue at 20261031.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-022-AC3",
+          "ac": 3,
+          "title": "COMMIT upserts each derived obligation; a new row is OPEN even when derived COMPLETE",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "ob",
+              "job": "xmd_submitObligregRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "COMMIT",
+                "DAYS": "30"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT Status FROM core.StatutoryObligation WHERE CompanyCode = 'STC' AND ObligationCode = 'VATRETURN' AND PeriodKey = '25A4'",
+              "equals": "OPEN"
+            },
+            {
+              "sql": "SELECT CONVERT(char(8), DueDate, 112) FROM core.StatutoryObligation WHERE CompanyCode = 'STC' AND ObligationCode = 'CONFSTMT' AND PeriodKey = 'PE20260331'",
+              "equals": "20260414"
+            },
+            {
+              "sql": "SELECT CONVERT(char(8), DueDate, 112) FROM core.StatutoryObligation WHERE CompanyCode = 'STC' AND ObligationCode = 'ANNUALACCTS' AND PeriodKey = 'PE20260331'",
+              "equals": "20261231"
+            }
+          ],
+          "derivation": "AC3 with named example commit and BRF-OBLIGREG-01: MERGE inserts unmatched keys with Status OPEN (OBLIGREG.cob:611-660); VAT period 25A4 is SUBMITTED with evidence HMRC-STC-25A4 (db/seed/12-fin-menu.sql:239-253), so it is derived COMPLETE yet stored OPEN.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-022-AC4",
+          "ac": 4,
+          "title": "DAYS=0 flags DUE SOON only the obligation due on ASAT (26A2 VAT return due 20261106)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "ob",
+              "job": "xmd_submitObligregRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261106",
+                "MODE": "PREVIEW",
+                "DAYS": "0"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ob",
+              "json": "$.result.window",
+              "equals": 0
+            },
+            {
+              "on": "ob",
+              "json": "$.result.dueSoonCount",
+              "equals": 1
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].dueDate",
+              "equals": "2026-11-06"
+            }
+          ],
+          "derivation": "AC4 with the flag rule 0 <= days <= window (OBLIGREG.cob:532-576): 26A2 (FINALISED, not SUBMITTED, so open) has FilingDueDate DATEADD(day, 7, DATEADD(month, 1, 2026-09-30)) = 2026-11-06 (db/seed/11-fin-eventmap.sql:65-67; restored freshc), so ASAT is 20261106. Legacy runs (OBLIGREG.exe CO=STC MODE=PREVIEW DAYS=0 USER=FINCTRL, restored freshc): ASAT=20261107 -> 26A2 OVERDUE and due within window 0; ASAT=20261106 -> 26A2 DUE SOON (0 days), due within window 1, escalation window 0. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-044: ASAT and due date 20261106, the seeded 26A2 filing due date (observed legacy run)]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-022-AC5",
+          "ac": 5,
+          "title": "An OVERDUE obligation ends the run with RC 4 and status WARNING",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "ob",
+              "job": "xmd_submitObligregRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ob",
+              "run": {
+                "status": "WARNING",
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "ob",
+              "json": "$.result.obligations[*].flag",
+              "equals": "OVERDUE"
+            },
+            {
+              "on": "ob",
+              "json": "$.result.overdueCount",
+              "gte": 1
+            }
+          ],
+          "derivation": "AC5 with 3000 flags (open and days < 0 -> OVERDUE, RC at least 4, OBLIGREG.cob:532-576); at 20261031 the derived ANNUALACCTS due 20251231 has no matching register row and is open.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-022-EDGE-DAYS-HIGH-ORDER",
+          "ac": null,
+          "title": "DAYS beyond 4 digits keeps the low-order digits: DAYS=10030 gives a 30-day window",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "numeric-magnitude"
+          ],
+          "steps": [
+            {
+              "save": "ob",
+              "job": "xmd_submitObligregRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW",
+                "DAYS": "10030"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ob",
+              "json": "$.result.window",
+              "equals": 30
+            }
+          ],
+          "derivation": "Spec FR-022 'DAYS unsigned 9(4)' (S-WINDOW PIC 9(4), OBLIGREG.cob:101,202) with contracts 4.4 high-order truncation of numbers too large (BC-002 rejected); job values are passed unvalidated (spec 7.3).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-023",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-023-AC1",
+          "ac": 1,
+          "title": "Both published OTIF definitions are printed and both sides are summarised for 20251101..20261031",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "kpi",
+              "job": "xmd_submitKpiotifRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20251101",
+                "TO": "20261031",
+                "DETAIL": "N"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "kpi",
+              "run": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "kpi",
+              "json": "$.result.definitions",
+              "count": 2
+            },
+            {
+              "on": "kpi",
+              "json": "$.result.definitions[0].metricCode",
+              "equals": "OTIF.CUSTOMER"
+            },
+            {
+              "on": "kpi",
+              "json": "$.result.definitions[0].name",
+              "equals": "On time in full - customer"
+            },
+            {
+              "on": "kpi",
+              "json": "$.result.definitions[0].text",
+              "equals": "Eligible completed schedule obligations satisfying the published quantity and date rule, divided by eligible o"
+            },
+            {
+              "on": "kpi",
+              "json": "$.result.definitions[1].metricCode",
+              "equals": "OTIF.SUPPLIER"
+            },
+            {
+              "on": "kpi",
+              "json": "$.result.definitions[1].text",
+              "equals": "Eligible purchase schedules received in full by the ORIGINAL confirmed date, divided by eligible schedules due"
+            },
+            {
+              "on": "kpi",
+              "json": "$.result.sides",
+              "count": 2
+            }
+          ],
+          "derivation": "AC1 with named example year, 0300-PUBLISH-MEASURES LEFT(Definition + ' Zero denominator: ' + rule, 110) ordered by MetricCode (KPIOTIF.cob:240-275) over the seeded rpt.MetricDefinition rows (97-xmd-reports.sql:124-136); the side counts and percentages are parity-only on the same state (ALGO-RERUN-KPIOTIF-3000).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-023-AC2",
+          "ac": 2,
+          "title": "A side with no eligible schedule prints UNDEFINED instead of a percentage",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "kpi",
+              "job": "xmd_submitKpiotifRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20000101",
+                "TO": "20000131"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "kpi",
+              "json": "$.result.sides[0].eligible",
+              "equals": 0
+            },
+            {
+              "on": "kpi",
+              "json": "$.result.sides[0].percentage",
+              "equals": "UNDEFINED"
+            }
+          ],
+          "derivation": "AC2 with 3000-SUMMARISE (zero denominator -> UNDEFINED, KPIOTIF.cob:476-497) and the published zero-denominator rule D-19; no seeded customer schedule was originally promised in January 2000.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-023-AC3",
+          "ac": 3,
+          "title": "TO=20240229 without FROM gives FROM 20230229 (not a date) and the run proceeds as legacy",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "kpi",
+              "job": "xmd_submitKpiotifRun",
+              "body": {
+                "CO": "STC",
+                "TO": "20240229"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "kpi",
+              "spoolContains": "29/02/2023"
+            },
+            {
+              "on": "kpi",
+              "json": "$.run.returnCode",
+              "lte": 4
+            }
+          ],
+          "derivation": "AC3 with COMPUTE XB-FROM = XB-TO - 10000 (yyyymmdd arithmetic, KPIOTIF.cob:206-208) printed unvalidated by 9450-FORMAT-DATE (XMDBATPR.cpy:143-155) and the cohort compared as char(8) text (SME-677 answered).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-023-AC4",
+          "ac": 4,
+          "title": "SITE has no effect: runs with SITE=RDG and SITE=BHM count the same customer cohort",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "UPDATE so.DeliverySchedule SET OriginalPromiseDate = '2025-01-15' WHERE CompanyCode = 'STC' AND OrderNumber = 'SOS900005';"
+            },
+            {
+              "save": "rdg",
+              "job": "xmd_submitKpiotifRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20250101",
+                "TO": "20250131",
+                "SITE": "RDG"
+              }
+            },
+            {
+              "save": "bhm",
+              "job": "xmd_submitKpiotifRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20250101",
+                "TO": "20250131",
+                "SITE": "BHM"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rdg",
+              "json": "$.result.sides[0].eligible",
+              "equals": 2
+            },
+            {
+              "on": "bhm",
+              "json": "$.result.sides[0].eligible",
+              "equals": 2
+            },
+            {
+              "on": "rdg",
+              "json": "$.result.sides[0].otif",
+              "equals": 0
+            },
+            {
+              "on": "bhm",
+              "json": "$.result.sides[0].otif",
+              "equals": 0
+            },
+            {
+              "on": "rdg",
+              "json": "$.result.sides[0].open",
+              "equals": 2
+            },
+            {
+              "on": "bhm",
+              "json": "$.result.sides[0].open",
+              "equals": 2
+            }
+          ],
+          "derivation": "AC4 with SITE accepted and unused (SME-691; the cohort query of KPIOTIF.cob:283-310 has no site predicate): the two schedules of BHM order SOS900005 (93-so-demo.sql:107-108,169-170) are moved into January 2025 and counted, undelivered, under either SITE.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-024",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-024-AC1",
+          "ac": 1,
+          "title": "CHAINRPT SOS900008 lists the FR-010 steps and ends RC 0 although the trace warned XMD0004",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "rpt",
+              "job": "xmd_submitChainrptRun",
+              "body": {
+                "CO": "STC",
+                "TYPE": "ORDER",
+                "REF": "SOS900008"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rpt",
+              "run": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "rpt",
+              "json": "$.result.steps",
+              "count": 1
+            },
+            {
+              "on": "rpt",
+              "json": "$.result.steps[0].stage",
+              "equals": "Sales order schedules"
+            },
+            {
+              "on": "rpt",
+              "json": "$.result.chainName",
+              "equals": "Order to cash"
+            },
+            {
+              "on": "rpt",
+              "json": "$.result.state",
+              "equals": "INCOMPLETE CHAIN"
+            },
+            {
+              "on": "rpt",
+              "spoolContains": "SOS900008"
+            }
+          ],
+          "derivation": "AC1 with named example salesOrder: CHAINRPT CALLs the same CHAINTRC (CHAINRPT.cob:175-205) and sets RC only when the trace RC is above 4 (BRF-CHAINRPT-02); on the fresh deploy SOS900008 is one schedule step without journal (XMD0004, broken -> INCOMPLETE CHAIN).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-024-AC2",
+          "ac": 2,
+          "title": "No REF: RC 8, console STERP-W-1001 XMD0002, zero steps and state PARTIALLY COMPLETE",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "rpt",
+              "job": "xmd_submitChainrptRun",
+              "body": {
+                "CO": "STC",
+                "TYPE": "ORDER"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rpt",
+              "run": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "rpt",
+              "json": "$.sysout",
+              "contains": "STERP-W-1001 XMD0002  A document reference is required."
+            },
+            {
+              "on": "rpt",
+              "json": "$.result.steps",
+              "count": 0
+            },
+            {
+              "on": "rpt",
+              "json": "$.result.state",
+              "equals": "PARTIALLY COMPLETE"
+            }
+          ],
+          "derivation": "AC2 literal console text with CA-REASON-CODE X(8) plus one space (CHAINRPT.cob:198-204) and the state rule of BRF-CHAINRPT-01 (a refused trace is neither broken nor complete, CHAINRPT.cob:186-197).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-024-AC3",
+          "ac": 3,
+          "title": "An unknown order ends RC 16 with state INCOMPLETE CHAIN",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "rpt",
+              "job": "xmd_submitChainrptRun",
+              "body": {
+                "CO": "STC",
+                "TYPE": "ORDER",
+                "REF": "ZZ-NO-SUCH-ORDER"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rpt",
+              "run": {
+                "returnCode": 16
+              }
+            },
+            {
+              "on": "rpt",
+              "json": "$.result.state",
+              "equals": "INCOMPLETE CHAIN"
+            },
+            {
+              "on": "rpt",
+              "json": "$.sysout",
+              "contains": "STERP-W-1001 XMD0016  No sales order schedule carries that number."
+            }
+          ],
+          "derivation": "AC3 with CHAINTRC RC 16 XMD0016 and broken Y for an order without schedules (CHAINTRC.cob:186-193, oracle TXMDCTL.cob:167-187) propagated by CHAINRPT.cob:198-204.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-025",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-025-AC1",
+          "ac": 1,
+          "title": "PREVIEW of CALAROPN lists 8 sorted records: 4 ACCEPTED, 1 DUPLICATE, 3 REJECTED, RC 4, nothing staged",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "conv",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "conv",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records",
+              "count": 8
+            },
+            {
+              "on": "conv",
+              "json": "$.result.accepted",
+              "equals": 4
+            },
+            {
+              "on": "conv",
+              "json": "$.result.rejected",
+              "equals": 3
+            },
+            {
+              "on": "conv",
+              "json": "$.result.duplicate",
+              "equals": 1
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records[2].outcome",
+              "equals": "DUPLICATE"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records[2].reason",
+              "equals": "The same key appears earlier in the file"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records[3].seq",
+              "equals": 4
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records[3].outcome",
+              "equals": "ACCEPTED"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records[3].value",
+              "equals": -450.0
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records[5].reason",
+              "equals": "Document date is not a real calendar date"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records[6].reason",
+              "equals": "Amount is not numeric in the extract"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.records[7].reason",
+              "equals": "Customer is not on file at the cut over"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM stg.ImportBatch WHERE CompanyCode = 'CAL'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC1 with named example workflow4Step2Preview and the sorted order of spec FR-025 (K0001 SI-900101, SI-900102 twice, K0002 SC-900104 credit, SI-900103, K0003 SI-900106, SI-900107, ZZNOSUCH SI-900105; data/legacy/CALAROPN.DAT:1-8, oracle TXMDCONV.cob:75-180); PREVIEW stages and posts nothing (BR-CONVLOAD-034).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-025-AC2",
+          "ac": 2,
+          "title": "COMMIT stages 8 rows, posts 4 open items at 20260331 and leaves batch CONV-CALAROPN-20260331 PARTIAL 8/4/3/1",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "conv",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "conv",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "sql": "SELECT CONCAT(Status, '|', RowCountTotal, '|', RowCountAccepted, '|', RowCountRejected, '|', RowCountDuplicate, '|', Mode) FROM stg.ImportBatch WHERE CompanyCode = 'CAL' AND BatchRef = 'CONV-CALAROPN-20260331'",
+              "equals": "PARTIAL|8|4|3|1|COMMIT"
+            },
+            {
+              "sql": "SELECT CONCAT(SUM(CASE WHEN r.ValidationOutcome = 'VALID' THEN 1 ELSE 0 END), '|', SUM(CASE WHEN r.ValidationOutcome = 'INVALID' THEN 1 ELSE 0 END), '|', SUM(CASE WHEN r.ValidationOutcome = 'DUPLICATE' THEN 1 ELSE 0 END)) FROM stg.ImportRow r JOIN stg.ImportBatch b ON b.BatchId = r.BatchId WHERE b.CompanyCode = 'CAL' AND b.BatchRef = 'CONV-CALAROPN-20260331'",
+              "equals": "4|3|1"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104') AND PostingDate = '2026-03-31'",
+              "equals": 4
+            },
+            {
+              "sql": "SELECT CONCAT(OriginalAmount, '|', ResidualAmount, '|', SettlementStatus, '|', ItemType) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber = 'SI-900101'",
+              "equals": "12450.00|12450.00|OPEN|INVOICE"
+            },
+            {
+              "sql": "SELECT ItemType FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber = 'SC-900104'",
+              "equals": "CREDIT"
+            },
+            {
+              "sql": "SELECT CONCAT(r.CreatedDocumentType, '|', r.CreatedDocumentRef) FROM stg.ImportRow r JOIN stg.ImportBatch b ON b.BatchId = r.BatchId WHERE b.CompanyCode = 'CAL' AND b.BatchRef = 'CONV-CALAROPN-20260331' AND r.NaturalKey LIKE 'AROP|K0001%SI-900101%'",
+              "equals": "AROPENITEM|SI-900101"
+            }
+          ],
+          "derivation": "AC2 literal counts and amounts with named example workflow4Step2Commit, posting of spec 4.5 (PostingDate = cutover, Original = Residual, CREDIT only for kind CR, created document AROPENITEM, CONVLOAD.cob:882-966,1058-1117) and the batch UPDATE (PARTIAL when rejected or duplicate > 0, CONVLOAD.cob:1258-1292).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-025-AC3",
+          "ac": 3,
+          "title": "A second COMMIT reports the accepted records LOADED, adds no staging row and posts nothing twice",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "save": "first",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              }
+            },
+            {
+              "save": "again",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "again",
+              "json": "$.result.alreadyLoaded",
+              "equals": 4
+            },
+            {
+              "on": "again",
+              "json": "$.result.accepted",
+              "equals": 0
+            },
+            {
+              "on": "again",
+              "json": "$.result.records[0].outcome",
+              "equals": "LOADED"
+            },
+            {
+              "on": "again",
+              "json": "$.result.records[0].reason",
+              "equals": "Loaded by an earlier run of this batch"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM stg.ImportRow r JOIN stg.ImportBatch b ON b.BatchId = r.BatchId WHERE b.CompanyCode = 'CAL' AND b.BatchRef = 'CONV-CALAROPN-20260331'",
+              "equals": 8
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')",
+              "equals": 4
+            }
+          ],
+          "derivation": "AC3 ('the restart loads nothing twice', docs/DEMO-WORKFLOWS.md workflow 4 step 2) with the restart test on VALID staging rows of the same batch (CONVLOAD.cob:790-821) and the staging MERGE on (BatchId, RowNum).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-025-AC4",
+          "ac": 4,
+          "title": "CALGLTB COMMIT: accepted lines prove within 0.004 (173,250.75 each side) so the load commits with RC 4",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "gl",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALGLTB.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "gl",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "gl",
+              "json": "$.result.proofStatus",
+              "equals": "IN BALANCE"
+            },
+            {
+              "on": "gl",
+              "json": "$.result.totalDebitGbp",
+              "equals": 173250.75
+            },
+            {
+              "on": "gl",
+              "json": "$.result.totalCreditGbp",
+              "equals": 173250.75
+            },
+            {
+              "on": "gl",
+              "json": "$.result.accepted",
+              "equals": 5
+            },
+            {
+              "on": "gl",
+              "json": "$.result.rejected",
+              "equals": 2
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.OpeningBalance WHERE CompanyCode = 'CAL' AND BatchRef = 'CONV-CALGLTB-20260331'",
+              "equals": 5
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE Category = 'CONVERSION DIFFERENCE'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC4 with named example trialBalance and spec FR-025 (lines 1-5 balance at 173,250.75; 20260332 rejected; account 9999 is not in the chart of db/seed/08-fin-coa.sql so it is rejected and the proof holds; |DR - CR| > 0.004 would give RC 8 and rollback, CONVLOAD.cob:1175-1256).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-025-AC5",
+          "ac": 5,
+          "title": "Another company's extract loaded into STC accepts nothing and posts no open item",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "conv",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "STC",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260228",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "conv",
+              "json": "$.result.accepted",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT CONCAT(RowCountAccepted, '|', RowCountRejected) FROM stg.ImportBatch WHERE CompanyCode = 'STC' AND BatchRef = 'CONV-CALAROPN-20260228'",
+              "equals": "0|8"
+            },
+            {
+              "sql": "SELECT r.ValidationMessage FROM stg.ImportRow r JOIN stg.ImportBatch b ON b.BatchId = r.BatchId WHERE b.CompanyCode = 'STC' AND b.BatchRef = 'CONV-CALAROPN-20260228' AND r.NaturalKey LIKE '%SI-900101%'",
+              "equals": "Customer is not on file at the cut over"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'STC' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC5 with the legacy oracle cobol/tests/xmd/TXMDGAP.cob:126-153,219-224 (CO=STC, CUTOVER=20260228, COMMIT: 0 accepted, 8 rejected, SI-900101 'Customer is not on file at the cut over', no STC open item).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-025-EDGE-DEMO-JOURNEY",
+          "ac": null,
+          "title": "Workflow 4: CALAROPN preview, commit, commit again, then RECONCTL CAL at 20261031",
+          "layer": "e2e",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "preview",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "afterPreview",
+              "sql": "SELECT (SELECT COUNT(*) FROM stg.ImportBatch WHERE CompanyCode = 'CAL' AND BatchRef = 'CONV-CALAROPN-20260331') AS batches, (SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')) AS openItems;"
+            },
+            {
+              "save": "commit1",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              }
+            },
+            {
+              "save": "afterCommit",
+              "sql": "SELECT (SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')) AS openItems, (SELECT COUNT(*) FROM stg.ImportRow r JOIN stg.ImportBatch b ON b.BatchId = r.BatchId WHERE b.CompanyCode = 'CAL' AND b.BatchRef = 'CONV-CALAROPN-20260331') AS stagingRows;"
+            },
+            {
+              "save": "commit2",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              }
+            },
+            {
+              "save": "recon",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "CAL",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "preview",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "preview",
+              "json": "$.result.accepted",
+              "equals": 4
+            },
+            {
+              "on": "afterPreview",
+              "json": "$[0].batches",
+              "equals": 0
+            },
+            {
+              "on": "afterPreview",
+              "json": "$[0].openItems",
+              "equals": 0
+            },
+            {
+              "on": "commit1",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "afterCommit",
+              "json": "$[0].openItems",
+              "equals": 4
+            },
+            {
+              "on": "afterCommit",
+              "json": "$[0].stagingRows",
+              "equals": 8
+            },
+            {
+              "on": "commit2",
+              "json": "$.result.alreadyLoaded",
+              "equals": 4
+            },
+            {
+              "on": "commit2",
+              "json": "$.result.accepted",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')",
+              "equals": 4
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM stg.ImportRow r JOIN stg.ImportBatch b ON b.BatchId = r.BatchId WHERE b.CompanyCode = 'CAL' AND b.BatchRef = 'CONV-CALAROPN-20260331'",
+              "equals": 8
+            },
+            {
+              "on": "recon",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "recon",
+              "json": "$.result.runStatus",
+              "equals": "UNRECONCILED"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[0].status",
+              "equals": "DIFFERENCE"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[3].status",
+              "equals": "NO CONTROL"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[4].status",
+              "equals": "AGREED"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[5].status",
+              "equals": "AGREED"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[6].status",
+              "equals": "AGREED"
+            },
+            {
+              "on": "recon",
+              "json": "$.result.families[7].status",
+              "equals": "NO CONTROL"
+            }
+          ],
+          "derivation": "Section 10 demo journey of FR-025/FR-020 (docs/DEMO-WORKFLOWS.md workflow 4 steps 2 and 7: preview proves the file, commit creates real open items, the restart loads nothing twice; RECONCTL CAL shows the AR opening difference, GRNI/VAT/BANK agree, WIP/ACCRUAL have no configured control account) with the FR-025 values of TXMDCONV.cob:75-180.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-026",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-026-AC1",
+          "ac": 1,
+          "title": "Each demo extract parses into the legacy sequence, keys and values (CALAROPN, CALAPOPN, CALGLTB, CALSTOCK)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "ar",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "ap",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAPOPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "gl",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALGLTB.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "st",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALSTOCK.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "PREVIEW",
+                "ASAT": "20261015"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ar",
+              "json": "$.result.records",
+              "count": 8
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[0].seq",
+              "equals": 1
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[1].seq",
+              "equals": 2
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[2].seq",
+              "equals": 5
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[3].seq",
+              "equals": 4
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[4].seq",
+              "equals": 3
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[5].seq",
+              "equals": 7
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[6].seq",
+              "equals": 8
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[7].seq",
+              "equals": 6
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[0].type",
+              "equals": "AROP"
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[0].value",
+              "equals": 12450.0
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[0].currency",
+              "equals": "GBP"
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[3].currency",
+              "equals": "EUR"
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records",
+              "count": 6
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[0].seq",
+              "equals": 1
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[1].seq",
+              "equals": 2
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[2].seq",
+              "equals": 5
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[3].seq",
+              "equals": 4
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[4].seq",
+              "equals": 3
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[5].seq",
+              "equals": 6
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[3].value",
+              "equals": -320.0
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[3].currency",
+              "equals": "USD"
+            },
+            {
+              "on": "ap",
+              "json": "$.result.records[5].reason",
+              "equals": "Due date is missing or not a calendar date"
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records",
+              "count": 7
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[0].seq",
+              "equals": 1
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[1].seq",
+              "equals": 2
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[2].seq",
+              "equals": 3
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[3].seq",
+              "equals": 4
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[4].seq",
+              "equals": 5
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[5].seq",
+              "equals": 7
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[6].seq",
+              "equals": 6
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[0].value",
+              "equals": 125000.0
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[2].value",
+              "equals": -63100.25
+            },
+            {
+              "on": "gl",
+              "json": "$.result.records[5].reason",
+              "equals": "Balance date is not a real calendar date"
+            },
+            {
+              "on": "st",
+              "json": "$.result.records",
+              "count": 6
+            },
+            {
+              "on": "st",
+              "json": "$.result.records[0].seq",
+              "equals": 6
+            },
+            {
+              "on": "st",
+              "json": "$.result.records[1].seq",
+              "equals": 1
+            },
+            {
+              "on": "st",
+              "json": "$.result.records[2].seq",
+              "equals": 4
+            },
+            {
+              "on": "st",
+              "json": "$.result.records[3].seq",
+              "equals": 5
+            },
+            {
+              "on": "st",
+              "json": "$.result.records[4].seq",
+              "equals": 2
+            },
+            {
+              "on": "st",
+              "json": "$.result.records[5].seq",
+              "equals": 3
+            },
+            {
+              "on": "st",
+              "json": "$.result.records[0].reason",
+              "equals": "Negative opening stock is refused (D-09)"
+            },
+            {
+              "on": "st",
+              "json": "$.result.records[1].value",
+              "equals": 7429.5
+            }
+          ],
+          "derivation": "AC1 with layout FL-067 of spec FR-026 (CONVLOAD.cob:52-60,96-127,417-466; natural key bytes 5-24, STKB plus 25-64, ordinal sort) over data/legacy/*.DAT and the Agent 04 fixture probe FIXTURE-LEGACY-EXTRACTS.csv (values, nets, stock value 18 x 412.75 = 7429.50 and file-level reasons).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-026-AC2",
+          "ac": 2,
+          "title": "The SI-900107 line's amount text '       ABC12.X0' is rejected as not numeric",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "ar",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ar",
+              "json": "$.result.records[6].seq",
+              "equals": 8
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[6].outcome",
+              "equals": "REJECTED"
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records[6].reason",
+              "equals": "Amount is not numeric in the extract"
+            }
+          ],
+          "derivation": "AC2 with line 8 of data/legacy/CALAROPN.DAT (bytes 46-60 '       ABC12.X0') and the numeric screen of CONVLOAD.cob:1337-1359 (first 20 characters limited to spaces, signs, point, comma and digits).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-026-AC3",
+          "ac": 3,
+          "title": "Blank lines are neither counted nor listed",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "ar",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALAROPN.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ar",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "ar",
+              "json": "$.result.read",
+              "equals": 8
+            },
+            {
+              "on": "ar",
+              "json": "$.result.records",
+              "count": 8
+            }
+          ],
+          "derivation": "AC3 with the IF LEG-REC NOT = SPACES skip of CONVLOAD.cob:428-436; no repository extract contains an embedded blank line and scenarios cannot create files, so only the absence of a phantom record after the final line terminator of CALAROPN.DAT (8 lines of 80 bytes plus CRLF) is pinned.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-XMD-026-AC4",
+          "ac": 4,
+          "title": "A line longer than 130 bytes is truncated to 130 (pending confirmation, U-XMD-09)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "file-format",
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "save": "xml",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\einvoice-samples\\INV-2026-5541.xml",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT MAX(LEN(r.RawData)) FROM stg.ImportRow r JOIN stg.ImportBatch b ON b.BatchId = r.BatchId WHERE b.CompanyCode = 'CAL' AND b.BatchRef = 'CONV-INV-2026-5541-20260331'",
+              "equals": 130
+            }
+          ],
+          "derivation": "AC4 and U-XMD-09 ([UNKNOWN: GnuCOBOL 3.2 line-sequential handling of over-long lines], target proposal truncate to 130): line 2 of data/einvoice-samples/INV-2026-5541.xml is 175 bytes and staging stores the 130-byte record (CONVLOAD.cob:1058-1117), so the longest RawData of that batch must be 130.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-027",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-027-AC1",
+          "ac": 1,
+          "title": "BASE forecast 20261001..20261231 ends RC 0 with a CASHFCST spool and the STERP-I-0404 proof line",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "TREASURY",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "cash",
+              "job": "xmd_submitCashfcstRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20261001",
+                "TO": "20261231",
+                "SCENARIO": "BASE"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cash",
+              "run": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "cash",
+              "json": "$.sysout",
+              "contains": "STERP-I-0404 ITEMS="
+            },
+            {
+              "on": "cash",
+              "json": "$.sysout",
+              "contains": "CASHFCST-STC-"
+            },
+            {
+              "on": "cash",
+              "json": "$.result.proofLine",
+              "matches": "^STERP-I-0404 ITEMS="
+            }
+          ],
+          "derivation": "AC1 with named example quarter and the legacy oracle cobol/tests/xmd/TXMDCASH.cob:121-156 (RC 0 for STC, spool line naming a CASHFCST listing, proof line STERP-I-0404 of CASHFCST.cob:1145-1167).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-027-AC2",
+          "ac": 2,
+          "title": "A payable under an in-flight instruction is superseded and the instruction is forecast CONFIRMED",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "TREASURY",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "UPDATE ap.PaymentInstruction SET Status = 'SUBMITTED', ValueDate = CONVERT(date, '20261015', 112) WHERE CompanyCode = 'STC' AND InstructionRef = 'PY-6-0007-01'; UPDATE o SET o.PaymentInstructionId = p.PaymentInstructionId FROM ap.OpenItem o JOIN ap.PaymentInstruction p ON p.CompanyCode = o.CompanyCode AND p.InstructionRef = 'PY-6-0007-01' WHERE o.CompanyCode = 'STC' AND o.DocumentNumber = 'PI-26-0012';"
+            },
+            {
+              "save": "cash",
+              "job": "xmd_submitCashfcstRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20261001",
+                "TO": "20261231",
+                "SCENARIO": "BASE"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cash",
+              "run": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "cash",
+              "json": "$.result.supersededItems",
+              "gte": 1
+            },
+            {
+              "on": "cash",
+              "json": "$.result.flows[*].reference",
+              "equals": "PY-6-0007-01"
+            },
+            {
+              "on": "cash",
+              "json": "$.result.flows[*].category",
+              "equals": "CONFIRMED"
+            }
+          ],
+          "derivation": "AC2 with the legacy fixture and assertions of cobol/tests/xmd/TXMDCASH.cob:164-276 (instruction PY-6-0007-01 put back in flight with value date 20261015, open payable PI-26-0012 hung on it) and CASHFCST.cob:738-837 (superseded count, CONFIRMED flow referenced by InstructionRef).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-027-AC3",
+          "ac": 3,
+          "title": "SCENARIO=WORST warns STERP-W-0402, uses BASE and ends RC 4",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "TREASURY",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "cash",
+              "job": "xmd_submitCashfcstRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20261001",
+                "TO": "20261231",
+                "SCENARIO": "WORST"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cash",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "cash",
+              "json": "$.result.scenario",
+              "equals": "BASE"
+            },
+            {
+              "on": "cash",
+              "json": "$.sysout",
+              "contains": "STERP-W-0402 unknown scenario WORST - BASE assumed"
+            }
+          ],
+          "derivation": "AC3 literal with 0100-READ-ARGS (CASHFCST.cob:395-400: unknown scenario -> STERP-W-0402, BASE, RC 4).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-027-AC4",
+          "ac": 4,
+          "title": "An in-flight instruction without a value date is not forecast and its payable is not contractual",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "TREASURY",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "arrange",
+              "sql": "UPDATE ap.PaymentInstruction SET Status = 'SETTLED' WHERE CompanyCode = 'STC' AND InstructionRef <> 'PY-6-0007-01' AND Status NOT IN ('SETTLED','CANCELLED','REJECTED','RETURNED'); UPDATE ap.PaymentInstruction SET Status = 'SUBMITTED', ValueDate = NULL WHERE CompanyCode = 'STC' AND InstructionRef = 'PY-6-0007-01'; UPDATE o SET o.PaymentInstructionId = p.PaymentInstructionId FROM ap.OpenItem o JOIN ap.PaymentInstruction p ON p.CompanyCode = o.CompanyCode AND p.InstructionRef = 'PY-6-0007-01' WHERE o.CompanyCode = 'STC' AND o.DocumentNumber = 'PI-26-0012';"
+            },
+            {
+              "save": "cash",
+              "job": "xmd_submitCashfcstRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20261001",
+                "TO": "20261231",
+                "SCENARIO": "BASE"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cash",
+              "run": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "cash",
+              "json": "$.result.confirmedOutGbp",
+              "equals": 0
+            },
+            {
+              "on": "cash",
+              "json": "$.result.supersededItems",
+              "gte": 1
+            }
+          ],
+          "derivation": "AC4 and SME-689: CONFIRMED flows require p.ValueDate IS NOT NULL (CASHFCST.cob:774-802) while the payable linked to the in-flight instruction is excluded from contractual payables (CASHFCST.cob:670-690,738-760); with every other STC instruction settled the confirmed total is 0.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-028",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-028-AC1",
+          "ac": 1,
+          "title": "DETAIL for 26A3 lists one line per fin.VatTransaction of the period and ends RC 0 or 4",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "VATOWNER",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "vat",
+              "job": "xmd_submitVatauditRun",
+              "body": {
+                "CO": "STC",
+                "VATPERIOD": "26A3",
+                "MODE": "DETAIL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "vat",
+              "json": "$.run.returnCode",
+              "lte": 4
+            },
+            {
+              "on": "vat",
+              "json": "$.result.mode",
+              "equals": "DETAIL"
+            },
+            {
+              "on": "vat",
+              "json": "$.result.transactions",
+              "count": 3
+            },
+            {
+              "on": "vat",
+              "json": "$.result.lines",
+              "equals": 3
+            }
+          ],
+          "derivation": "AC1 with named example detail and 1000-DETAIL (VATAUDIT.cob:606-736): 26A3 is October-December 2026 (11-fin-eventmap.sql:61-70) and the seed derives three VAT records (sales, purchases, overheads) from the period 7 demonstration journals (91-fin-demo.sql:220-248).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-028-AC2",
+          "ac": 2,
+          "title": "MTD for 26A2 echoes nine boxes equal to the latest return (box 1 94,500.00, 4 47,670.00, 5 46,830.00)",
+          "layer": "api-journey",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "VATOWNER",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "prep",
+              "call": "fin_prepareVatReturn",
+              "path": {
+                "vatPeriodKey": "26A2"
+              },
+              "body": {
+                "basis": "INVOICE"
+              },
+              "as": "VATOWNER"
+            },
+            {
+              "save": "vat",
+              "job": "xmd_submitVatauditRun",
+              "body": {
+                "CO": "STC",
+                "VATPERIOD": "26A2",
+                "MODE": "MTD"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "prep",
+              "status": 200
+            },
+            {
+              "on": "vat",
+              "json": "$.result.mode",
+              "equals": "MTD"
+            },
+            {
+              "on": "vat",
+              "json": "$.result.boxes",
+              "count": 9
+            },
+            {
+              "on": "vat",
+              "json": "$.result.boxes[0].valueGbp",
+              "equals": 94500.0
+            },
+            {
+              "on": "vat",
+              "json": "$.result.boxes[3].valueGbp",
+              "equals": 47670.0
+            },
+            {
+              "on": "vat",
+              "json": "$.result.boxes[4].valueGbp",
+              "equals": 46830.0
+            },
+            {
+              "on": "vat",
+              "json": "$.sysout",
+              "contains": "STERP-I-MTDBOX 01"
+            }
+          ],
+          "derivation": "AC2 demo boxes with named example mtd and docs/DEMO-WORKFLOWS.md workflow 6 step 2 (VATOWNER prepares 26A2): the seeded July-September journals give output VAT 94,500.00 and input VAT 47,670.00 (91-fin-demo.sql:70-130), and VATAUDIT echoes each box as STERP-I-MTDBOX (VATAUDIT.cob:743-914).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-028-AC3",
+          "ac": 3,
+          "title": "VATPERIOD=99Z9 ends RC 8 STERP-E-0202 with no spool and no program run registered",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "VATOWNER",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "vat",
+              "job": "xmd_submitVatauditRun",
+              "body": {
+                "CO": "STC",
+                "VATPERIOD": "99Z9",
+                "MODE": "DETAIL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "vat",
+              "run": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "vat",
+              "json": "$.sysout",
+              "contains": "STERP-E-0202 no VAT period 99Z9 for company STC"
+            },
+            {
+              "on": "vat",
+              "json": "$.run.spoolFile",
+              "isNull": true
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'VATAUDIT'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC3 with 0200 period load (VATAUDIT.cob:552-560: STERP-E-0202, RC 8) ending before JOBLOG START and the spool (VATAUDIT.cob:436-443,469-472, BRF-VATAUDIT-06), so core.JobRun holds only the submission row.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-XMD-028-AC4",
+          "ac": 4,
+          "title": "MODE=COMMIT warns STERP-W-0102 and runs DETAIL, writing nothing",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "VATOWNER",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "vat",
+              "job": "xmd_submitVatauditRun",
+              "body": {
+                "CO": "STC",
+                "VATPERIOD": "26A3",
+                "MODE": "COMMIT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "vat",
+              "json": "$.sysout",
+              "contains": "STERP-W-0102 mode COMMIT is not DETAIL or MTD - DETAIL assumed"
+            },
+            {
+              "on": "vat",
+              "json": "$.result.mode",
+              "equals": "DETAIL"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.VatReturn WHERE CompanyCode = 'STC' AND VatPeriodKey = '26A3'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC4 literal console text of VATAUDIT.cob:493-495 and the mode table of spec 4.6 (any other value runs DETAIL); VATAUDIT writes nothing but core.JobRun.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-029",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-029-AC1",
+          "ac": 1,
+          "title": "XMDCLOSE PREVIEW runs RECONCTL, OBLIGREG and EXCPAGE with DAYS=0, ends MAXCC 4 WARNING, writes only job runs",
+          "layer": "api-journey",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "close",
+              "job": "xmd_submitXmdcloseRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "close",
+              "run": {
+                "status": "WARNING",
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps",
+              "count": 3
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps[0].program",
+              "equals": "RECONCTL"
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps[1].program",
+              "equals": "OBLIGREG"
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps[2].program",
+              "equals": "EXCPAGE"
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps[0].parameters",
+              "contains": "ASAT=20261031"
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps[1].parameters",
+              "contains": "DAYS=0"
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps[2].parameters",
+              "contains": "DAYS=0"
+            },
+            {
+              "on": "close",
+              "json": "$.result.maxcc",
+              "equals": 4
+            },
+            {
+              "on": "close",
+              "json": "$.result.status",
+              "equals": "WARNING"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM rpt.ReconciliationRun",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE Category IN ('RECONCILIATION DIFFERENCE','STATUTORY OBLIGATION','EXCEPTION ESCALATION')",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.StatutoryObligation WHERE PeriodKey LIKE 'PE%'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC1 with named example workflow6Step5, jobs/XMDCLOSE.cmd:20-42 (DAYS always passed, 0 by SETENV.cmd:39, D-XMD-07) and MAXCC = highest step code: OBLIGREG ends 4 on the fresh deploy because open derived obligations are overdue at 20261031 (FR-022), RECONCTL and EXCPAGE end 0 or 4.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-029-AC2",
+          "ac": 2,
+          "title": "A step ending >= 8 stops the stream and the status follows MAXCC",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "close",
+              "job": "xmd_submitXmdcloseRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "close",
+              "json": "$.result.terminatedByCondCode",
+              "equals": false
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps",
+              "count": 3
+            }
+          ],
+          "derivation": "AC2 with the condition rule of jobs/XMDCLOSE.cmd (if LASTCC GEQ 8 goto ABEND) and contracts 8.4; no repository state lets an XMDCLOSE step end >= 8 through DSL arrangement (it needs a spool or SQL infrastructure failure), so only the converse is pinned: with every step below 8 all three steps run and the stream is not terminated.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-XMD-029-AC3",
+          "ac": 3,
+          "title": "RESTART=STEP030 runs only EXCPAGE and MAXCC excludes the earlier steps",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "steps": [
+            {
+              "save": "close",
+              "job": "xmd_submitXmdcloseRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW",
+                "DAYS": "30",
+                "RESTART": "STEP030"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "close",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps",
+              "count": 1
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps[0].step",
+              "equals": "STEP030"
+            },
+            {
+              "on": "close",
+              "json": "$.result.steps[0].program",
+              "equals": "EXCPAGE"
+            },
+            {
+              "on": "close",
+              "json": "$.result.maxcc",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName IN ('RECONCTL','OBLIGREG')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC3 with named example restart and 'if defined P_RESTART goto %P_RESTART%' (jobs/XMDCLOSE.cmd:17); EXCPAGE ends 0 unless the spool or listing fails (EXCPAGE.cob:186-207), so MAXCC is 0 without the OBLIGREG warning.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-XMD-030",
+      "scenarios": [
+        {
+          "id": "FR-STERP-XMD-030-AC1",
+          "ac": 1,
+          "title": "XMDCONV PREVIEW runs four PREVIEW CONVLOAD steps, bypasses the commit pass and writes only job runs",
+          "layer": "api-journey",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "conv",
+              "job": "xmd_submitXmdconvRun",
+              "body": {
+                "CO": "CAL",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "conv",
+              "json": "$.result.steps",
+              "count": 4
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[0].parameters",
+              "contains": "CALGLTB.DAT"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[1].parameters",
+              "contains": "CALAROPN.DAT"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[2].parameters",
+              "contains": "CALAPOPN.DAT"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[3].parameters",
+              "contains": "CALSTOCK.DAT"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[0].parameters",
+              "contains": "MODE=PREVIEW"
+            },
+            {
+              "on": "conv",
+              "json": "$.sysout",
+              "contains": "//*  MODE=PREVIEW - THE COMMIT PASS IS BYPASSED"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.maxcc",
+              "equals": 4
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM stg.ImportBatch WHERE CompanyCode = 'CAL'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC1 with named example preview and jobs/XMDCONV.cmd:23-42 (STEP010-013 in ledger order, SYSOUT bypass line); every demo extract holds rejected records, so each PREVIEW step ends 4 (FR-025/026).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-030-AC2",
+          "ac": 2,
+          "title": "XMDCONV COMMIT commits the four files after the preview pass and ends at STEP030 with code 8 (FAILED)",
+          "layer": "api-journey",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "conv",
+              "job": "xmd_submitXmdconvRun",
+              "body": {
+                "CO": "CAL",
+                "MODE": "COMMIT",
+                "CUTOVER": "20260331"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "conv",
+              "run": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps",
+              "count": 9
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[4].step",
+              "equals": "STEP020"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[4].parameters",
+              "contains": "CALGLTB.DAT"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[4].parameters",
+              "contains": "MODE=COMMIT"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[8].step",
+              "equals": "STEP030"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[8].program",
+              "equals": "@SQL"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[8].conditionCode",
+              "equals": 8
+            },
+            {
+              "on": "conv",
+              "json": "$.result.maxcc",
+              "equals": 8
+            },
+            {
+              "on": "conv",
+              "json": "$.result.status",
+              "equals": "FAILED"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.terminatedByCondCode",
+              "equals": true
+            },
+            {
+              "on": "conv",
+              "json": "$.sysout",
+              "contains": "//*  STREAM TERMINATED BY COND CODE 8"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')",
+              "equals": 4
+            }
+          ],
+          "derivation": "AC2 with named example commit, jobs/XMDCONV.cmd:45-66 and D-XMD-11: STEP030 selects SourceFile, Outcome and CompanyCode, which stg.ImportRow lacks (db/tables/95-xmd/01-ImportBatch.sql:11-14), so it ends 8 and the ABEND line is written.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-030-AC3",
+          "ac": 3,
+          "title": "A resubmitted COMMIT stream reports the records LOADED and posts nothing twice",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "covers": [
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "save": "first",
+              "job": "xmd_submitXmdconvRun",
+              "body": {
+                "CO": "CAL",
+                "MODE": "COMMIT",
+                "CUTOVER": "20260331"
+              }
+            },
+            {
+              "save": "again",
+              "job": "xmd_submitXmdconvRun",
+              "body": {
+                "CO": "CAL",
+                "MODE": "COMMIT",
+                "CUTOVER": "20260331"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem WHERE CompanyCode = 'CAL' AND DocumentNumber IN ('SI-900101','SI-900102','SI-900103','SC-900104')",
+              "equals": 4
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM stg.ImportRow r JOIN stg.ImportBatch b ON b.BatchId = r.BatchId WHERE b.CompanyCode = 'CAL' AND b.BatchRef = 'CONV-CALAROPN-20260331'",
+              "equals": 8
+            },
+            {
+              "sql": "SELECT RowCountAccepted FROM stg.ImportBatch WHERE CompanyCode = 'CAL' AND BatchRef = 'CONV-CALAROPN-20260331'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM fin.OpeningBalance WHERE CompanyCode = 'CAL' AND BatchRef = 'CONV-CALGLTB-20260331'",
+              "equals": 5
+            }
+          ],
+          "derivation": "AC3 ('the commit pass is restartable', jobs/XMDCONV.cmd header) with the CONVLOAD restart test (CONVLOAD.cob:790-821: LOADED, not posted or restaged) and the batch counts of the latest run (CONVLOAD.cob:1258-1292).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-XMD-030-AC4",
+          "ac": 4,
+          "title": "STEP030 behaves as the legacy sqlcmd step: invalid stg.ImportRow columns give code 8",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "CAL",
+            "site": "GLA"
+          },
+          "steps": [
+            {
+              "save": "conv",
+              "job": "xmd_submitXmdconvRun",
+              "body": {
+                "CO": "CAL",
+                "MODE": "COMMIT",
+                "CUTOVER": "20260331"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "conv",
+              "json": "$.result.steps[8].step",
+              "equals": "STEP030"
+            },
+            {
+              "on": "conv",
+              "json": "$.result.steps[8].conditionCode",
+              "equals": 8
+            },
+            {
+              "on": "conv",
+              "json": "$.sysout",
+              "contains": "Invalid column name 'CompanyCode'"
+            }
+          ],
+          "derivation": "AC4 with the verbatim @SQL statement of jobs/XMDCONV.cmd:63-66 (D-XMD-11, BC-XMD-07 rejected) and RUNSTEP.cmd:41-44 (an error gives step code 8); stg.ImportRow has no CompanyCode column (01-ImportBatch.sql:11-14).",
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ]
+}

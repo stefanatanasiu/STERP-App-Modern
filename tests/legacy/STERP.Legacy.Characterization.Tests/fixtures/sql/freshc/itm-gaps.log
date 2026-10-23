@@ -1,0 +1,18 @@
+# itm-gaps
+ok 1 - a purchase pack must hold a positive quantity -- REQ: ITM-008
+ok 2 - the purchase pack in force moves from 25 to 20 by date, it is not rewritten -- REQ: ITM-008
+ok 3 - the same part has a pack of 25 at Reading and a pack of 5 at Birmingham -- REQ: ITM-008
+ok 4 - 65 of demand rounds to 75 at Reading with 10 of excess supply, and to 65 at Birmingham -- REQ: ITM-008, AC-071
+ok 5 - a site may hold its own approved make or buy choice without changing the item -- REQ: ITM-008
+ok 6 - every site planning record holds usable lead times, minimums and pack multiples -- REQ: ITM-008
+ok 7 - an item identity is never reused, so a copy must be given its own code -- REQ: ITM-021
+ok 8 - a new item code carries no balance, movement, serial or reservation -- REQ: ITM-021, AC-069
+ok 9 - every dangerous goods item can be labelled: UN number, class and packing group -- REQ: ITM-027, AC-132
+ok 10 - every UKCA marked item names its declaration of conformity -- REQ: ITM-027
+ok 11 - 1,000 units despatched in the period are 50 kg of plastic packaging, 15 kg of it recycled -- REQ: ITM-027, RPT-019, AC-132
+ok 12 - only the quantity that left stock is counted, the receipt of 250 is not -- REQ: ITM-027, RPT-019
+ok 13 - the packaging data report is bounded by its period -- REQ: ITM-027, RPT-019
+ok 14 - only plastic packaging is flagged for Plastic Packaging Tax -- REQ: ITM-027
+ok 15 - every packaging component has a positive weight and a recycled content between 0 and 100 -- REQ: ITM-027, RPT-019
+ok 16 - the suite left no fixtures behind -- REQ: ITM-008, ITM-021, ITM-027
+# itm-gaps done

@@ -1,0 +1,171 @@
+@inherits StPage
+@* frmReportLauncher (page:platform/report-launcher, FR-STERP-PLATFORM-043/044): the catalogue rows for the argument (report
+   code, program or module), a Parameters panel built from ParamSpec, the run log; Run (F10) submits the catalogue launch,
+   follows the run to its end and opens the spool viewer when the run produced a spool file. *@
+<div class="st-page">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Run (F10)" Glyph="RUN" OnClick="OnConfirmAsync" />
+        <StToolButton Text="Refresh (F5)" Glyph="REFRESH" OnClick="LoadDataAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <StGrid Id="@Uid("grid")" Data="_data" Selected="_selected" SelectedChanged="SelectedChangedAsync" Label="@Window.Title" />
+    <div style="display:flex; height:230px; flex:0 0 230px; min-height:0">
+        <fieldset class="st-group" style="width:264px; flex:0 0 264px; overflow:auto; margin:4px 2px 2px 0">
+            <legend>Parameters</legend>
+            @if (_parameters.Count == 0)
+            {
+                <div style="margin:4px 0">@(_panelMessage.Length > 0 ? _panelMessage : "(this report takes no parameters)")</div>
+            }
+            @foreach (var p in _parameters)
+            {
+                var item = p;
+                <div class="st-field" data-sterp-field="@item.Key">
+                    <label for="@Uid("p-" + item.Key)" style="width:70px; flex:0 0 70px; overflow:hidden">@(item.Key):</label>
+                    <input id="@Uid("p-" + item.Key)" class="st-input" style="width:150px" aria-label="@item.Key" value="@item.Value" autocomplete="off" spellcheck="false"
+                           @oninput="e => item.Value = e.Value?.ToString() ?? string.Empty" />
+                </div>
+            }
+        </fieldset>
+        <fieldset class="st-group" style="flex:1 1 auto; display:flex; flex-direction:column; margin:4px 0 2px 2px; min-width:0">
+            <legend>Run log</legend>
+            <pre class="st-pre st-sunken" tabindex="0" style="font-size:11px">@_log</pre>
+        </fieldset>
+    </div>
+</div>
+
+@code {
+    private sealed class Parameter
+    {
+        public string Key { get; init; } = "";
+        public string Value { get; set; } = "";
+    }
+
+    private GridData _data = GridData.Empty;
+    private int _selected = -1;
+    private List<Parameter> _parameters = [];
+    private string _panelMessage = "";
+    private string _log = "";
+
+    [Inject] private JobRunner Jobs { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Window.SetTitle("Run Report");
+        await LoadDataAsync();
+    }
+
+    /// <summary>frmReportLauncher.LoadData: platform_listReportCatalogue for the argument; '&lt;n&gt; report(s) available.'.</summary>
+    private Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/platform/v1/report-catalogue" + Query.Build(("argument", FormArgument)));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        _data = GridData.FromItems(r.Json);
+        _selected = _data.Count > 0 ? 0 : -1;
+        SetStatus(_data.Count + " report(s) available.", "");
+        await BuildParametersAsync();
+    });
+
+    private async Task SelectedChangedAsync(int index)
+    {
+        _selected = index;
+        await BuildParametersAsync();
+    }
+
+    /// <summary>frmReportLauncher.BuildParameters: one labelled box per ParamSpec key with the legacy defaults.</summary>
+    private async Task BuildParametersAsync()
+    {
+        _parameters = [];
+        _panelMessage = "";
+        if (_selected < 0)
+        {
+            StateHasChanged();
+            return;
+        }
+        var code = _data.Text(_selected, "reportCode");
+        var r = await Api.GetAsync($"/api/platform/v1/report-catalogue/{Query.Path(code)}/parameters");
+        if (r.IsSuccess && r.Json?["parameters"] is JsonArray list)
+        {
+            _parameters = list.Select(p => new Parameter { Key = Json.Str(p?["key"]), Value = Json.Str(p?["value"]) }).ToList();
+            _panelMessage = Json.Str(r.Json["message"]);
+        }
+        else
+        {
+            _parameters = LocalDefaults(_data.Text(_selected, "paramSpec"));
+        }
+        // values the opening page placed on the launcher (frmReportLauncher.InitialParameters, frmReportLauncher.vb:66)
+        foreach (var p in _parameters)
+        {
+            if (Window.InitialParameters.TryGetValue(p.Key, out var initial)) p.Value = initial;
+        }
+        StateHasChanged();
+    }
+
+    /// <summary>The defaults of frmReportLauncher.vb:52-64 (used when the parameter operation is not available).</summary>
+    private List<Parameter> LocalDefaults(string spec)
+    {
+        var s = Session;
+        var list = new List<Parameter>();
+        foreach (var raw in spec.Split(','))
+        {
+            var key = raw.Trim().ToUpperInvariant();
+            if (key.Length == 0) continue;
+            var value = key switch
+            {
+                "CO" => s.CompanyCode,
+                "SITE" => s.SiteCode,
+                "USER" => s.UserCode,
+                "ASAT" or "TO" => UkFormat.Yyyymmdd(s.BusinessDate),
+                "FROM" => UkFormat.Yyyymmdd(new DateOnly(s.BusinessDate.Year, 1, 1)),
+                "PERIOD" => (s.Period?.FiscalYear ?? 0).ToString("0000", UkFormat.Culture) + (s.Period?.PeriodNo ?? 0).ToString("00", UkFormat.Culture),
+                "MODE" => "PREVIEW",
+                _ => "",
+            };
+            list.Add(new Parameter { Key = key, Value = value });
+        }
+        return list;
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadDataAsync();
+
+    /// <summary>frmReportLauncher.RunClicked: run the report; RC &lt;= 4 opens the spool, otherwise 'The report ended with return code n.' RPTnnnn.</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        var code = _selected >= 0 ? _data.Text(_selected, "reportCode") : "";
+        var prog = _selected >= 0 ? _data.Text(_selected, "programName") : "";
+        if (prog.Length == 0)
+        {
+            SetStatus("Select a report first.", "");
+            return;
+        }
+        var args = new JsonArray();
+        foreach (var p in _parameters)
+        {
+            if (p.Value.Trim().Length > 0 && p.Key != "USER") args.Add(new JsonObject { ["key"] = p.Key, ["value"] = p.Value.Trim() });
+        }
+        // the identity is always the signed-on user, even when ParamSpec omits USER
+        args.Add(new JsonObject { ["key"] = "USER", ["value"] = Session.UserCode });
+        await GuardAsync(async () =>
+        {
+            var outcome = await Jobs.RunAsync(() => Api.PostAsync(ApiHost.Jobs, $"/api/platform/v1/jobs/{Query.Path(code)}/runs",
+                new JsonObject { ["parameters"] = args }, Instruction.New().Options()));
+            if (!outcome.Accepted) throw new ApiFailure(outcome.Submit);
+            if (outcome.JobRunId > 0)
+            {
+                var sysout = await Api.GetAsync(ApiHost.Jobs, $"/api/jobs/v1/runs/{outcome.JobRunId}/sysout");
+                _log = sysout.IsSuccess ? sysout.Text : "";
+            }
+            var rc = outcome.ReturnCode ?? 0;
+            if (rc <= 4)
+            {
+                var spool = outcome.SpoolFile;
+                SetStatus("Return code " + rc + ".  " + (spool.Length == 0 ? "No spool file produced." : spool), CueOk);
+                if (spool.Length > 0) OpenForm("frmSpoolViewer", spool);
+            }
+            else
+            {
+                await ShowErrorAsync("The report ended with return code " + rc + ".", "RPT" + rc.ToString("0000", UkFormat.Culture));
+            }
+        });
+    }
+}

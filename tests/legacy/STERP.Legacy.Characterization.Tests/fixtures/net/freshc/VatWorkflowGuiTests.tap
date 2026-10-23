@@ -1,0 +1,3 @@
+ok - vat workflow GUI: independent controller menu routes load saved return without PREPARE # SKIP requires a dedicated STERP_QA_VAT_ database, never production or shared GUI QA
+ok - vat workflow: exact frozen company period VRN nine boxes despite stale caches # SKIP requires a dedicated STERP_QA_VAT_ database, never production or shared GUI QA
+ok - vat workflow: unauthorised draft missing and already recorded exports create no files # SKIP requires a dedicated STERP_QA_VAT_ database, never production or shared GUI QA

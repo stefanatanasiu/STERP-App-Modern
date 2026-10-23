@@ -1,0 +1,484 @@
+@inherits StPage
+@* frmReceiptEntry (page:ar/receipt-entry, FR-STERP-AR-035, STERP-AR.md 4.1; frmReceiptEntry.vb:13-260, .Designer.vb:1-109):
+   ar_getAllocatableItems offers what the money may be applied to; ar_previewAllocation reports the residual (no business
+   effect); F10 records the receipt (ar_recordReceipt) and then applies the keyed lines (ar_allocateReceipt) - two units of work
+   with two idempotency keys; Correct allocation reverses an allocation (ar_unallocateAllocation). The arithmetic - discount,
+   tolerance, cross currency, the residual itself - is the engine's, never the page's. *@
+<div class="st-page" style="overflow:auto">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Open items (F5)" Glyph="REFRESH" OnClick="LoadItemsAsync" />
+        <StToolButton Text="Preview residual" Glyph="FIND" OnClick="PreviewAsync" />
+        <StToolButton Text="Post receipt (F10)" Glyph="POST" OnClick="OnConfirmAsync" />
+        <StToolButton Text="Correct allocation" Glyph="REJECT" OnClick="CorrectAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <fieldset class="st-group" style="flex:0 0 auto">
+        <legend>Receipt header</legend>
+        <div class="st-filters" style="padding:2px 4px">
+            <StTextField Caption="&Customer account:" Inline="true" LabelWidth="100" Width="100" MaxLength="20" Field="Customer" @bind-Value="_customer" Id="@Uid("customer")" />
+            <StTextField Caption="Receipt &date:" Inline="true" LabelWidth="96" Width="86" MaxLength="10" Field="ReceiptDate" @bind-Value="_receiptDate" Id="@Uid("date")" />
+            <StSelectField Caption="Receipt c&urrency:" Inline="true" LabelWidth="110" Width="70" Field="Currency" Items="Currencies" Value="@_currency" ValueChanged="v => _currency = v" Id="@Uid("currency")" />
+            <StSelectField Caption="&Method:" Inline="true" LabelWidth="60" Width="82" Field="Method" Items="Methods" Value="@_method" ValueChanged="v => _method = v" Id="@Uid("method")" />
+        </div>
+        <div class="st-filters" style="padding:2px 4px">
+            <StTextField Caption="&Bank account:" Inline="true" LabelWidth="100" Width="100" MaxLength="20" Field="BankAccount" @bind-Value="_bankAccount" Id="@Uid("bank")" />
+            <StTextField Caption="&Gross amount:" Inline="true" LabelWidth="96" Width="86" MaxLength="15" Right="true" Field="Amount" @bind-Value="_amount" Id="@Uid("amount")" />
+            <StTextField Caption="Bank &reference:" Inline="true" LabelWidth="110" Width="262" MaxLength="60" Field="BankReference" @bind-Value="_bankReference" Id="@Uid("bankref")" />
+        </div>
+        <div class="st-filters" style="padding:2px 4px">
+            <StTextField Caption="&External reference:" Inline="true" LabelWidth="100" Width="100" MaxLength="60" Field="ExternalReference" @bind-Value="_externalReference" Id="@Uid("extref")" />
+            <span class="st-filter"><span style="width:96px; display:inline-block">Customer name:</span><span>(press F2 for the account list)</span></span>
+        </div>
+    </fieldset>
+    <div style="padding:2px 4px">Open items - key the amount to allocate, in the receipt currency, against each item:</div>
+    <div class="st-gridbox st-sunken" id="@Uid("items")" data-sterp-field="Items">
+        <table class="st-grid" role="grid" aria-rowcount="@(RowCount + 1)" tabindex="0">
+            <thead>
+                <tr role="row">
+                    <th class="st-rowhead" role="columnheader"><span class="st-sr">Row</span></th>
+                    @if (_items is not null)
+                    {
+                        <th role="columnheader" style="min-width:100px;width:100px">@_allocCaption</th>
+                        <th role="columnheader" style="min-width:90px;width:90px">@_writeOffCaption</th>
+                        <th role="columnheader" style="min-width:160px;width:160px">Write off reason</th>
+                        @for (var c = 0; c < _items.Columns.Count; c++)
+                        {
+                            var col = _items.Columns[c];
+                            <th role="columnheader" class="@(c == _items.Columns.Count - 1 ? "st-fill" : null)">@col.Caption</th>
+                        }
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (var r = 0; r < RowCount; r++)
+                {
+                    var index = r;
+                    var row = _items!.Rows[r];
+                    var selected = index == _selected;
+                    <tr role="row" @key="index" class="@(selected ? "st-sel" : null)" aria-selected="@(selected ? "true" : "false")" id="@Uid($"items-r{index}")"
+                        @onclick="() => SelectRow(index)">
+                        <td class="st-rowhead" role="rowheader"></td>
+                        @if (selected)
+                        {
+                            <td role="gridcell" class="st-r"><input id="@CellId(index, 0)" class="st-input st-right" style="width:100%; box-sizing:border-box" aria-label="@_allocCaption"
+                                                                     value="@_alloc[index]" autocomplete="off" spellcheck="false" @oninput="e => _alloc[index] = e.Value?.ToString() ?? string.Empty" /></td>
+                            <td role="gridcell" class="st-r"><input id="@CellId(index, 1)" class="st-input st-right" style="width:100%; box-sizing:border-box" aria-label="@_writeOffCaption"
+                                                                     value="@_writeOff[index]" autocomplete="off" spellcheck="false" @oninput="e => _writeOff[index] = e.Value?.ToString() ?? string.Empty" /></td>
+                            <td role="gridcell"><input id="@CellId(index, 2)" class="st-input" style="width:100%; box-sizing:border-box" aria-label="Write off reason"
+                                                       value="@_woReason[index]" autocomplete="off" spellcheck="false" @oninput="e => _woReason[index] = e.Value?.ToString() ?? string.Empty" /></td>
+                        }
+                        else
+                        {
+                            <td role="gridcell" class="st-r">@MoneyText(_alloc[index])</td>
+                            <td role="gridcell" class="st-r">@MoneyText(_writeOff[index])</td>
+                            <td role="gridcell">@_woReason[index]</td>
+                        }
+                        @for (var c = 0; c < _items.Columns.Count; c++)
+                        {
+                            var col = _items.Columns[c];
+                            var last = c == _items.Columns.Count - 1;
+                            if (string.Equals(col.Kind, "BOOL", StringComparison.OrdinalIgnoreCase))
+                            {
+                                var flag = row[col.Name] is JsonValue v && v.TryGetValue<bool>(out var b) && b;
+                                <td role="gridcell" class="st-c @(last ? "st-fill" : null)"><input type="checkbox" checked="@flag" disabled tabindex="-1" /></td>
+                            }
+                            else
+                            {
+                                <td role="gridcell" class="@UkFormat.Alignment(col.Kind) @(last ? "st-fill" : null)">@_items.Cell(row, col)</td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (RowCount == 0)
+        {
+            <div class="st-empty">(no records - press F5 to refresh)</div>
+        }
+    </div>
+    <fieldset class="st-group" style="flex:0 0 auto">
+        <legend>Residual preview - RCPTALOC works the totals out, the screen only shows them</legend>
+        <div style="display:flex; flex-wrap:wrap; gap:4px 12px; padding:2px 4px">
+            @foreach (var t in TotalSpec)
+            {
+                <span style="display:inline-flex; gap:4px"><span>@t.Caption</span><span style="min-width:66px; text-align:right" id="@Uid("t-" + t.Key.ToLowerInvariant())">@_total[t.Key]</span></span>
+            }
+        </div>
+    </fieldset>
+</div>
+
+@code {
+    /// <summary>Preview name, caption and the RCPTALOC COMMAREA field that holds the figure (.Designer.vb:30-35).</summary>
+    private static readonly (string Key, string Caption, string Field)[] TotalSpec =
+    [
+        ("APPLIED", "Applied (£):", "totApplied"), ("DISCOUNT", "Settlement discount (£):", "totDiscount"),
+        ("WRITEOFF", "Written off (£):", "totWriteoff"), ("RESIDUAL", "Residual of receipt (£):", "residual"),
+        ("UNALLOCATED", "Unallocated cash (£):", "unallocated"),
+    ];
+
+    private static readonly IReadOnlyList<(string Value, string Text)> Currencies = StSelectField.Of("GBP", "EUR", "USD");
+
+    private static readonly IReadOnlyList<(string Value, string Text)> Methods = StSelectField.Of("BACS", "CHEQUE", "DD", "CARD", "CASH");
+
+    /// <summary>Result set 1 of ar.usp_OpenItemsForAllocation (the debit items), in result-set order.</summary>
+    private static readonly string[] ItemColumns =
+    [
+        "OpenItemId", "ItemType", "DocumentNumber", "DocumentDate", "DueDate", "CurrencyCode", "FxRate", "OriginalAmount", "ResidualAmount",
+        "OutstandingGBP", "SettlementStatus", "TermsCode", "DaysOverdue", "BucketNo", "BucketName", "IsDisputed", "DisputedAmountGBP",
+        "IsCrossCurrency", "DiscountAvailable", "DiscountAmount", "SmallDifferenceToleranceGBP",
+    ];
+
+    /// <summary>DebtorsService.MaxAllocations: the largest number of allocation instructions RCPTALOCCA carries.</summary>
+    private const int MaxAllocations = 20;
+
+    private readonly Dictionary<string, string> _total = TotalSpec.ToDictionary(t => t.Key, _ => "-");
+    private string _customer = "";
+    private string _receiptDate = "";
+    private string _currency = "GBP";
+    private string _method = "BACS";
+    private string _bankAccount = "";
+    private string _amount = "";
+    private string _bankReference = "";
+    private string _externalReference = "";
+
+    /// <summary>The items table (null = nothing loaded, legacy _items Is Nothing) and the three columns keyed by the clerk.</summary>
+    private GridData? _items;
+    private string[] _alloc = [];
+    private string[] _writeOff = [];
+    private string[] _woReason = [];
+    private string _allocCaption = "";
+    private string _writeOffCaption = "";
+    private int _selected = -1;
+    private string? _pendingFocus;
+
+    private bool _posted;
+    private string _loadedCustomer = "";
+    private string _loadedCurrency = "";
+
+    private int RowCount => _items?.Count ?? 0;
+
+    private string CellId(int row, int column) => Uid($"items-{row}-{column}");
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ArWindow.Size(Window, Browser, 888, 546);
+    }
+
+    /// <summary>frmReceiptEntry.OnLoad: receipt date = business date, currency = base currency (else the first), method BACS.</summary>
+    protected override Task OnInitializedAsync()
+    {
+        _receiptDate = ArFmt.Date(Session.BusinessDate);
+        var baseCurrency = Session.Selected?.BaseCurrency ?? "";
+        _currency = Currencies.Any(c => c.Value == baseCurrency) ? baseCurrency : Currencies[0].Value;
+        _method = Methods[0].Value;
+        if (FormArgument != "") _customer = FormArgument;
+        SetStatus("Key the receipt header, press F5 for the open items, then F10 to post.");
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadItemsAsync();
+
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        var code = await Dialogs.LookupAsync("named", "AR.CUSTOMER", "Customer account");
+        if (code == "") return;
+        _customer = code;
+        await LoadItemsAsync();
+    }
+
+    public override async Task<bool> CanCloseAsync()
+    {
+        if (_items is null || _posted || Allocated() == 0m) return true;
+        return await ConfirmAsync("Allocations have been keyed but not posted.  Abandon them?");
+    }
+
+    /// <summary>The grid keys of the DataGridView: Up/Down (and Enter, which commits the cell) move the current row.</summary>
+    protected override Task? OnKey(KeyInfo key)
+    {
+        if (key.TargetField != "Items" || key.Ctrl || key.Alt || _items is not { Count: > 0 }) return null;
+        int next;
+        switch (key.Key)
+        {
+            case "ArrowDown":
+            case "Enter":
+                next = Math.Min(_items.Count - 1, _selected + 1);
+                break;
+            case "ArrowUp":
+                next = Math.Max(0, _selected - 1);
+                break;
+            default:
+                return null;
+        }
+        var column = key.TargetId.StartsWith(Uid("items-"), StringComparison.Ordinal) && key.TargetId.Length > 0 &&
+                     char.IsAsciiDigit(key.TargetId[^1]) ? key.TargetId[^1] - '0' : -1;
+        if (next != _selected)
+        {
+            _selected = next;
+            if (column >= 0) _pendingFocus = CellId(next, column);
+            StateHasChanged();
+        }
+        return Task.CompletedTask;
+    }
+
+    private void SelectRow(int index)
+    {
+        if (index == _selected) return;
+        _selected = index;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingFocus is { } id)
+        {
+            _pendingFocus = null;
+            await Browser.SelectAllAsync(id);
+        }
+    }
+
+    private static string MoneyText(string text) => ArFmt.Dec(text).ToString("#,##0.00", UkFormat.Culture);
+
+    private string Currency() => _currency;
+
+    private void ClearTotals(string text)
+    {
+        foreach (var key in _total.Keys.ToList()) _total[key] = text;
+    }
+
+    /// <summary>The items this customer may be credited with, plus the columns for the clerk (frmReceiptEntry.LoadItems).</summary>
+    private async Task LoadItemsAsync()
+    {
+        _items = null;
+        _alloc = _writeOff = _woReason = [];
+        _selected = -1;
+        _loadedCustomer = "";
+        _loadedCurrency = "";
+        _posted = false;
+        ClearTotals("");
+        var customer = _customer.Trim().ToUpperInvariant();
+        if (customer == "")
+        {
+            SetStatus("Key a customer account first, or press F2 for the account list.", CueWarning);
+            return;
+        }
+        _customer = customer;
+        await GuardAsync(async () =>
+        {
+            var currency = Currency();
+            var r = await Api.GetAsync($"/api/ar/v1/customers/{Query.Path(customer)}/allocatable-items" + Query.Build(("currency", currency)));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            var items = ArFmt.Grid(r.Json?["debitItems"], ItemColumns);
+            _alloc = Enumerable.Repeat("0.00", items.Count).ToArray();
+            _writeOff = Enumerable.Repeat("0.00", items.Count).ToArray();
+            _woReason = Enumerable.Repeat("", items.Count).ToArray();
+            _allocCaption = "Allocate " + currency;
+            _writeOffCaption = "Write off " + currency;
+            _items = items;
+            _selected = items.Count > 0 ? 0 : -1;
+            _posted = false;
+            _loadedCustomer = customer;
+            _loadedCurrency = currency;
+            var note = "";
+            if (r.Json?["totals"] is JsonObject h)
+            {
+                note = "Balance " + ArFmt.Money(ArFmt.Dec(ArFmt.Col(h, "BalanceGBP"))) + " | unapplied cash " + ArFmt.Money(ArFmt.Dec(ArFmt.Col(h, "UnappliedCashGBP"))) +
+                       " | small difference tolerance " + ArFmt.Money(ArFmt.Dec(ArFmt.Col(h, "SmallDifferenceToleranceGBP"))) + " | ";
+            }
+            SetStatus(note + items.Count + " open item(s) in " + currency +
+                      ".  Key the amounts (and any small difference to write off, with its reason), press Preview, then F10 to post.", "");
+        });
+    }
+
+    /// <summary>Sum of what the clerk has keyed - only to decide whether there is anything to send.</summary>
+    private decimal Allocated()
+    {
+        var total = 0m;
+        if (_items is null) return total;
+        for (var i = 0; i < _items.Count; i++) total += ArFmt.Dec(_alloc[i]) + ArFmt.Dec(_writeOff[i]);
+        return total;
+    }
+
+    private DateOnly ReceiptDate() => ArFmt.ParseDate(_receiptDate) ?? Session.BusinessDate;
+
+    /// <summary>DebtorsService.NewReceipt: the RCPTALOC header from the page.</summary>
+    private JsonObject Header() => new()
+    {
+        ["customer"] = _customer.Trim(),
+        ["receiptDate"] = ArFmt.Iso(ReceiptDate()),
+        ["currency"] = Currency(),
+        ["bankAccount"] = _bankAccount.Trim(),
+        ["method"] = _method,
+        ["gross"] = ArFmt.Dec(_amount),
+        ["bankRef"] = _bankReference.Trim(),
+        ["externalRef"] = _externalReference.Trim(),
+    };
+
+    /// <summary>DebtorsService.AddAllocation for the keyed rows in grid order; rows beyond the twentieth are not sent.</summary>
+    private JsonArray Lines()
+    {
+        var lines = new JsonArray();
+        if (_items is null) return lines;
+        for (var i = 0; i < _items.Count; i++)
+        {
+            var apply = ArFmt.Dec(_alloc[i]);
+            var writeOff = ArFmt.Dec(_writeOff[i]);
+            if (apply == 0m && writeOff == 0m) continue;
+            if (lines.Count + 1 > MaxAllocations) break;
+            var row = _items.Rows[i];
+            lines.Add(new JsonObject
+            {
+                ["openItemId"] = ArFmt.Int(ArFmt.Col(row, "OpenItemId")),
+                ["documentNumber"] = ArFmt.Str(ArFmt.Col(row, "DocumentNumber")),
+                ["currency"] = ArFmt.Str(ArFmt.Col(row, "CurrencyCode")),
+                ["apply"] = apply,
+                ["writeOff"] = writeOff,
+                ["writeOffReason"] = _woReason[i].Trim(),
+            });
+        }
+        return lines;
+    }
+
+    /// <summary>Shows the totals RCPTALOC put back in the COMMAREA (zeros when the call returned no area).</summary>
+    private void ShowTotals(JsonNode? area)
+    {
+        foreach (var t in TotalSpec) _total[t.Key] = area is JsonObject ? ArFmt.AreaMoney(area, t.Field) : ArFmt.Money(0m);
+    }
+
+    private static JsonNode? AreaOf(ApiResponse r) => r.IsSuccess ? r.Data : r.Problem?.Data;
+
+    /// <summary>CobolResult.Display: the message (or the severity) with the reason code in brackets (COM-017).</summary>
+    private static string Display(ApiResponse r)
+    {
+        string message, reason, severity;
+        if (r.IsSuccess && r.Outcome is { } o)
+        {
+            (message, reason, severity) = (o.Message.Trim(), o.ReasonCode.Trim(), o.Severity);
+        }
+        else
+        {
+            var p = r.Problem!;
+            (message, reason, severity) = (p.Detail.Trim(), p.ReasonCode.Trim(), p.Severity);
+        }
+        if (message.Length == 0) message = severity;
+        return reason.Length > 0 ? message + "  (" + reason + ")" : message;
+    }
+
+    /// <summary>PREVIEW has no business effect - it only reports what posting would do.</summary>
+    private async Task PreviewAsync()
+    {
+        if (!Ready()) return;
+        await GuardAsync(async () =>
+        {
+            var body = Header();
+            body["lines"] = Lines();
+            var r = await Api.PostAsync("/api/ar/v1/allocations/preview", body);
+            var area = AreaOf(r);
+            ShowTotals(area);
+            if (r.IsSuccess && r.Outcome is { ReturnCode: 6 } hold)
+            {
+                // a preview requests nothing - say what posting would do instead of the hold text
+                await ShowWarningAsync(hold.Message + " - posting this receipt would be held. Preview only: nothing " +
+                                       "has been posted and no approval has been requested.", hold.ReasonCode);
+                return;
+            }
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Preview only - nothing has been posted.  Residual " + ArFmt.AreaMoney(area, "residual") + ", unallocated cash " +
+                      ArFmt.AreaMoney(area, "unallocated") + ".", "");
+        });
+    }
+
+    /// <summary>F10 - records the receipt, then applies the instructions; the two links stay separate (AR-010).</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        if (!Ready()) return;
+        if (!await ConfirmAsync("Post this receipt of " + ArFmt.Amount(ArFmt.Dec(_amount), Currency()) + " for " + _customer.Trim() + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var lines = Lines();
+            var receiptDate = ReceiptDate();
+            var receipt = await Api.PostAsync("/api/ar/v1/receipts", Header(), Instruction.New().Options());
+            var area = AreaOf(receipt);
+            ShowTotals(area);
+            if (!await ShowResultAsync(receipt))
+            {
+                SetStatus("The receipt was not recorded: " + Display(receipt), CueError);
+                return;
+            }
+            _posted = true;
+            var receiptNo = ArFmt.AreaText(area, "receiptNo");
+            if (lines.Count > 0)
+            {
+                var allocate = await Api.PostAsync("/api/ar/v1/allocations",
+                    new JsonObject
+                    {
+                        ["sourceItemId"] = ArFmt.Int(ArFmt.Col(area, "sourceItemId")),
+                        ["sourceDoc"] = ArFmt.AreaText(area, "sourceDoc"),
+                        ["receiptDate"] = ArFmt.Iso(receiptDate),
+                        ["effectiveDate"] = ArFmt.Iso(receiptDate),
+                        ["lines"] = lines,
+                    }, Instruction.New().Options());
+                var allocated = AreaOf(allocate);
+                ShowTotals(allocated);
+                if (ArFmt.AreaText(allocated, "receiptNo") is { Length: > 0 } no) receiptNo = no;
+                area = allocated;
+                if (!await ShowResultAsync(allocate))
+                {
+                    SetStatus("Receipt " + receiptNo + " was recorded but not allocated: " + Display(allocate), CueWarning);
+                    return;
+                }
+            }
+            _posted = true;
+            SetStatus("Receipt " + receiptNo + " posted; applied " + ArFmt.AreaMoney(area, "totApplied") + ", unallocated cash " +
+                      ArFmt.AreaMoney(area, "unallocated") + ".", CueOk);
+        });
+    }
+
+    /// <summary>Reverses an allocation that was applied to the wrong item; the account history keeps both (AR-011).</summary>
+    private async Task CorrectAsync()
+    {
+        var id = await InputBoxAsync("Allocation number to correct:", "Allocation correction", "");
+        if (id.Trim() == "") return;
+        var reason = await InputBoxAsync("Why is allocation " + id.Trim() + " being corrected?", "Allocation correction", "");
+        if (reason.Trim() == "")
+        {
+            SetStatus("An allocation correction must carry a reason.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ar/v1/allocations/{ArFmt.Int(id.Trim())}/unallocate",
+                new JsonObject { ["correctReason"] = reason.Trim() }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Allocation " + id.Trim() + " reversed; " + ArFmt.Int(ArFmt.Col(r.Data, "reversedCnt")) + " entry(ies) backed out, journal " +
+                      ArFmt.AreaText(r.Data, "journalNo") + ".", CueOk);
+            await LoadItemsAsync();
+        });
+    }
+
+    private bool Ready()
+    {
+        if (_posted)
+        {
+            SetStatus("This receipt has already been recorded. Press F5 to start another receipt.", CueWarning);
+            return false;
+        }
+        if (_items is null)
+        {
+            SetStatus("Press F5 for the open items of this account first.", CueWarning);
+            return false;
+        }
+        if (_customer.Trim().ToUpperInvariant() != _loadedCustomer || Currency() != _loadedCurrency)
+        {
+            ClearTotals("");
+            SetStatus("The customer or currency has changed. Press F5 to reload the open items before previewing or posting.", CueWarning);
+            return false;
+        }
+        if (ArFmt.Dec(_amount) <= 0m)
+        {
+            SetStatus("Key the gross amount of the receipt in " + Currency() + ".", CueWarning);
+            return false;
+        }
+        return true;
+    }
+}

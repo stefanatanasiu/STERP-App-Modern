@@ -1,0 +1,11 @@
+# ar-enquiry
+ok 1 - an enquiry on an unknown customer is refused -- REQ: AR-022, COM-002
+ok 2 - an unknown statement style is refused -- REQ: AR-018
+ok 3 - an unknown collection stage is refused -- REQ: AR-016
+ok 4 - a user without AR.ENQUIRY is refused the aged debt report -- REQ: COM-002, AR-017
+ok 5 - the sales ledger clerk holds AR.ENQUIRY -- REQ: COM-002
+ok 6 - both of this debtor's open invoices are offered for allocation -- REQ: AR-010
+ok 7 - another debtor's unapplied receipt is not offered against this account -- REQ: AR-010, AR-021
+ok 8 - the clerk short payment tolerance is GBP 5.00 -- REQ: AR-012, D-22
+ok 9 - statement opening plus movement equals closing, and closing equals the ledger balance -- REQ: AR-018, AR-021
+# ar-enquiry done

@@ -1,0 +1,46 @@
+@* A tab control strip (TabControl): captions with access keys; the page renders the selected tab's content below it.
+   Left/Right move between tabs; the selected tab is the one in the tab order. *@
+<div class="st-tabstrip" role="tablist" id="@Id">
+    @for (var i = 0; i < Captions.Count; i++)
+    {
+        var index = i;
+        var selected = index == Selected;
+        <button type="button" role="tab" id="@($"{Id}-t{index}")" class="st-tab @(selected ? "st-tab-sel" : null)" aria-selected="@(selected ? "true" : "false")"
+                aria-controls="@PanelId" tabindex="@(selected ? 0 : -1)" @onclick="() => SelectAsync(index)" @onkeydown="e => OnKeyDown(e, index)"><StMnemonic Text="@Captions[index]" /></button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<string> Captions { get; set; } = [];
+
+    [Parameter] public int Selected { get; set; }
+
+    [Parameter] public EventCallback<int> SelectedChanged { get; set; }
+
+    [Parameter] public string Id { get; set; } = "tabs-" + Guid.NewGuid().ToString("N")[..8];
+
+    /// <summary>Id of the element holding the selected tab's content (role="tabpanel").</summary>
+    [Parameter] public string PanelId { get; set; } = "";
+
+    [Inject] private BrowserInterop Browser { get; set; } = default!;
+
+    private async Task SelectAsync(int index)
+    {
+        if (index == Selected) return;
+        Selected = index;
+        await SelectedChanged.InvokeAsync(index);
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e, int index)
+    {
+        var next = e.Key switch
+        {
+            "ArrowRight" => (index + 1) % Captions.Count,
+            "ArrowLeft" => (index + Captions.Count - 1) % Captions.Count,
+            _ => index,
+        };
+        if (next == index) return;
+        await SelectAsync(next);
+        await Browser.FocusAsync($"{Id}-t{next}");
+    }
+}

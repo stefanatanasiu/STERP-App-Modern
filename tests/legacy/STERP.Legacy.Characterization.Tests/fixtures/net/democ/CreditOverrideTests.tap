@@ -1,0 +1,3 @@
+ok - ar: Livingston held order resumes through normal sales acceptance after scoped approval # SKIP Mutating credit tests require matching SQL/ODBC STERP_QA_CREDIT_ isolated database
+ok - ar: credit override native lifecycle enforces independent scoped authority and audit # SKIP Mutating credit tests require matching SQL/ODBC STERP_QA_CREDIT_ isolated database
+ok - ar: credit override native menus preserve sales request and credit approval separation # SKIP Mutating credit tests require matching SQL/ODBC STERP_QA_CREDIT_ isolated database

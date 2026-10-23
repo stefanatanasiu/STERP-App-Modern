@@ -1,0 +1,7 @@
+# bom-header-freeze
+ok 1 - released header refuses Description changes
+ok 2 - released header refuses YieldFactor changes
+ok 3 - released header refuses EffectiveFrom changes
+ok 4 - released header allows audit stamps without content changes
+ok 5 - lifecycle supersession still closes the old revision effectivity
+ok 6 - draft headers remain editable

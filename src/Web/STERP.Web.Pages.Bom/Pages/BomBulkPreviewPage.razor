@@ -1,0 +1,123 @@
+@inherits StListPage
+@* frmBomBulkPreview (page:bom/bulk-change-preview, FR-STERP-BOM-023; frmBomBulkPreview.vb:4-74): engineering replacement
+   preview through BOMBULK PREVIEW; never exposes apply or approval. The outcome is not presented with the outcome dialogs:
+   the status line and the answer box show it exactly as the legacy form did (CobolResult.Display). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync" GridId="@Uid("grdBulkPreview")">
+    <Filters>
+        <StTextField Caption="&Change reference:" Inline="true" Width="180" @bind-Value="_changeRef" Id="@Uid("txtChangeRef")" />
+        <StTextField Caption="&Old component:" Inline="true" Width="150" @bind-Value="_oldItem" Id="@Uid("txtOldItem")" />
+        <StTextField Caption="&Replacement:" Inline="true" Width="150" @bind-Value="_newItem" Id="@Uid("txtNewItem")" />
+        <StTextField Caption="&Effective date:" Inline="true" Width="90" @bind-Value="_effective" Id="@Uid("txtEffectiveDate")" />
+        <StSelectField Caption="&Scope:" Inline="true" Width="90" Items="Scopes" @bind-Value="_scope" Id="@Uid("cboScope")" />
+        <StTextField Caption="&Bill / parent:" Inline="true" Width="170" @bind-Value="_scopeItem" Id="@Uid("txtScopeItem")" />
+        <StSelectField Caption="&Include:" Inline="true" Width="160" Items="Drafts" @bind-Value="_drafts" Id="@Uid("cboIncludeDraft")" />
+    </Filters>
+    <Tools>
+        <StToolButton Text="Preview (F10)" Glyph="ENGINE" OnClick="PreviewAsync" />
+    </Tools>
+    <Below>
+        <div id="@Uid("txtPreviewAnswer")" class="st-input" role="textbox" aria-readonly="true" aria-multiline="true" style="width:100%; height:76px; overflow-y:auto; white-space:pre-wrap; box-sizing:border-box">@_answer</div>
+    </Below>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Scopes = StSelectField.Of("ITEM", "BOMREF", "PARENT");
+    private static readonly IReadOnlyList<(string Value, string Text)> Drafts = StSelectField.Of("RELEASED AND DRAFT", "RELEASED ONLY");
+    private string _changeRef = "";
+    private string _oldItem = "";
+    private string _newItem = "";
+    private string _effective = "";
+    private string _scope = "ITEM";
+    private string _scopeItem = "";
+    private string _drafts = "RELEASED AND DRAFT";
+    private string _answer = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Bulk Change Preview");
+        _effective = Fmt.Date(Session.BusinessDate);
+    }
+
+    /// <summary>F5 / Refresh clears the grid and the answer.</summary>
+    protected override Task LoadDataAsync()
+    {
+        // the answer is cleared first: Populate renders the page
+        _answer = "";
+        Populate(GridData.Empty);
+        SetStatus("Enter the change reference, source and replacement. F10 previews only; no bills are changed.");
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnConfirmAsync() => PreviewAsync();
+
+    private async Task PreviewAsync()
+    {
+        _answer = "";
+        Populate(GridData.Empty);
+        var effective = Fmt.ParseDate(_effective);
+        if (effective is null)
+        {
+            SetStatus("Enter a valid effective date in dd/MM/yyyy form.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var changeRef = _changeRef.Trim().ToUpperInvariant();
+            var r = await Api.PostAsync("/api/bom/v1/engineering-changes/" + Query.Path(changeRef.Length == 0 ? " " : changeRef) + "/preview", new JsonObject
+            {
+                ["oldItem"] = _oldItem.Trim().ToUpperInvariant(),
+                ["newItem"] = _newItem.Trim().ToUpperInvariant(),
+                ["effectiveDate"] = Fmt.Iso(effective.Value),
+                ["scope"] = _scope,
+                ["scopeItem"] = _scopeItem.Trim().ToUpperInvariant(),
+                ["includeDraft"] = _drafts == "RELEASED AND DRAFT",
+            });
+            // BomBulkService.Preview returns the CobolResult of BOMBULK; only a failure without a legacy result is an error
+            int rc;
+            string reason, message;
+            JsonNode? data;
+            if (r.IsSuccess)
+            {
+                var o = r.Outcome;
+                (rc, reason, message, data) = (o?.ReturnCode ?? 0, o?.ReasonCode ?? "", o?.Message ?? "", r.Data);
+            }
+            else if (r.Problem is { ReturnCode: { } prc } p)
+            {
+                (rc, reason, message, data) = (prc, p.ReasonCode, p.Detail, p.Data);
+            }
+            else
+            {
+                throw new ApiFailure(r);
+            }
+            var lines = data?["lines"] as JsonArray ?? [];
+            Populate(GridData.FromItems(lines, Fmt.Col("bill"), Fmt.Col("revision"), Fmt.Col("proposedRevision"), Fmt.Col("parent"),
+                Fmt.Col("treatment"), Fmt.Col("outcome"), Fmt.Col("reason"), Fmt.Col("detail"), Fmt.Col("line", "INT"),
+                Fmt.Col("beforeQty", "QTY"), Fmt.Col("afterQty", "QTY")));
+            _answer = Fmt.Str(data?["summary"]) + "\r\n" + Fmt.Str(data?["refusal"]) + "\r\n" + Display(rc, message, reason);
+            SetStatus("PREVIEW ONLY - " + Fmt.Int(data?["targetCount"]) + " target(s), " + Fmt.Int(data?["failedCount"]) + " failed, " +
+                      Fmt.Int(data?["appliedCount"]) + " applied. " + reason, rc <= 4 ? CueOk : "*** REFUSED");
+        });
+    }
+
+    /// <summary>CobolResult.Display: the message (or the severity name) and "  (reason)" when a reason exists.</summary>
+    private static string Display(int rc, string message, string reason)
+    {
+        var m = (message ?? "").Trim();
+        if (m.Length == 0)
+        {
+            m = rc switch
+            {
+                0 => "OK",
+                4 => "WARNING",
+                6 => "HOLD",
+                8 => "ERROR",
+                12 => "SEVERE",
+                16 => "NOT FOUND",
+                _ => "RC" + rc.ToString("00", System.Globalization.CultureInfo.InvariantCulture),
+            };
+        }
+        var r = (reason ?? "").Trim();
+        return r.Length > 0 ? m + "  (" + r + ")" : m;
+    }
+}

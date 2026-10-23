@@ -1,0 +1,114 @@
+@inherits StListPage
+@* frmKitTrial (page:kit/trial-kitting, FR-STERP-KIT-052): non-committing trial kitting and the maximum buildable output
+   (frmKitTrial.vb:11-110). Max build sends quantity 0 as KitService.MaxBuild did (SME-648) and leaves the grid as it is. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Kit:" Inline="true" Width="130" @bind-Value="_kit" Id="@Uid("kit")" />
+        <StTextField Caption="&Parent:" Inline="true" Width="150" @bind-Value="_item" Id="@Uid("item")" />
+        <StTextField Caption="&Qty:" Inline="true" Width="70" @bind-Value="_qty" Id="@Uid("qty")" />
+        <StTextField Caption="&By:" Inline="true" Width="80" @bind-Value="_date" Id="@Uid("date")" />
+        <StSelectField Caption="&Supply:" Inline="true" Width="130" Items="Supplies" @bind-Value="_supply" Id="@Uid("supply")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Trial (F10)" Glyph="ENGINE" OnClick="TrialAsync" />
+        <StToolButton Text="Max build" Glyph="RUN" OnClick="MaxAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Supplies = StSelectField.Of("FREE STOCK", "+ INBOUND", "+ SUBASSEMBLIES");
+
+    private string _kit = "";
+    private string _item = "";
+    private string _qty = "1";
+    private string _date = "";
+    private string _supply = "FREE STOCK";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Trial Kitting");
+        _date = Date(Session.BusinessDate);
+        if (FormArgument != "") _kit = FormArgument;
+    }
+
+    /// <summary>LoadData: guidance only - nothing is read until Trial (F10).</summary>
+    protected override Task LoadDataAsync()
+    {
+        SetStatus("Enter a kit or a parent item and press Trial (F10).  Nothing is committed.", "");
+        return Task.CompletedTask;
+    }
+
+    protected override Task OnConfirmAsync() => TrialAsync();
+
+    /// <summary>Non-committing feasibility for the stated quantity and date (KIT-006).</summary>
+    private async Task TrialAsync()
+    {
+        if (!Asked()) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/kit/v1/trials", Body(Qty(), Subassemblies()));
+            var data = KitLegacy.Payload(r);
+            Populate(KitLegacy.Table(KitLegacy.TrialSpec, r.IsSuccess ? data?["lines"] : null));
+            if (await ShowResultAsync(r)) Report("Trial", data);
+        });
+    }
+
+    /// <summary>The whole parents the eligible stock supports, and what limits it (KIT-006).</summary>
+    private async Task MaxAsync()
+    {
+        if (!Asked()) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/kit/v1/trials/max-build", Body(0m, false));
+            if (await ShowResultAsync(r)) Report("Max build", r.Data);
+        });
+    }
+
+    /// <summary>KitService.TrialArea: kit, parent, blank revision, the session site, quantity, required date and the supply choice.</summary>
+    private JsonObject Body(decimal qty, bool subassemblies) => new()
+    {
+        ["kitRef"] = Code(_kit),
+        ["parentItem"] = Code(_item),
+        ["parentRev"] = "",
+        ["site"] = Session.SiteCode,
+        ["requestedQty"] = qty,
+        ["reqDate"] = When().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+        ["useInbound"] = Inbound() ? "Y" : "N",
+        ["useSubassy"] = subassemblies ? "Y" : "N",
+    };
+
+    private void Report(string what, JsonNode? data)
+    {
+        var limiting = KitLegacy.Text(data, "limitingItem");
+        var hint = KitLegacy.Text(data, "actionHint");
+        SetStatus(what + ": buildable " + KitLegacy.Qty(KitLegacy.Num(data, "maxBuildable")) + " | " + KitLegacy.Text(data, "completeness") +
+                  " | " + KitLegacy.Count(data, "shortageCnt") + " shortage(s)" +
+                  (limiting != "" ? " | limited by " + limiting : "") +
+                  (hint != "" ? " | " + hint : ""),
+                  KitLegacy.Text(data, "feasible") == "Y" ? CueOk : CueWarning);
+    }
+
+    private bool Asked()
+    {
+        if (Code(_kit) != "" || Code(_item) != "") return true;
+        SetStatus("Enter a kit reference or a parent item first.", CueWarning);
+        return false;
+    }
+
+    /// <summary>Decimal.TryParse of the Qty box; anything else is 1.</summary>
+    private decimal Qty() => KitLegacy.TryDecimal(_qty, out var q) ? q : 1m;
+
+    /// <summary>Date.TryParse of the By box (en-GB dates); anything else is the business date.</summary>
+    private DateOnly When() => KitLegacy.ParseDate(_date) ?? Session.BusinessDate;
+
+    private int SupplyIndex() => Supplies.Select(s => s.Value).ToList().IndexOf(_supply);
+
+    private bool Inbound() => SupplyIndex() >= 1;
+
+    private bool Subassemblies() => SupplyIndex() >= 2;
+
+    private static string Code(string text) => KitLegacy.Code(text);
+}

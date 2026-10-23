@@ -1,0 +1,290 @@
+@inherits StPage
+@* frmBomEditor (page:bom/bill-maintenance, FR-STERP-BOM-020; frmBomEditor.vb:15-235): the header with its declared boundary,
+   the component occurrences, the by-product recoveries, the other revisions of the same bill and the validation findings.
+   A released revision is never edited here - the engineer validates (BOMVALID CHECK) and releases through
+   bom.usp_ReleaseBom, which refuses anything it is not happy with. The facade reads use the workstation date (Date.Today). *@
+<div class="st-page">
+    <div class="st-filters" style="flex:0 0 auto">
+        <StTextField Caption="&Bill reference:" Inline="true" Width="200" MaxLength="30" @bind-Value="_bom" Id="@Uid("bom")" />
+        <StTextField Caption="Re&vision:" Inline="true" Width="50" MaxLength="4" @bind-Value="_rev" Id="@Uid("rev")" />
+        <button type="button" class="st-button" style="min-width:76px" @onclick="FindClickedAsync"><StMnemonic Text="F&ind (F2)" /></button>
+        <button type="button" class="st-button" style="min-width:76px" @onclick="LoadBillAsync"><StMnemonic Text="&Load (F5)" /></button>
+        <button type="button" class="st-button" style="min-width:94px" @onclick="ValidateAsync"><StMnemonic Text="V&alidate (F10)" /></button>
+        <button type="button" class="st-button" style="min-width:80px" @onclick="ReleaseAsync"><StMnemonic Text="&Release..." /></button>
+        <button type="button" class="st-button" style="min-width:70px" @onclick="ExplodeAsync"><StMnemonic Text="&Explode" /></button>
+    </div>
+    <div style="flex:0 0 auto; padding:1px 8px; min-height:15px; line-height:15px; white-space:pre-wrap">@_who</div>
+    <div style="flex:0 0 auto; padding:1px 8px; min-height:15px; line-height:15px; white-space:pre-wrap">@_boundary</div>
+    <div role="tablist" style="flex:0 0 auto; display:flex; gap:2px; margin:4px 8px 0; border-bottom:1px solid var(--st-shadow)">
+        @for (var i = 0; i < Tabs.Length; i++)
+        {
+            var index = i;
+            var selected = index == _tab;
+            <button type="button" role="tab" id="@Uid("tab-" + Tabs[index].Kind)" aria-selected="@(selected ? "true" : "false")" aria-controls="@Uid("tabpanel")"
+                    tabindex="@(selected ? 0 : -1)" class="st-button"
+                    style="min-width:0; height:21px; padding:0 8px; margin-bottom:-1px; @(selected ? "border-bottom-color:var(--st-face); font-weight:bold" : null)"
+                    @onclick="() => SelectTabAsync(index)"><StMnemonic Text="@Tabs[index].Caption" /></button>
+        }
+    </div>
+    <div role="tabpanel" id="@Uid("tabpanel")" style="display:flex; flex-direction:column; flex:1 1 auto; min-height:0; margin:0 8px 8px">
+        <StGrid Id="@Uid("grid-" + Tabs[_tab].Kind)" Data="_grids[Tabs[_tab].Kind]" Selected="_selected[Tabs[_tab].Kind]" SelectedChanged="GridSelected" />
+    </div>
+</div>
+
+@code {
+    private static readonly (string Caption, string Kind)[] Tabs =
+        [("&Components", "LINES"), ("&By-products", "BYPRODUCT"), ("&Revisions", "REVISIONS"), ("&Validation", "FINDINGS")];
+
+    private readonly Dictionary<string, GridData> _grids = Tabs.ToDictionary(t => t.Kind, _ => GridData.Empty);
+    private readonly Dictionary<string, int> _selected = Tabs.ToDictionary(t => t.Kind, _ => -1);
+    private string _bom = "";
+    private string _rev = "";
+    private string _who = "No bill loaded.";
+    private string _boundary = "";
+    private int _tab;
+    private GridData? _findings;
+    private string _status = "";
+
+    /// <summary>OnLoad: the form argument is a bill reference (or a parent item); the prompt is shown after the load.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        Window.SetTitle("Bill of Material Maintenance");
+        if (FormArgument != "") _bom = FormArgument;
+        if (_bom != "") await LoadBillAsync();
+        SetStatus("Enter a bill reference (or a parent item) and press F5. F10 validates, " +
+                  "release is refused unless the validation still matches the content.");
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadBillAsync();
+
+    protected override Task OnLookupAsync(KeyInfo key) => FindClickedAsync();
+
+    protected override Task OnConfirmAsync() => ValidateAsync();
+
+    private string Bom() => _bom.Trim().ToUpperInvariant();
+
+    private string Rev() => _rev.Trim().ToUpperInvariant();
+
+    /// <summary>Date.Today of the workstation (the browser's local date).</summary>
+    private static string Today() => Fmt.Iso(DateOnly.FromDateTime(DateTime.Now));
+
+    private void GridSelected(int index) => _selected[Tabs[_tab].Kind] = index;
+
+    /// <summary>GridHelper.Bind: the first row becomes current.</summary>
+    private void Bind(string kind, GridData? data)
+    {
+        _grids[kind] = data ?? GridData.Empty;
+        _selected[kind] = _grids[kind].Count > 0 ? 0 : -1;
+        StateHasChanged();
+    }
+
+    private async Task FindClickedAsync()
+    {
+        // frmLookup.Pick(Me, "core.usp_UiLookup", "ITM.ITEM", ...): a master-file lookup
+        var code = await Dialogs.LookupAsync("master", "ITM.ITEM", "Parent item");
+        if (code != "")
+        {
+            _bom = code;
+            await LoadBillAsync();
+        }
+    }
+
+    private Task<ApiResponse> HeaderAsync() =>
+        Api.GetAsync("/api/bom/v1/bills/" + Query.Path(Bom()) + "/header" + Query.Build(("revision", Rev()), ("asOf", Today())));
+
+    private static JsonNode? First(ApiResponse r)
+    {
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        return r.Items.Count > 0 ? r.Items[0] : null;
+    }
+
+    /// <summary>A blank revision means "the one effective today", exactly as the engine selects it.</summary>
+    private async Task LoadBillAsync()
+    {
+        if (Bom() == "") return;
+        await GuardAsync(async () =>
+        {
+            _findings = null;
+            var h = First(await HeaderAsync());
+            if (h is null)
+            {
+                var revs = await Api.GetAsync("/api/bom/v1/bill-revisions" + Query.Build(("parentItemCode", Bom()), ("asOf", Today())));
+                if (!revs.IsSuccess) throw new ApiFailure(revs);
+                if (revs.Items.Count > 0)
+                {
+                    _bom = Fmt.Str(revs.Items[0]?["bomRef"]);
+                    h = First(await HeaderAsync());
+                }
+            }
+            if (h is null)
+            {
+                _who = "No bill loaded.";
+                _boundary = "";
+                _status = "";
+                SetStatus("No bill " + Bom() + " in " + Session.CompanyCode + ".", CueError);
+                return;
+            }
+            _bom = Fmt.Str(h["bomRef"]);
+            _rev = Fmt.Str(h["bomRevision"]);
+            _status = Fmt.Str(h["status"]);
+            _who = Fmt.Str(h["bomRef"]) + " rev " + Fmt.Str(h["bomRevision"]) + "   |   " +
+                   Fmt.Str(h["parentItemCode"]) + " " + Fmt.Str(h["parentDescription"]) +
+                   "   |   " + Fmt.Str(h["purpose"]) +
+                   (Fmt.Str(h["variantCode"]) != "" ? " / " + Fmt.Str(h["variantCode"]) : "") +
+                   "   |   " + Fmt.Str(h["componentCount"]) + " component(s), " +
+                   Fmt.Str(h["byProductCount"]) + " by-product(s)";
+            _boundary = "Nominal basis " + Fmt.Qty(Fmt.Dec(h["nominalBasis"]), Fmt.Str(h["stockUom"])) +
+                        "   |   yield " + Fmt.Rate(Fmt.Dec(h["yieldFactor"])) +
+                        "   |   production quantum " + Fmt.Qty(Fmt.Dec(h["productionQuantum"]), "") +
+                        "   |   effective " + Fmt.Date(h["effectiveFrom"]) + " to " +
+                        (Fmt.Str(h["effectiveTo"]) == "" ? "open" : Fmt.Date(h["effectiveTo"])) +
+                        "   |   author " + Fmt.Str(h["authorUser"]) +
+                        ", reviewer " + Fmt.Str(h["reviewerUser"]);
+            SetStatus("Status " + _status +
+                      (Fmt.Bool(h["isFrozen"]) ? " - frozen, a change needs a new revision (BOM-004)." : " - draft, validate before release."),
+                      _status == "RELEASED" ? CueOk : CueWarning);
+            StateHasChanged();
+            await LoadTabAsync();
+        });
+    }
+
+    /// <summary>TabControl.SelectedIndexChanged: only a change of tab reloads it.</summary>
+    private async Task SelectTabAsync(int index)
+    {
+        if (index == _tab) return;
+        _tab = index;
+        StateHasChanged();
+        await LoadTabAsync();
+    }
+
+    /// <summary>TabControl keys: Ctrl+PgDn / Ctrl+PgUp select the next / previous tab.</summary>
+    protected override Task? OnKey(KeyInfo key)
+    {
+        if (key.Ctrl && !key.Alt && key.Key == "PageDown") return SelectTabAsync((_tab + 1) % Tabs.Length);
+        if (key.Ctrl && !key.Alt && key.Key == "PageUp") return SelectTabAsync((_tab + Tabs.Length - 1) % Tabs.Length);
+        return null;
+    }
+
+    private async Task LoadTabAsync()
+    {
+        if (Bom() == "") return;
+        var kind = Tabs[_tab].Kind;
+        if (kind == "FINDINGS")
+        {
+            Bind(kind, _findings);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var path = kind switch
+            {
+                "REVISIONS" => "/api/bom/v1/bill-revisions" + Query.Build(("bomRef", Bom()), ("asOf", Today())),
+                "BYPRODUCT" => "/api/bom/v1/bills/" + Query.Path(Bom()) + "/by-products" + Query.Build(("revision", Rev()), ("asOf", Today())),
+                _ => "/api/bom/v1/bills/" + Query.Path(Bom()) + "/components" + Query.Build(("revision", Rev()), ("asOf", Today())),
+            };
+            var r = await Api.GetAsync(path);
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Bind(kind, GridData.FromItems(r.Json));
+        });
+    }
+
+    /// <summary>BomService.NewFindingTable: the findings of the last validation (empty when the engine refused).</summary>
+    private static GridData Findings(JsonNode? rows) =>
+        GridData.FromItems(rows as JsonArray ?? [], Fmt.Col("severity"), Fmt.Col("reason"), Fmt.Col("lineNum", "INT"), Fmt.Col("item"),
+            Fmt.Col("path"), Fmt.Col("message"));
+
+    /// <summary>BOMVALID CHECK: the same rules the release gate applies, with nothing recorded.</summary>
+    private async Task ValidateAsync()
+    {
+        if (Bom() == "")
+        {
+            SetStatus("Load a bill first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            // BomService.Validate replaces the findings table before it links to the engine
+            _findings = Findings(null);
+            var r = await Api.PostAsync("/api/bom/v1/bills/" + Query.Path(Bom()) + "/validate", new JsonObject
+            {
+                ["bomRevision"] = Rev(),
+                ["effectiveDate"] = Today(),
+            });
+            if (!r.IsSuccess && r.Problem?.ReturnCode is null) throw new ApiFailure(r);
+            var data = r.IsSuccess ? r.Data : r.Problem?.Data;
+            if (r.IsSuccess && (r.Outcome?.ReturnCode ?? 0) <= 4) _findings = Findings(data?["findings"]);
+            await SelectTabAsync(3);
+            Bind("FINDINGS", _findings);
+            if (!await ShowResultAsync(r)) return;
+            var releaseAllowed = Fmt.Bool(data?["releaseAllowed"]);
+            var cycle = Fmt.Str(data?["cyclePath"]).Trim();
+            SetStatus("Validation " + Fmt.Str(data?["outcome"]) + " - " + Fmt.Int(data?["errorCount"]) +
+                      " error(s), " + Fmt.Int(data?["warningCount"]) + " warning(s)" +
+                      (cycle != "" ? " | cycle: " + cycle : "") +
+                      (releaseAllowed ? " | this revision may be released." : " | release is blocked until the errors are cleared."),
+                      releaseAllowed ? CueOk : CueWarning);
+        });
+    }
+
+    /// <summary>The gate is the procedure, not the screen: it refuses anything it is not happy with.</summary>
+    private async Task ReleaseAsync()
+    {
+        if (Bom() == "" || Rev() == "")
+        {
+            SetStatus("Load the bill and the revision to release first.", CueWarning);
+            return;
+        }
+        if (_status == "RELEASED")
+        {
+            SetStatus("Revision " + Rev() + " is already released - supersede it with a new revision.", CueWarning);
+            return;
+        }
+        var reviewer = await InputBoxAsync("Reviewer who approved revision " + Rev() + " of " + Bom() + "." + "\r\n" +
+                                           "The reviewer may be neither the author nor you.", "Release bill of material", "");
+        if (reviewer.Trim() == "") return;
+        var reason = await InputBoxAsync("Reason for the release (recorded on the revision).", "Release bill of material", "Engineering release");
+        if (!await ConfirmAsync("Release " + Bom() + " revision " + Rev() + " with effect from today?")) return;
+        var instruction = Instruction.New();
+        await GuardAsync(async () =>
+        {
+            var bom = Bom();
+            var rev = Rev();
+            var r = await Api.PostAsync("/api/bom/v1/bills/" + Query.Path(bom) + "/revisions/" + Query.Path(rev) + "/release", new JsonObject
+            {
+                ["reviewerUser"] = reviewer.Trim().ToUpperInvariant(),
+                ["effectiveFrom"] = Today(),
+                ["supersedeRevision"] = "",
+                ["reason"] = reason.Trim(),
+            }, instruction.Options());
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            if (r.Items.Count > 0)
+            {
+                Bind("FINDINGS", GridData.FromItems(r.Json));
+                await SelectTabAsync(3);
+            }
+            await LoadBillAsync();
+            SetStatus("Release of " + Bom() + " revision " + Rev() + " accepted - the revision is now frozen.", CueOk);
+        });
+    }
+
+    private async Task ExplodeAsync()
+    {
+        var parent = "";
+        if (Bom() != "")
+        {
+            var r = await Api.GetAsync("/api/bom/v1/bills/" + Query.Path(Bom()) + "/header" + Query.Build(("revision", Rev()), ("asOf", Today())));
+            if (r.IsSuccess && r.Items.Count > 0) parent = Fmt.Str(r.Items[0]?["parentItemCode"]);
+            else if (!r.IsSuccess)
+            {
+                await ShowProblemAsync(r);
+                return;
+            }
+        }
+        if (parent == "")
+        {
+            SetStatus("Load a bill first.", CueWarning);
+            return;
+        }
+        OpenForm("frmBomExplosion", parent);
+    }
+}

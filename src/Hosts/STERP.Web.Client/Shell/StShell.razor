@@ -1,0 +1,56 @@
+@implements IDisposable
+@inject ShellService Shell
+@inject DialogService Dialogs
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject KeyboardRouter Router
+@* frmMain: menu bar, toolbar, workspace, status bar; the splash while starting (Program.Main). *@
+<div class="st-shell" aria-hidden="@(Dialogs.HasModal ? "true" : null)" @onclick="Shell.CloseMenus">
+    @switch (Shell.Phase)
+    {
+        case ShellPhase.Ready:
+            <StMenuBar />
+            <StMainToolbar />
+            <StWorkspace />
+            <StStatusBar />
+            break;
+        case ShellPhase.Ended:
+            <div class="st-ended st-raised" role="main">
+                <h1 style="font-size:12pt;color:#000080;margin:0 0 8px">@Shell.Options.ProductName</h1>
+                <p>@Shell.EndedText</p>
+            </div>
+            break;
+        default:
+            <Splash />
+            break;
+    }
+</div>
+<DialogHost />
+
+@code {
+    private DotNetObjectReference<KeyboardRouter>? _router;
+
+    protected override void OnInitialized()
+    {
+        Shell.Changed += OnChanged;
+        Dialogs.Changed += OnChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _router = DotNetObjectReference.Create(Router);
+        await JS.InvokeVoidAsync("sterp.initKeyboard", _router);
+        var uri = new Uri(Navigation.Uri);
+        _ = Shell.StartAsync(uri.AbsolutePath, uri.Query);
+    }
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Shell.Changed -= OnChanged;
+        Dialogs.Changed -= OnChanged;
+        _router?.Dispose();
+    }
+}

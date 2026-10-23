@@ -1,0 +1,126 @@
+@inherits StListPage
+@* frmStockCount (page:itm/stock-count, FR-STERP-ITM-043): count headers or the lines of a count reference, the counted
+   quantity recorded through the audited maintenance contract (ITM.COUNTLINE), and the COUNTADJ batch run behind the count
+   sheet and the approved adjustment (frmStockCount.vb:1-104). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="Count &ref:" Inline="true" Width="140" Field="COUNTREF" @bind-Value="_ref" Id="@Uid("ref")" />
+        <StSelectField Caption="&Status:" Inline="true" Width="110" Items="Statuses" Value="@_status" ValueChanged="StatusChangedAsync" Id="@Uid("status")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Enter count (F10)" Glyph="SAVE" OnClick="EnterAsync" />
+        <StToolButton Text="Count sheet" Glyph="PRINT" OnClick="SheetAsync" />
+        <StToolButton Text="Approve adjustment" Glyph="POST" OnClick="ApproveAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Statuses =
+        StSelectField.Of("OPEN", "COUNTED", "RECOUNT", "APPROVED", "POSTED", "ALL");
+
+    private string _ref = "";
+    private string _status = "OPEN";
+
+    [Inject] private JobRunner Jobs { get; set; } = default!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Stock Count and Adjustment");
+        if (FormArgument != "") _ref = FormArgument;
+    }
+
+    /// <summary>frmStockCount.LoadData: the counts with the status filter, or the lines of the count reference.</summary>
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        if (_ref.Trim() == "")
+        {
+            var r = await Api.GetAsync("/api/itm/v1/stock-counts" + Query.Build(("status", _status)));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(GridData.FromItems(r.Json));
+            SetStatus("Enter a count reference to see its lines.", "");
+        }
+        else
+        {
+            var r = await Api.GetAsync($"/api/itm/v1/stock-counts/{Query.Path(_ref.Trim().ToUpperInvariant())}/lines");
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(GridData.FromItems(r.Json));
+        }
+    });
+
+    private async Task StatusChangedAsync(string value)
+    {
+        _status = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => EnterAsync();
+
+    /// <summary>frmStockCount.EnterClicked: the counted quantity of the selected line, as typed, through ITM.COUNTLINE.</summary>
+    private async Task EnterAsync()
+    {
+        var countId = SelectedValue("countId");
+        var lineNum = SelectedValue("lineNum");
+        if (countId is null || lineNum is null)
+        {
+            SetStatus("Select a count line first.", CueWarning);
+            return;
+        }
+        var item = Json.Str(SelectedValue("itemCode")).TrimEnd();
+        var qty = await InputBoxAsync("Counted quantity for " + item + " (book quantity " + Json.Raw(SelectedValue("expectedQty")) + "):",
+            "STERP - Stock Count", Json.Raw(SelectedValue("countedQty")));
+        if (qty.Trim() == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.SendAsync(HttpMethod.Put, ApiHost.Api,
+                $"/api/itm/v1/stock-count-lines/{Json.Raw(countId)}/{Json.Raw(lineNum)}/counted-quantity",
+                new JsonObject { ["countedQty"] = qty.Trim() }, Instruction.New().Options());
+            if (!r.IsSuccess)
+            {
+                // MaintService.Save caught every failure and returned its text ('<text>  (<code>)' for a business rule,
+                // the exception message otherwise); the form showed it with ShowError(msg, "") - no reason code line
+                var p = r.Problem!;
+                await ShowErrorAsync(p.Kind == "business-rule" && p.ReasonCode.Length > 0 ? p.Detail + "  (" + p.ReasonCode + ")" : p.Detail, "");
+                return;
+            }
+            SetStatus("Counted quantity recorded for " + item + ".", CueOk);
+            await LoadDataAsync();
+        });
+    }
+
+    private Task SheetAsync() => RunCountAdjAsync("PREVIEW");
+
+    private async Task ApproveAsync()
+    {
+        if (!await ConfirmAsync("Post the approved adjustment for count " + _ref.Trim() + "?")) return;
+        await RunCountAdjAsync("COMMIT");
+    }
+
+    /// <summary>frmStockCount.RunCountAdj: the count sheet and the approved adjustment are the same batch program (COUNTADJ).</summary>
+    private async Task RunCountAdjAsync(string mode)
+    {
+        if (_ref.Trim() == "")
+        {
+            SetStatus("Enter the count reference first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var body = new JsonObject
+            {
+                ["CO"] = Session.CompanyCode,
+                ["SITE"] = Session.SiteCode,
+                ["COUNT"] = _ref.Trim().ToUpperInvariant(),
+                ["USER"] = Session.UserCode,
+                ["MODE"] = mode,
+            };
+            var outcome = await Jobs.RunAsync(() => Api.PostAsync(ApiHost.Jobs, "/api/itm/v1/jobs/COUNTADJ/runs", body, Instruction.New().Options()));
+            if (!outcome.Accepted) throw new ApiFailure(outcome.Submit);
+            var rc = outcome.Run?["execution"]?["exitCode"] is JsonValue v && v.TryGetValue<int>(out var exit) ? exit : outcome.ReturnCode ?? 0;
+            SetStatus("COUNTADJ " + mode.ToLowerInvariant() + " finished with return code " + rc + ".", rc <= 4 ? CueOk : CueError);
+            await LoadDataAsync();
+        });
+    }
+}

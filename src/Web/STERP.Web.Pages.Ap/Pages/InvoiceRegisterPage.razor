@@ -1,0 +1,134 @@
+@inherits StListPage
+@* frmInvoiceRegister (page:ap/invoice-register, FR-STERP-AP-024): what has been captured, how far it has been matched, whether
+   it may be paid and, when it may not, the reason. Registration, the duplicate test and the tolerance arithmetic belong to
+   APINVREG and APMATCH; the page performs no invoice capture (frmInvoiceRegister.vb:11-107). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="Supplier or &reference:" Inline="true" Width="170" Field="FILTER" @bind-Value="_filter" Id="@Uid("filter")" />
+        <StSelectField Caption="&View:" Inline="true" Width="120" Items="Views" Value="@_view" ValueChanged="ViewChangedAsync" Id="@Uid("view")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Match (F10)" Glyph="ENGINE" OnClick="MatchAsync" />
+        <StToolButton Text="Duplicate check" Glyph="FIND" OnClick="DuplicateAsync" />
+        <StToolButton Text="Open items" Glyph="RUN" OnClick="OpenItemsAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Views = StSelectField.Of("ALL", "BLOCKED", "UNMATCHED", "UNPAID", "OVERDUE");
+
+    private string _filter = "";
+    private string _view = "ALL";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Purchase Invoice Register");
+        if (FormArgument != "") _filter = FormArgument;
+    }
+
+    /// <summary>frmInvoiceRegister.LoadData: InvoiceService.Register (ap.usp_ListInvoiceRegister).</summary>
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/ap/v1/purchase-invoices" + Query.Build(("filter", _filter.Trim()), ("mode", _view)));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json));
+        SetStatus(Data.Count + " document(s) in the register.", "");
+    });
+
+    private async Task ViewChangedAsync(string value)
+    {
+        _view = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => MatchAsync();
+
+    /// <summary>
+    /// frmInvoiceRegister.MatchClicked: APMATCH re-matches every line and reports the outcome; a line outside tolerance leaves
+    /// the invoice blocked for payment (AP-006, AP-008).
+    /// </summary>
+    private async Task MatchAsync()
+    {
+        var reg = SelectedColumn("registerNumber");
+        if (reg == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/purchase-invoices/{Query.Path(reg)}/match", new JsonObject(), Instruction.New().Options());
+            if (!await ShowResultAsync(r))
+            {
+                SetStatus(reg + " could not be matched: " + LegacyResult.From(r).Display, CueError);
+                return;
+            }
+            var m = LegacyResult.From(r);
+            await LoadDataAsync();
+            var variance = m.Int("linesVariance");
+            var unmatched = m.Int("linesUnmatched");
+            SetStatus(reg + ": " + m.Int("linesMatched") + " line(s) matched, " + variance + " with a variance, " + unmatched +
+                      " unmatched | invoice is " + m.Str("invoiceState").TrimEnd(), variance + unmatched == 0 ? CueOk : CueWarning);
+        });
+    }
+
+    /// <summary>frmInvoiceRegister.DuplicateClicked: the duplicate test the clerk runs before keying a document again (AP-004).</summary>
+    private async Task DuplicateAsync()
+    {
+        if (SelectedRow is null)
+        {
+            SetStatus("Select a document first.", CueWarning);
+            return;
+        }
+        var supplier = Json.Str(SelectedValue("supplierCode")).TrimEnd();
+        var docRef = Json.Str(SelectedValue("supplierDocRef")).TrimEnd();
+        var docType = Json.Str(SelectedValue("documentType")).TrimEnd();
+        var gross = Json.Dec(SelectedValue("statedGross"));
+        var docDate = UkFormat.ParseDate(Json.Str(SelectedValue("documentDate"))) ?? Session.BusinessDate;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/ap/v1/purchase-invoices/duplicate-check", new JsonObject
+            {
+                ["supplierCode"] = supplier,
+                ["documentType"] = docType,
+                ["supplierDocRef"] = docRef,
+                ["statedGross"] = gross,
+                ["documentDate"] = docDate.ToString("yyyy-MM-dd", UkFormat.Culture),
+            });
+            var d = LegacyResult.From(r);
+            if (d.Data is null && !r.IsSuccess) throw new ApiFailure(r);
+            if (d.Str("dupFound") == "Y")
+            {
+                var register = d.Str("dupRegister").TrimEnd();
+                await ShowWarningAsync("This document is already registered as " + register +
+                                       ". Registering it again would pay the supplier twice.", d.ReasonCode);
+                SetStatus("Duplicate of " + register + ".", CueError);
+            }
+            else
+            {
+                var similar = (d.Data?["similar"] as JsonArray)?.Count ?? 0;
+                SetStatus("No exact duplicate; " + similar + " similar document(s) to judge. " + d.Message, similar == 0 ? CueOk : CueWarning);
+            }
+        });
+    }
+
+    /// <summary>frmInvoiceRegister.OpenItemsClicked: the open items of the selected supplier, or of the whole ledger.</summary>
+    private Task OpenItemsAsync()
+    {
+        var supplier = Json.Str(SelectedValue("supplierCode")).TrimEnd();
+        return GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/ap/v1/open-items" + Query.Build(("supplierCode", supplier), ("mode", "OPEN")));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(GridData.FromItems(r.Json));
+            SetStatus("Open items for " + (supplier == "" ? "the whole ledger" : supplier) + ". Press F5 for the register.", "");
+        });
+    }
+
+    /// <summary>frmInvoiceRegister.Selected: the column of the selected row, or 'Select a document first.'.</summary>
+    private string SelectedColumn(string column)
+    {
+        var v = Json.Str(SelectedValue(column)).TrimEnd();
+        if (v == "") SetStatus("Select a document first.", CueWarning);
+        return v;
+    }
+}

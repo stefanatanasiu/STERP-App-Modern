@@ -1,0 +1,45 @@
+# suite TKITCOM commercial kits (D-11)
+ok 1 - KITCOMM refuses an unknown function with KIT0002
+ok 2 - An unknown function is an error, not a warning
+ok 3 - An allocation with no kit item is refused with KIT0001
+ok 4 - KIT-001 even a refused call creates no parent stock
+ok 5 - A refused allocation allocates nothing
+ok 6 - Two commercial kit definitions were built
+ok 7 - ALLOCATE answers a released commercial kit
+ok 8 - The definition has three components
+ok 9 - The dearest component takes two thirds of the revenue
+ok 10 - The largest line carries the rounding residual
+ok 11 - Component two is allocated 16.67
+ok 12 - Component three is allocated 16.67
+ok 13 - The residual is the single penny of rounding
+ok 14 - The allocated total is the parent net amount exactly
+ok 15 - Allocated total less parent net is nil
+ok 16 - The three component lines add back to 100.00
+ok 17 - KITCOMM says the allocation reconciles
+ok 18 - KIT-001 allocating revenue creates no parent stock
+ok 19 - A kit with no standalone prices is refused - KIT0028
+ok 20 - An unpriced kit is refused with 8
+ok 21 - An unpriced kit allocates nothing
+ok 22 - An unpriced kit does not claim to reconcile
+ok 23 - RETURNCK answers a partial component return
+ok 24 - The credit is the allocated 66.66, not list 66.67
+ok 25 - KIT-001 a commercial kit return creates no parent stock
+ok 26 - A return is not a despatch
+ok 27 - Half of a two piece component credits half its 16.67
+ok 28 - The whole of component two credits its full 16.67
+ok 29 - More cannot come back than went out - KIT0011
+ok 30 - Free stock supports no complete sets
+ok 31 - An incomplete set may not be despatched
+ok 32 - A partial set is reported with KIT0020
+ok 33 - A shortage is a warning the order desk can act on
+ok 34 - The limiting component is named
+ok 35 - Two of the limiting component are short
+ok 36 - KIT-001 counting sets creates no parent stock
+ok 37 - One set out of two is not a complete parent kit
+ok 38 - FULFIL reports the one set that was delivered
+ok 39 - Both sets delivered is a complete parent kit
+ok 40 - A fulfilled kit still reconciles to the parent net
+ok 41 - KIT-001 fulfilment creates no parent stock
+1..41
+# TKITCOM commercial kits (D-11) passed 00041 failed 00000
+# exit 0

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Jobs</RootNamespace>
+    <AssemblyName>STERP.Jobs</AssemblyName>
+    <Description>STERP-JOBS: the single batch web service and job runner (ASP.NET Core 10) composing the slice libraries.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\STERP.Modules.Composition\STERP.Modules.Composition.csproj" />
+  </ItemGroup>
+</Project>

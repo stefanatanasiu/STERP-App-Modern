@@ -1,0 +1,179 @@
+@inherits StPage
+@* frmCreditControl (page:ar/credit-control, FR-STERP-AR-043; frmCreditControl.vb:13-146, .Designer.vb:1-64): the credit
+   controller's worklist (ar.usp_CreditControlWorklist) filtered on the page by collection stage; disputes and promises to pay
+   go to ARDISPUT, which decides whether they are accepted; the aged debt and dunning runs open the platform report launcher. *@
+<div class="st-page">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Refresh (F5)" Glyph="REFRESH" OnClick="LoadDataAsync" />
+        <StToolButton Text="Raise dispute" Glyph="REJECT" OnClick="DisputeAsync" />
+        <StToolButton Text="Promise to pay (F10)" Glyph="POST" OnClick="OnConfirmAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Aged debt report" Glyph="PRINT" OnClick='() => LaunchAsync("AGEDDEBT", "Aged debt")' />
+        <StToolButton Text="Dunning letters" Glyph="PRINT" OnClick='() => LaunchAsync("DUNNING", "Dunning letters")' />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <div class="st-filters">
+        <StTextField Caption="&Owner (credit controller):" Inline="true" Width="100" MaxLength="20" Field="Owner" @bind-Value="_owner" Id="@Uid("owner")" />
+        <StSelectField Caption="Collection &stage:" Inline="true" Width="130" Field="Stage" Items="Stages" Value="@_stage" ValueChanged="StageChangedAsync" Id="@Uid("stage")" />
+    </div>
+    <div style="padding:2px 4px">Overdue items to work - worst stage and largest value first:</div>
+    <StGrid Id="@Uid("work")" Data="_work" Selected="_workSelected" SelectedChanged="i => _workSelected = i" Label="Overdue items" />
+    <div style="padding:2px 4px">Accounts behind the list, with the cash sitting unapplied against them:</div>
+    <StGrid Id="@Uid("accounts")" Data="_accounts" Selected="_accountsSelected" SelectedChanged="i => _accountsSelected = i" Label="Accounts" Style="flex:0 0 158px" />
+</div>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Stages =
+        StSelectField.Of("ALL STAGES", "STATEMENT", "REMINDER1", "REMINDER2", "ACCOUNTSTOP", "FINALDEMAND");
+
+    private static readonly string[] WorkColumns =
+    [
+        "CompanyCode", "CustomerCode", "CustomerName", "OpenItemId", "DocumentNumber", "DocumentDate", "DueDate", "CurrencyCode",
+        "ResidualAmount", "ResidualAmountGBP", "UndisputedGBP", "DaysOverdue", "BucketNo", "BucketName", "StageNo", "StageCode",
+        "StageAction", "OwnerUser", "IsDisputed", "DisputedAmountGBP", "CaseRef", "CaseType", "CaseStatus", "NextActionDate",
+        "NextAction", "PromiseAmountGBP", "PromiseDate", "PromiseStatus", "IsSuppressed", "SuppressReason", "LastReminderStep",
+        "LastReminderDate", "CollectionMethod", "HoldFlag", "Priority",
+    ];
+
+    private static readonly string[] AccountColumns =
+    [
+        "CompanyCode", "CustomerCode", "CustomerName", "CustomerStatus", "ControllerUser", "AccountOwner", "CreditLimitGBP", "OverrideGBP",
+        "BalanceGBP", "ExposureGBP", "CreditAvailableGBP", "UtilisationPct", "CreditState", "HoldFlag", "HoldReason", "OverdueGBP",
+        "UndisputedOverdueGBP", "DisputedGBP", "UnappliedCashGBP", "CreditNoteGBP", "DepositGBP", "MaxDaysOverdue", "OldestDueDate",
+        "RiskClass", "ReviewDate", "ContactRestriction", "WorkItems", "WorstStage", "NextPromiseDate",
+    ];
+
+    private string _owner = "";
+    private string _stage = "ALL STAGES";
+    private GridData _work = GridData.Empty;
+    private GridData _accounts = GridData.Empty;
+    private int _workSelected = -1;
+    private int _accountsSelected = -1;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ArWindow.Size(Window, Browser, 908, 554);
+    }
+
+    /// <summary>frmCreditControl.OnLoad: the menu argument names the owner, then the list.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _owner = FormArgument != "" ? FormArgument : "";
+        await LoadDataAsync();
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadDataAsync();
+
+    private Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/ar/v1/credit-control/worklist" + Query.Build(("ownerUser", _owner.Trim())));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        var stage = _stage;
+        var items = r.Json?["items"] as JsonArray ?? [];
+        if (stage != "" && stage != "ALL STAGES")
+        {
+            // DataView RowFilter "StageCode = '<stage>'" (case-insensitive, order kept)
+            items = new JsonArray(items.OfType<JsonObject>()
+                .Where(o => string.Equals(ArFmt.Str(ArFmt.Col(o, "StageCode")), stage, StringComparison.OrdinalIgnoreCase))
+                .Select(o => (JsonNode?)o.DeepClone()).ToArray());
+        }
+        _work = ArFmt.Grid(items, WorkColumns);
+        _workSelected = _work.Count > 0 ? 0 : -1;
+        _accounts = ArFmt.Grid(r.Json?["accounts"], AccountColumns);
+        _accountsSelected = _accounts.Count > 0 ? 0 : -1;
+        SetStatus(_work.Count + " item(s) to work at " + stage.ToLowerInvariant() + ", " + _accounts.Count +
+                  " account(s) behind them.  F10 records a promise to pay.", _work.Count == 0 ? CueOk : CueWarning);
+    });
+
+    private async Task StageChangedAsync(string value)
+    {
+        _stage = value;
+        await LoadDataAsync();
+    }
+
+    private JsonObject? SelectedItem => _workSelected >= 0 && _workSelected < _work.Count ? _work.Rows[_workSelected] : null;
+
+    /// <summary>Raises a dispute against the selected item; the debt stays on the account (AR-015).</summary>
+    private async Task DisputeAsync()
+    {
+        var row = SelectedItem;
+        if (row is null)
+        {
+            SetStatus("Select an overdue item first.", CueWarning);
+            return;
+        }
+        var document = ArFmt.Str(ArFmt.Col(row, "DocumentNumber"));
+        var reasonCode = await InputBoxAsync("Dispute reason code for " + document + " (PRICE, QUALITY, DELIVERY, PAPERWORK):", "Raise dispute", "PRICE");
+        if (reasonCode.Trim() == "") return;
+        var reason = await InputBoxAsync("What is being disputed on " + document + "?", "Raise dispute", "");
+        if (reason.Trim() == "")
+        {
+            SetStatus("A dispute must carry a reason.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/ar/v1/disputes",
+                new JsonObject
+                {
+                    ["customer"] = ArFmt.Str(ArFmt.Col(row, "CustomerCode")),
+                    ["documentNo"] = document,
+                    ["openItemId"] = ArFmt.Int(ArFmt.Col(row, "OpenItemId")),
+                    ["disputedAmt"] = ArFmt.Dec(ArFmt.Col(row, "ResidualAmountGBP")),
+                    ["reasonCode"] = reasonCode.Trim().ToUpperInvariant(),
+                    ["reason"] = reason.Trim(),
+                }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Dispute " + ArFmt.AreaText(r.Data, "caseRef") + " raised on " + document + "; the debt stays on the account, undisputed " +
+                      ArFmt.AreaMoney(r.Data, "undisputedAmt") + ".", CueOk);
+            await LoadDataAsync();
+        });
+    }
+
+    /// <summary>F10 - records a promise to pay against the selected item's collection case.</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        var row = SelectedItem;
+        if (row is null)
+        {
+            SetStatus("Select an overdue item first.", CueWarning);
+            return;
+        }
+        var amount = await InputBoxAsync("Amount promised (£) by " + ArFmt.Str(ArFmt.Col(row, "CustomerName")) + ":", "Promise to pay",
+            ArFmt.Dec(ArFmt.Col(row, "ResidualAmountGBP")).ToString("0.00", UkFormat.Culture));
+        if (amount.Trim() == "") return;
+        var promised = await InputBoxAsync("Date promised (dd/MM/yyyy):", "Promise to pay", ArFmt.Date(Session.BusinessDate.AddDays(7)));
+        var due = ArFmt.ParseDate(promised);
+        if (!due.HasValue)
+        {
+            SetStatus("A promise needs a date in dd/MM/yyyy form.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/ar/v1/promises-to-pay",
+                new JsonObject
+                {
+                    ["customer"] = ArFmt.Str(ArFmt.Col(row, "CustomerCode")),
+                    ["caseRef"] = ArFmt.Str(ArFmt.Col(row, "CaseRef")),
+                    ["promiseAmt"] = ArFmt.Dec(amount),
+                    ["promiseDate"] = ArFmt.Iso(due.Value),
+                    ["narrative"] = "Promise taken on the credit control worklist.",
+                }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Promise of " + ArFmt.Money(ArFmt.Dec(amount)) + " by " + ArFmt.Date(due.Value) + " recorded, status " +
+                      ArFmt.AreaText(r.Data, "promiseStatus") + ".  A broken promise is picked up by the engine's review sweep.", CueOk);
+            await LoadDataAsync();
+        });
+    }
+
+    /// <summary>Opens the standard report launcher on one report definition (every run is recorded in core.JobRun).</summary>
+    private Task LaunchAsync(string reportCode, string title) => GuardAsync(() =>
+    {
+        OpenForm("frmReportLauncher", reportCode);
+        SetStatus(title + " - choose the parameters in the report launcher and press F10 to run.", "");
+        return Task.CompletedTask;
+    });
+}

@@ -1,0 +1,47 @@
+@using Sterp.Web.Framework.Format
+@* The ListForm layout (ListForm.vb:24-100): toolbar "Refresh (F5)", page actions, "Close (F3)"; a filter row that wraps
+   instead of overflowing; the grid; the window status line shows "<n> record(s)". *@
+<div class="st-page">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Refresh (F5)" Glyph="REFRESH" OnClick="OnRefresh" />
+        @Tools
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="OnClose" />
+    </div>
+    @if (Filters is not null)
+    {
+        <div class="st-filters">@Filters</div>
+    }
+    @Above
+    <StGrid Id="@GridId" Data="Data" Selected="Selected" SelectedChanged="SelectedChanged" OnActivate="OnActivate" Label="@Title" EmptyText="@EmptyText" />
+    @Below
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "";
+
+    [Parameter, EditorRequired] public GridData Data { get; set; } = GridData.Empty;
+
+    [Parameter] public int Selected { get; set; } = -1;
+
+    [Parameter] public EventCallback<int> SelectedChanged { get; set; }
+
+    [Parameter] public EventCallback<int> OnActivate { get; set; }
+
+    [Parameter] public EventCallback OnRefresh { get; set; }
+
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    /// <summary>Page actions between Refresh (F5) and Close (F3) (ListForm.BuildTools).</summary>
+    [Parameter] public RenderFragment? Tools { get; set; }
+
+    /// <summary>Filter controls (ListForm.BuildFilters); no row when absent.</summary>
+    [Parameter] public RenderFragment? Filters { get; set; }
+
+    [Parameter] public RenderFragment? Above { get; set; }
+
+    [Parameter] public RenderFragment? Below { get; set; }
+
+    [Parameter] public string GridId { get; set; } = "grid-" + Guid.NewGuid().ToString("N")[..8];
+
+    [Parameter] public string? EmptyText { get; set; }
+}

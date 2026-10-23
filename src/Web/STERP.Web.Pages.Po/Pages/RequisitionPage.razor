@@ -1,0 +1,302 @@
+@inherits PoPage
+@* frmRequisition (page:po/requisition, FR-STERP-PO-010; frmRequisition.vb:12-175, RequisitionService.vb): the screen collects
+   the demand, POREQ decides whether it may be raised (po_createRequisition / po_addRequisitionLine / po_getRequisition /
+   po_submitRequisition), BUDGCHK answers the budget question on submit and SOURCSEL reports the approved source
+   (po_checkSupplierSource). The current requisition number, the last COMMAREA answer and the lines of this sitting are page
+   state (the RequisitionService instance of the legacy form, contracts 6.9). Layout: the legacy control positions. *@
+<div class="st-page" style="overflow:auto">
+    <div style="position:relative; flex:0 0 auto; height:248px; min-width:834px">
+        <PoPicker Caption="&Demand:" CaptionX="8" CaptionWidth="70" X="100" Y="6" Width="130" Items="Demands" Value="@_demand"
+                  ValueChanged="v => _demand = v" Id="@Uid("demand")" Field="DEMAND" />
+        @for (var i = 0; i < Head.Length; i++)
+        {
+            var f = Head[i];
+            <PoEdit Caption="@f.Caption" CaptionX="8" CaptionWidth="90" X="100" Y="@(34 + i * 25)" Width="@f.Width" Value="@_edit[f.Key]"
+                    ValueChanged="v => _edit[f.Key] = v" Id="@Uid(f.Key.ToLowerInvariant())" Field="@f.Key" />
+        }
+        <PoBox Text="Line" X="420" Y="30" Width="406" Height="190" />
+        @for (var i = 0; i < Line.Length; i++)
+        {
+            var f = Line[i];
+            <PoEdit Caption="@f.Caption" CaptionX="430" CaptionWidth="110" X="544" Y="@(50 + i * 24)" Width="@f.Width" Value="@_edit[f.Key]"
+                    ValueChanged="v => _edit[f.Key] = v" Id="@Uid(f.Key.ToLowerInvariant())" Field="@f.Key" />
+        }
+        <PoButton Text="Chec&k this source" X="430" Y="220" Width="150" OnClick="SourceClickedAsync" />
+        <PoButton Text="&Add line" X="590" Y="220" Width="90" OnClick="AddClickedAsync" />
+    </div>
+    <StGrid Id="@Uid("grid")" Data="_grid" Selected="_selected" SelectedChanged="i => _selected = i" Style="margin:0 8px 8px 8px" />
+</div>
+
+@code {
+    /// <summary>Header boxes (frmRequisition.vb:15-19): key, caption, width; captions at x 8, boxes at x 100, 25 pixels apart.</summary>
+    private static readonly (string Key, string Caption, int Width)[] Head =
+    [
+        ("REQ", "&Requisition:", 140), ("PURPOSE", "&Purpose:", 300), ("NEEDEDBY", "Needed &by:", 90), ("CC", "&Cost centre:", 90),
+        ("PROJECT", "Pro&ject:", 90), ("BUDGET", "B&udget code:", 110), ("DEMANDREF", "Demand re&f:", 140),
+    ];
+
+    /// <summary>Line box (frmRequisition.vb:21-25): captions at x 430, boxes at x 544, 24 pixels apart.</summary>
+    private static readonly (string Key, string Caption, int Width)[] Line =
+    [
+        ("ITEM", "&Item:", 180), ("DESC", "Descrip&tion:", 260), ("QTY", "&Quantity:", 90), ("UOM", "U&nit:", 60),
+        ("PRICE", "Est. &price:", 90), ("SUPPLIER", "Suggested &supplier:", 100), ("ACCOUNT", "&Account:", 90),
+    ];
+
+    /// <summary>The demand picker (frmRequisition.vb:38): MANUAL first and selected.</summary>
+    private static readonly string[] Demands = ["MANUAL", "SALES", "KIT", "REPLENISH", "PROJECT"];
+
+    private readonly Dictionary<string, string> _edit = Head.Concat(Line).ToDictionary(f => f.Key, _ => "");
+    private string _demand = Demands[0];
+    private GridData _grid = GridData.Empty;
+    private int _selected = -1;
+
+    // RequisitionService instance state (RequisitionService.vb:14-27)
+    private string _reqNumber = "";
+    private string _status = "";
+    private decimal _totalGbp;
+    private decimal _lineValueGbp;
+    private int _lineNum;
+    private string _budgetOutcome = "";
+    private decimal _budgetUsedPct;
+    private decimal _budgetAvailGbp;
+    private PoResult? _lastSource;
+
+    /// <summary>RequisitionService.Lines: the lines captured in this sitting (the COMMAREA carries one line at a time).</summary>
+    private readonly List<JsonObject> _lines = [];
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        LegacySize(840, 520);
+    }
+
+    /// <summary>frmRequisition.OnLoad (frmRequisition.vb:64-72).</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _edit["NEEDEDBY"] = PoFmt.Date(Session.BusinessDate.AddDays(14));
+        SetStatus("Enter the demand, add the lines, then F10 to submit it for approval.");
+        if (FormArgument != "")
+        {
+            _edit["REQ"] = FormArgument;
+            await OnRefreshKeyAsync();
+        }
+    }
+
+    /// <summary>F2 on Item: the item lookup (frmLookup.Pick core.usp_UiLookup ITM.ITEM); elsewhere the BaseForm answer.</summary>
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        if (key.TargetField != "ITEM")
+        {
+            await base.OnLookupAsync(key);
+            return;
+        }
+        var c = await Dialogs.LookupAsync("master", "ITM.ITEM", "Item");
+        if (c != "") _edit["ITEM"] = c;
+        StateHasChanged();
+    }
+
+    private Dictionary<string, string> Values() => new(_edit);
+
+    /// <summary>
+    /// Add line (frmRequisition.vb:84-99): a typed number is enquired first when none is current (its answer is not shown),
+    /// the header is created when still none is current (demand type from the picker), then the line is added.
+    /// </summary>
+    private Task AddClickedAsync() => GuardAsync(async () =>
+    {
+        var v = Values();
+        if (_reqNumber == "" && PoFmt.S(v["REQ"]) != "") await ActAsync("ENQUIRE", PoFmt.S(v["REQ"]));
+        if (_reqNumber == "")
+        {
+            v["DEMANDTYPE"] = _demand;
+            if (!await ShowResultAsync(await CreateAsync(v))) return;
+        }
+        var r = await AddLineAsync(v);
+        if (!await ShowResultAsync(r)) return;
+        _edit["REQ"] = _reqNumber;
+        _edit["ITEM"] = "";
+        _edit["DESC"] = "";
+        _edit["QTY"] = "";
+        BindLines();
+        SetStatus(_reqNumber + "  " + _status + "   total " + PoFmt.Money(_totalGbp) + "   budget " + BudgetText(), BudgetCue());
+    });
+
+    /// <summary>
+    /// Check this source (frmRequisition.vb:108-122): SOURCSEL answers for the named supplier; a refusal is shown as its
+    /// display text with the warning cue (never through ShowResult), otherwise the lead time, minimum order and last price.
+    /// </summary>
+    private Task SourceClickedAsync() => GuardAsync(async () =>
+    {
+        var v = Values();
+        v["REQ"] = _reqNumber;
+        var ca = await SourceAsync(v);
+        var s = _lastSource!;
+        if (s.IsNotFound || s.IsError || s.IsSevere)
+        {
+            SetStatus(s.Display, CueWarning);
+            return;
+        }
+        var t = PoFmt.Text(ca, "supplier") + "  lead time " + PoFmt.Int(PoFmt.Get(ca, "leadTimeDays")) + " day(s), min order " +
+                PoFmt.Qty(PoFmt.Dec(PoFmt.Get(ca, "minOrderQty")), PoFmt.Text(ca, "uomCode")) + ", last paid " +
+                PoFmt.Money(PoFmt.Dec(PoFmt.Get(ca, "lastPaidPrice")), PoFmt.Text(ca, "srcCurrency"));
+        if (PoFmt.Text(ca, "srcRestriction") != "") t += "   RESTRICTION: " + PoFmt.Text(ca, "srcRestriction");
+        SetStatus(t, s.IsWarning || s.IsHold ? CueWarning : CueOk);
+    });
+
+    /// <summary>F10 submits the requisition for approval (frmRequisition.vb:126-136).</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        if (_reqNumber == "")
+        {
+            SetStatus("Add at least one line first.", CueWarning);
+            return;
+        }
+        if (!await ConfirmAsync("Submit requisition " + _reqNumber + " for approval?")) return;
+        await GuardAsync(async () =>
+        {
+            var r = await ActAsync("SUBMIT", _reqNumber);
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Requisition " + _reqNumber + " is " + _status + ".  Budget " + BudgetText(), BudgetCue());
+        });
+    }
+
+    /// <summary>F5 opens the requisition in the Requisition field, or re-reads the current one (frmRequisition.vb:140-153).</summary>
+    protected override async Task OnRefreshKeyAsync()
+    {
+        var no = PoFmt.S(_edit["REQ"]);
+        if (no == "") no = _reqNumber;
+        if (no == "")
+        {
+            SetStatus("Type a requisition number and press F5, or add a line to raise a new one.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await ActAsync("ENQUIRE", no);
+            if (!await ShowResultAsync(r)) return;
+            _edit["REQ"] = _reqNumber;
+            BindLines();
+            SetStatus(_reqNumber + "  " + _status + "   " + PoFmt.Money(_totalGbp), "");
+        });
+    }
+
+    private string BudgetText() => _budgetOutcome == ""
+        ? "not checked"
+        : _budgetOutcome + " at " + PoFmt.Pct(_budgetUsedPct) + " used, " + PoFmt.Money(_budgetAvailGbp) + " left";
+
+    private string BudgetCue() => _budgetOutcome == "BLOCK" ? CueHold : _budgetOutcome == "WARN" ? CueWarning : CueOk;
+
+    /// <summary>GridHelper.Bind(_grid, _svc.Lines): LineNum INT, decimals by name (Qty QTY, the others MONEY).</summary>
+    private void BindLines()
+    {
+        _grid = new GridData(
+        [
+            PoFmt.Col("LineNum", "INT"), PoFmt.Col("ItemCode", "TEXT"), PoFmt.Col("Description", "TEXT"), PoFmt.Col("Qty", "QTY"),
+            PoFmt.Col("UomCode", "TEXT"), PoFmt.Col("EstPrice", "MONEY"), PoFmt.Col("LineValueGBP", "MONEY"),
+            PoFmt.Col("SuggestedSupplier", "TEXT"), PoFmt.Col("BudgetOutcome", "TEXT"),
+        ], _lines);
+        _selected = _grid.Count > 0 ? 0 : -1;
+        StateHasChanged();
+    }
+
+    // ------------------------------------------------------------------------- RequisitionService (the facade)
+
+    /// <summary>RequisitionService.Area: the coding fields every header and line call carries (RequisitionService.vb:119-128).</summary>
+    private static JsonObject Area(Dictionary<string, string>? v) => v is null ? [] : new JsonObject
+    {
+        ["costCentre"] = PoFmt.S(v["CC"]),
+        ["project"] = PoFmt.S(v["PROJECT"]),
+        ["jobRef"] = "",
+        ["budgetCode"] = PoFmt.S(v["BUDGET"]),
+    };
+
+    /// <summary>RequisitionService.Read (RequisitionService.vb:130-141): the COMMAREA answer; a failure carries no area, so the
+    /// numbers sent are read back with the outputs POREQ clears on entry.</summary>
+    private void Read(JsonNode? ca)
+    {
+        var no = PoFmt.Text(ca, "reqNumber");
+        if (no != "") _reqNumber = no;
+        _status = PoFmt.Text(ca, "status");
+        _totalGbp = PoFmt.Dec(PoFmt.Get(ca, "totalGbp"));
+        _lineValueGbp = PoFmt.Dec(PoFmt.Get(ca, "lineValueGbp"));
+        _lineNum = PoFmt.Int(PoFmt.Get(ca, "lineNum"));
+        _budgetOutcome = PoFmt.Text(ca, "budgetOutcome");
+        _budgetUsedPct = PoFmt.Dec(PoFmt.Get(ca, "budgetUsedPct"));
+        _budgetAvailGbp = PoFmt.Dec(PoFmt.Get(ca, "budgetAvailGbp"));
+    }
+
+    /// <summary>RequisitionService.Create (RequisitionService.vb:34-46): POREQ CREATE with a new correlation id.</summary>
+    private async Task<PoResult> CreateAsync(Dictionary<string, string> v)
+    {
+        var body = Area(v);
+        body["requester"] = "";
+        body["purpose"] = PoFmt.T(v["PURPOSE"]);
+        body["neededBy"] = PoFmt.Iso(PoFmt.Dt(v["NEEDEDBY"], Session.BusinessDate));
+        var demand = PoFmt.S(v.GetValueOrDefault("DEMANDTYPE"));
+        body["demandType"] = demand == "" ? "MANUAL" : demand;
+        body["demandRef"] = PoFmt.S(v["DEMANDREF"]);
+        var r = await LinkAsync(Api.PostAsync("/api/po/v1/requisitions", body, Instruction.New().Options()));
+        Read(r.Data ?? new JsonObject());
+        _lines.Clear();
+        return r;
+    }
+
+    /// <summary>RequisitionService.AddLine (RequisitionService.vb:49-68): POREQ ADDLINE; a line that succeeded joins the sitting.</summary>
+    private async Task<PoResult> AddLineAsync(Dictionary<string, string> v)
+    {
+        var body = Area(v);
+        body["itemCode"] = PoFmt.S(v["ITEM"]);
+        body["description"] = PoFmt.T(v["DESC"]);
+        body["quantity"] = PoFmt.D(v["QTY"]);
+        body["uomCode"] = PoFmt.S(v["UOM"]);
+        body["estUnitPrice"] = PoFmt.D(v["PRICE"]);
+        body["suggestSupp"] = PoFmt.S(v["SUPPLIER"]);
+        body["accountCode"] = PoFmt.S(v["ACCOUNT"]);
+        body["lineNeededBy"] = PoFmt.Iso(PoFmt.Dt(v["NEEDEDBY"], Session.BusinessDate));
+        var no = _reqNumber;
+        var r = await LinkAsync(Api.PostAsync($"/api/po/v1/requisitions/{Seg(no)}/lines", body));
+        Read(r.Data ?? new JsonObject { ["reqNumber"] = no });
+        if (r.Succeeded)
+        {
+            _lines.Add(new JsonObject
+            {
+                ["LineNum"] = _lineNum,
+                ["ItemCode"] = PoFmt.S(v["ITEM"]),
+                ["Description"] = PoFmt.T(v["DESC"]),
+                ["Qty"] = PoFmt.D(v["QTY"]),
+                ["UomCode"] = PoFmt.S(v["UOM"]),
+                ["EstPrice"] = PoFmt.D(v["PRICE"]),
+                ["LineValueGBP"] = _lineValueGbp,
+                ["SuggestedSupplier"] = PoFmt.S(v["SUPPLIER"]),
+                ["BudgetOutcome"] = _budgetOutcome,
+            });
+        }
+        return r;
+    }
+
+    /// <summary>RequisitionService.Act (RequisitionService.vb:71-77): ENQUIRE or SUBMIT of the number given (else the current one).</summary>
+    private async Task<PoResult> ActAsync(string func, string reqNo)
+    {
+        var no = reqNo == "" ? _reqNumber : reqNo;
+        var r = func == "ENQUIRE"
+            ? await LinkAsync(Api.GetAsync($"/api/po/v1/requisitions/{Seg(no)}"))
+            : await LinkAsync(Api.PostAsync($"/api/po/v1/requisitions/{Seg(no)}/submit", null));
+        Read(r.Data ?? new JsonObject { ["reqNumber"] = no });
+        return r;
+    }
+
+    /// <summary>RequisitionService.Source (RequisitionService.vb:105-117): SOURCSEL CHECK; the outcome is kept as LastSource.</summary>
+    private async Task<JsonNode?> SourceAsync(Dictionary<string, string> v)
+    {
+        var body = new JsonObject
+        {
+            ["reqNumber"] = PoFmt.S(v["REQ"]),
+            ["itemCode"] = PoFmt.S(v["ITEM"]),
+            ["supplier"] = PoFmt.S(v["SUPPLIER"]),
+            ["quantity"] = PoFmt.D(v["QTY"]),
+            ["uomCode"] = PoFmt.S(v["UOM"]),
+            ["neededBy"] = PoFmt.Iso(PoFmt.Dt(v["NEEDEDBY"], Session.BusinessDate)),
+        };
+        _lastSource = await LinkAsync(Api.PostAsync("/api/po/v1/supplier-sources/check", body));
+        return _lastSource.Data;
+    }
+}

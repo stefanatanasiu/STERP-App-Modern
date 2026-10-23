@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Cst</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Cst</AssemblyName>
+    <Description>STERP-CST pages (wave W10, Costing): Item Cost Enquiry, Cost Sets, Cost Roll-up and What-if, Job Cost Enquiry / Work in Progress (STERP-CST.md 7.2, STERP-WEB 7.2).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,3 @@
+ok - vat workflow GUI: independent controller menu routes load saved return without PREPARE  # REQ: FIN-018,COM-002
+ok - vat workflow: exact frozen company period VRN nine boxes despite stale caches  # REQ: FIN-018,FIN-025,FIN-026,COM-002
+ok - vat workflow: unauthorised draft missing and already recorded exports create no files  # REQ: FIN-018,COM-002

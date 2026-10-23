@@ -1,0 +1,46 @@
+# suite TCSTCALC costing calculations
+ok 1 - C3 receipt values inventory at standard 900.00
+ok 2 - C3 goods received not invoiced accrues 1,000.00
+ok 3 - C3 receipt price variance is 100.00 adverse
+ok 4 - C3 the receipt variance is flagged adverse
+ok 5 - C3 incremental invoice price variance is 20.00
+ok 6 - C3 total adverse variance is 120.00 not 220.00
+ok 7 - C7 return at a lower standard restores 10.00
+ok 8 - C7 return valuation variance is 2.00 adverse
+ok 9 - C7 return at a higher standard restores 14.00
+ok 10 - C7 the credit variance is 2.00 favourable
+ok 11 - C5 allowed standard cost is 80.00
+ok 12 - C5 actual cost is 99.00
+ok 13 - C5 usage variance is 8.00
+ok 14 - C5 price variance is 11.00
+ok 15 - C5 total adverse variance is 19.00
+ok 16 - C5 components reconcile to the total difference
+ok 17 - the baseline quantity is disclosed
+ok 18 - margin on 1,000.00 less 600.00 is 400.00
+ok 19 - margin percentage is 40.0000
+ok 20 - the result is reported as expected not realised
+ok 21 - VAT is stripped from a gross 1,200.00 to 1,000.00
+ok 22 - zero revenue makes the margin percentage undefined
+ok 23 - a missing cost makes the markup undefined
+ok 24 - a missing cost makes the result incomplete
+ok 25 - setup is charged per run - 2h x 30.00 x 2 = 120.00
+ok 26 - run labour is 0.5h x 100 units x 20.00 = 1,000.00
+ok 27 - total labour is 1,120.00
+ok 28 - labour hours are 4 setup plus 50 run
+ok 29 - recovery rate is budget over normal capacity hours
+ok 30 - low production under recovers 30,000.00 of burden
+ok 31 - under recovery is flagged as a period expense
+ok 32 - EUR 60.00 at 1.20 per GBP is a 50.00 unit cost
+ok 33 - the normalised result is reported in sterling
+ok 34 - C4 goods 1,000.00 plus freight 80.00 is 1,080.00
+ok 35 - C4 provisional unit cost is 10.80
+ok 36 - recoverable VAT is excluded from inventory cost
+ok 37 - the excluded recoverable VAT is reported as 216.00
+ok 38 - cost elements reconcile to the total cost
+ok 39 - customs duty of 5 per cent adds 50.00
+ok 40 - irrecoverable VAT of 210.00 is capitalised
+ok 41 - the landed acquisition cost is 1,260.00
+ok 42 - a zero quantity is rejected, not divided by
+1..42
+# TCSTCALC costing calculations passed 00042 failed 00000
+# exit 0

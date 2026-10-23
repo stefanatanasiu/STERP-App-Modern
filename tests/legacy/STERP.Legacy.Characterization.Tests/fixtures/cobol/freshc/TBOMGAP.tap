@@ -1,0 +1,52 @@
+# suite TBOMGAP header, copy and compa
+ok 1 - A copy with no named source bill is refused
+ok 2 - The refused copy is an error, not a warning
+ok 3 - A copy with no reference for the new bill is refused
+ok 4 - A job bill must name the job or order it is for
+ok 5 - Nothing was copied by a refused request
+ok 6 - A manufactured parent raises no classification finding
+ok 7 - A governed header may be released
+ok 8 - The validation names the parent it governed
+ok 9 - A bought-in parent is an incompatible classification
+ok 10 - The classification finding is an error, not a note
+ok 11 - An incompatible parent blocks the release
+ok 12 - The validation outcome is a failure
+ok 13 - The calculation approval is refused with reason BOM0340
+ok 14 - The copy of a released bill is accepted
+ok 15 - Copying a released bill does not copy its release
+ok 16 - Only the selected source content is copied
+ok 17 - The optional and note lines are counted as excluded
+ok 18 - The exclusion is written down, not assumed
+ok 19 - The stored copy is held as a draft
+ok 20 - The copy inherits no engineering reviewer
+ok 21 - The copy inherits no release signature
+ok 22 - The copy inherits no prior validation evidence
+ok 23 - The excluded lines are absent from the stored copy
+ok 24 - The copy records exactly one derivation
+ok 25 - The lineage names the bill it was copied from
+ok 26 - The lineage names the revision it was copied from
+ok 27 - The lineage records the derivation as a copy
+ok 28 - The lineage names the demand the copy was made for
+ok 29 - A repeated copy is reported as the original
+ok 30 - A repeated copy is a warning, not a new bill
+ok 31 - The repeated request returns the first bill
+ok 32 - Only one job bill exists after the repeat
+ok 33 - A to B reports one added occurrence
+ok 34 - A to B reports one removed occurrence
+ok 35 - A to B reports one changed quantity
+ok 36 - A to B keeps the resequenced line out of the changes
+ok 37 - A to B is a material change
+ok 38 - The changed occurrence reports a difference of two
+ok 39 - The new occurrence is reported as added
+ok 40 - The dropped occurrence is reported as removed
+ok 41 - A renumbered bill adds nothing
+ok 42 - A renumbered bill removes nothing
+ok 43 - A renumbered bill changes nothing
+ok 44 - All three occurrences are reported as resequenced
+ok 45 - A pure sequence change is not a material change
+ok 46 - The header quantities did not move either
+ok 47 - Every reported line is marked as a sequence change
+ok 48 - The reason is spelled out on the line
+1..48
+# TBOMGAP header, copy and compa passed 00048 failed 00000
+# exit 0

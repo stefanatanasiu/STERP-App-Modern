@@ -1,0 +1,78 @@
+# suite TAPGAP1 holds, blocks, stateme
+ok 1 - an active supplier validates cleanly
+ok 2 - it may be purchased from
+ok 3 - it may be paid
+ok 4 - the open balance is 1,200.00
+ok 5 - one open item stands behind it
+ok 6 - a purchasing hold is applied without error
+ok 7 - the hold is recorded against the account
+ok 8 - new purchasing is suspended
+ok 9 - the existing liability is untouched
+ok 10 - the payment hold is not set with it
+ok 11 - legitimate payment is still allowed
+ok 12 - it is a warning, not a bar on the account
+ok 13 - the purchasing suspension is named
+ok 14 - the payment gate still says yes
+ok 15 - a hold without a reason is refused
+ok 16 - the missing reason is named
+ok 17 - a payment hold is applied separately
+ok 18 - both policies now restrict the account
+ok 19 - payment is now held for authority
+ok 20 - the payment hold is named
+ok 21 - the debt is still reported while held
+ok 22 - lifting the payment hold restores payment
+ok 23 - and the purchasing suspension survives it
+ok 24 - the purchasing suspension can be lifted too
+ok 25 - the derivation is clean
+ok 26 - thirty days from 10 September is 10 October
+ok 27 - the late internal receipt does not move it
+ok 28 - the discount deadline is 20 September
+ok 29 - two per cent of 1,200.00 is 24.00
+ok 30 - the term length is thirty days
+ok 31 - the dates come from the recorded terms
+ok 32 - the internal delay is noted, not acted on
+ok 33 - an authorised override is a warning
+ok 34 - the override is given its own reason code
+ok 35 - the contractual date is still retained
+ok 36 - a block without a reason is refused
+ok 37 - the missing reason is named
+ok 38 - blocking payment is reported as a warning
+ok 39 - the block quotes the recognised liability rule
+ok 40 - the open item is blocked for payment
+ok 41 - one open item was affected
+ok 42 - the block is owned and quantified
+ok 43 - the liability is still recognised as posted
+ok 44 - but it is no longer eligible for payment
+ok 45 - a dispute without a reason is refused
+ok 46 - a match dispute is recorded and owned
+ok 47 - the dispute quotes its own rule
+ok 48 - the item is marked as disputed
+ok 49 - the open item carries the dispute
+ok 50 - and the payment block stands beside it
+ok 51 - the accounting state is still posted
+ok 52 - releasing without a resolution is refused
+ok 53 - a recorded resolution releases the block
+ok 54 - the invoice becomes payable again
+ok 55 - and the accounting state never moved
+ok 56 - the supplier statement is recorded
+ok 57 - it is given a statement number
+ok 58 - our ledger shows 800.00 open at that date
+ok 59 - the statement is 500.00 higher than our ledger
+ok 60 - the agreeing line is matched
+ok 61 - the blocked debt is reported as disputed
+ok 62 - the payment in flight is a timing difference
+ok 63 - the 50.00 charge is missing from our ledger
+ok 64 - 400.00 of it is our payment in flight
+ok 65 - 50.00 of it is the unrecorded charge
+ok 66 - 50.00 of it is the blocked debt
+ok 67 - every penny of the difference is explained
+ok 68 - one line agreed and three need review
+ok 69 - the differences are a review, not an error
+ok 70 - the review rule is quoted
+ok 71 - the statement is left in dispute, not agreed
+ok 72 - the unmatched charge created no open item
+ok 73 - and the ledger still stands at 800.00
+ok 74 - the unmatched line is owned as an exception
+1..74
+# TAPGAP1 holds, blocks, stateme passed 00074 failed 00000
+# exit 0

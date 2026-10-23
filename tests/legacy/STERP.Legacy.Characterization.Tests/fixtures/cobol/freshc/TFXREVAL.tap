@@ -1,0 +1,39 @@
+# suite TFXREVAL foreign currency
+ok 1 - AC-016 the invoice is carried at 937.50
+ok 2 - AC-016 the carrying amount starts at the invoice
+ok 3 - FIN-019 the carrying enquiry is accepted
+ok 4 - AC-016 at the closing rate the carrying is 960.00
+ok 5 - AC-016 the revaluation adjustment is 22.50
+ok 6 - AC-016 a receivable worth more sterling is a gain
+ok 7 - FIN-020 the revaluation is marked unrealised
+ok 8 - FIN-020 a payable revalued upwards is a loss
+ok 9 - FIN-020 the payable loss is 22.50
+ok 10 - AC-016 the cash received is 1,000.00
+ok 11 - AC-016 the realised gain is 62.50
+ok 12 - AC-016 settlement is measured from the invoice rate
+ok 13 - FIN-020 the settlement difference is realised
+ok 14 - FIN-020 a payable settled at 1.20 realises a loss
+ok 15 - FIN-020 the realised loss is 62.50
+ok 16 - AC-016 the lifetime exchange gain is 62.50
+ok 17 - AC-016 the naive sum of both movements is 85.00
+ok 18 - AC-016 the lifetime gain is not the 85.00 double
+ok 19 - AC-016 the revalued carrying value is not realised
+ok 20 - FIN-019 sterling is never revalued against itself
+ok 21 - FIN-019 the refusal is reported as FXR0001
+ok 22 - FIN-019 an unknown function is refused
+ok 23 - FIN-019 a carry with no rate given is accepted
+ok 24 - FIN-019 FXCONV supplies the held rate of 1.200000
+ok 25 - FIN-019 1,200 dollars at the held rate is 1,000.00
+ok 26 - FIN-019 the carrying amount follows the held rate
+ok 27 - FIN-019 no held rate means no carrying amount
+ok 28 - AC-016 the unrealised gain of 22.50 is posted
+ok 29 - AC-016 the run is recorded with an identity
+ok 30 - FIN-020 the revaluation run is marked posted
+ok 31 - AC-016 the posted adjustment is the 22.50 difference
+ok 32 - COM-015 repeating the run posts no second journal
+ok 33 - D-14 the revaluation is reversed in the next period
+ok 34 - D-14 the run is left marked reversed
+ok 35 - D-14 a reversed revaluation is not reversed twice
+1..35
+# TFXREVAL foreign currency passed 00035 failed 00000
+# exit 0

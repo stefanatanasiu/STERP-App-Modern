@@ -1,0 +1,7 @@
+ok - acc: a VAT error is assessed against the reporting threshold before it is corrected  # REQ: FIN-027 AC: AC-116
+ok - acc: close - a balanced journal posts into an open period, the VAT return is built from it, and a closed period refuses it  # REQ: XMD-005,FIN-002,FIN-004,FIN-010,FIN-011,FIN-018,FIN-025,RPT-005,RPT-006 AC: AC-101
+ok - acc: reverse charge, import VAT and duty are recorded on both sides and never reclaimed twice  # REQ: FIN-028,PO-025 AC: AC-117
+ok - acc: statutory obligations are mapped to a deadline and the close checklist knows about them  # REQ: FIN-023,FIN-030,XMD-013,COM-020,COM-025 AC: AC-119,AC-111
+ok - acc: the VAT return has nine boxes that agree with each other and with the detail behind them  # REQ: FIN-025,FIN-026,RPT-007,RPT-017 AC: AC-109,AC-115
+ok - acc: the bank bridge explains the difference between the book and the statement  # REQ: FIN-014,FIN-015,RPT-015 AC: AC-101
+ok - acc: under the cash accounting scheme VAT follows the money, not the invoice  # REQ: FIN-029 AC: AC-118

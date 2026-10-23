@@ -1,0 +1,66 @@
+@using Sterp.Web.Framework.Shell
+@* MessageBox.Show equivalent: title, icon, text and the standard buttons (OK, Yes, No, Cancel). *@
+<div class="st-dialog st-raised" role="@(Icon is DialogIcon.Error or DialogIcon.Warning ? "alertdialog" : "dialog")" aria-modal="true" aria-labelledby="@($"{Dialog.Id}-t")" aria-describedby="@($"{Dialog.Id}-x")">
+    <div class="st-titlebar"><span class="st-title" id="@($"{Dialog.Id}-t")">@Title</span></div>
+    <div class="st-dialog-body">
+        <StIcon Kind="Icon" />
+        <div class="st-dialog-text" id="@($"{Dialog.Id}-x")">@Text</div>
+    </div>
+    <div class="st-dialog-buttons">
+        @foreach (var b in ButtonList)
+        {
+            var caption = b;
+            <button type="button" class="st-button" id="@($"{Dialog.Id}-{caption}")" @onclick="() => Dialog.Close(caption)">@caption</button>
+        }
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] public DialogInstance Dialog { get; set; } = default!;
+
+    [Parameter] public string Text { get; set; } = "";
+
+    [Parameter] public string Title { get; set; } = "STERP";
+
+    [Parameter] public DialogButtons Buttons { get; set; } = DialogButtons.Ok;
+
+    [Parameter] public DialogIcon Icon { get; set; } = DialogIcon.None;
+
+    [Inject] private BrowserInterop Browser { get; set; } = default!;
+
+    private string[] ButtonList => Buttons switch
+    {
+        DialogButtons.OkCancel => ["OK", "Cancel"],
+        DialogButtons.YesNo => ["Yes", "No"],
+        DialogButtons.YesNoCancel => ["Yes", "No", "Cancel"],
+        _ => ["OK"],
+    };
+
+    protected override void OnInitialized()
+    {
+        Dialog.KeyHandler = key =>
+        {
+            if (key.Is("Escape"))
+            {
+                if (ButtonList.Contains("Cancel")) Dialog.Close("Cancel");
+                else if (Buttons == DialogButtons.Ok) Dialog.Close("OK");
+                return true;
+            }
+            if (key.Is("Enter"))
+            {
+                if (key.TargetTag == "button" && key.TargetId.StartsWith(Dialog.Id + "-", StringComparison.Ordinal))
+                {
+                    return false; // the focused button handles Enter itself
+                }
+                Dialog.Close(ButtonList[0]);
+                return true;
+            }
+            return key.Key.StartsWith('F') && key.Key.Length <= 3;
+        };
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.FocusAsync($"{Dialog.Id}-{ButtonList[0]}");
+    }
+}

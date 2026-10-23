@@ -1,0 +1,15 @@
+ok - po: POPRICE explains where the price came from  # REQ: PO-004
+ok - po: a call-off is drawn against its blanket order and an unknown source raises nothing  # REQ: PO-021
+ok - po: a receipt cannot be confirmed before it has been validated  # REQ: PO-009
+ok - po: every purchasing menu row names a screen, a maintenance definition or a report that exists  # REQ: COM-019,COM-024
+ok - po: screen fields are converted the way the COMMAREA expects  # REQ: PO-003
+ok - po: the approved source register and the purchase price screens open on their seeded STC rows  # REQ: PO-002,PO-004
+ok - po: the budget check reports the percentage used after the purchase  # REQ: PO-005
+ok - po: the goods receipt screen validates a seeded STC order and lists its outstanding lines  # REQ: PO-009,PO-014,PO-025
+ok - po: the open order enquiry answers the three buyer questions  # REQ: PO-008,PO-017,PO-022,PO-024
+ok - po: the order screen opens on the seeded STC orders, which carry supplier, currency, item, quantity and price  # REQ: PO-003,PO-024
+ok - po: the requisition facade keeps its own line list for the screen  # REQ: PO-001
+ok - po: the requisition screen opens the seeded STC requisition and says who supplies the line  # REQ: PO-001,PO-002
+ok - po: the supplier checks button reports the due diligence verdict before an order may be issued  # REQ: PO-026
+ok - po: the three purchasing screens open as STERP base forms  # REQ: COM-024
+ok - po: validating a delivery lists the outstanding order lines  # REQ: PO-009,PO-014

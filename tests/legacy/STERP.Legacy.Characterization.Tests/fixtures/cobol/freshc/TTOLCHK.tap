@@ -1,0 +1,29 @@
+# suite po TOLCHK
+ok 1 - AC-053 receive 20 of 30 leaves 10 outstanding
+ok 2 - AC-053 no over delivery on a part receipt
+ok 3 - AC-053 part receipt is within tolerance
+ok 4 - PO-011 second receipt closes the outstanding ten
+ok 5 - PO-011 permitted quantity is the approved quantity
+ok 6 - AC-053 receipt at the approved limit is accepted
+ok 7 - AC-053 five excess units stay separately visible
+ok 8 - AC-053 at-limit receipt leaves no outstanding
+ok 9 - AC-053 at-limit receipt needs no amendment
+ok 10 - AC-053 one unit above the limit blocks
+ok 11 - AC-053 above-limit receipt needs an amendment
+ok 12 - AC-053 excess above the limit is one unit
+ok 13 - AC-053 above-limit receipt returns hold 06
+ok 14 - D-08 over delivery override is capped at 5 per cent
+ok 15 - D-08 permitted quantity after the cap is 105
+ok 16 - D-08 price variance failing both tests blocks
+ok 17 - D-08 price variance amount is 100.00
+ok 18 - D-08 price variance percentage is 5
+ok 19 - D-08 only the percentage test fails, so it warns
+ok 20 - D-08 price variance amount is 25.00
+ok 21 - D-08 one per cent and 10.00 is within tolerance
+ok 22 - D-08 a within-tolerance price returns 00
+ok 23 - D-08 charge variance of 20.00 is within 25.00
+ok 24 - D-08 charge variance of 30.00 needs authority
+ok 25 - D-08 charge variance amount is 30.00
+1..25
+# po TOLCHK passed 00025 failed 00000
+# exit 0

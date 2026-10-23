@@ -1,0 +1,50 @@
+# suite TCSTVAL valuation engines
+ok 1 - FIFOVAL refuses an issue with no item code
+ok 2 - A refused FIFO issue values nothing
+ok 3 - FIFOVAL refuses an issue of nothing
+ok 4 - FIFOVAL refuses an unknown function
+ok 5 - MWAVAL refuses a pool with no item code
+ok 6 - A refused average issue relieves nothing
+ok 7 - MWAVAL refuses an issue of nothing
+ok 8 - STDCOST refuses a review with no company
+ok 9 - C1 the FIFO issue is accepted
+ok 10 - C1 an issue of twelve is relieved at 66.00
+ok 11 - C1 the issue took value from both layers
+ok 12 - C1 the older layer gave up all ten units
+ok 13 - C1 the newer layer gave up only two units
+ok 14 - C1 eight units are left in the pool
+ok 15 - C1 what is left is worth 64.00
+ok 16 - C1 the average unit cost of the issue is 5.50
+ok 17 - C1 one open layer survives the issue
+ok 18 - C1 the stored pool is eight units
+ok 19 - C1 the stored pool is worth 64.00
+ok 20 - C1 the surviving layer is the 8.00 one
+ok 21 - C1 an issue beyond the layers is refused
+ok 22 - C1 the refusal is an error, not a warning
+ok 23 - C2 the receipt is accepted
+ok 24 - C2 the pool was a hundred units at 4.00 before
+ok 25 - C2 the new average is 750.00 over 150 = 5.00
+ok 26 - C2 the pool is 150 units after the receipt
+ok 27 - C2 the pool carries 750.00 after the receipt
+ok 28 - C2 an issue of forty costs 200.00
+ok 29 - C2 a hundred and ten units remain
+ok 30 - C2 what remains is worth 550.00
+ok 31 - C2 an issue does not move the average
+ok 32 - C2 nothing is stranded on a pool that is not empty
+ok 33 - C2 the stored pool reads back at 550.00
+ok 34 - C2 the stored pool is on the average method
+ok 35 - C2 an issue beyond the pool is refused
+ok 36 - MWAVAL refuses an unknown function
+ok 37 - The named set answers a standard of 12.00
+ok 38 - The previous standard of 10.00 comes with it
+ok 39 - The set that answered is the active one
+ok 40 - The standard is split over its elements
+ok 41 - Impact retains the cost set lifecycle status
+ok 42 - Impact names the independent preparer
+ok 43 - Impact names the approving user
+ok 44 - Impact refuses an unknown cost set
+ok 45 - An item with no standard in the set is not found
+ok 46 - A missing standard is never quietly zero
+1..46
+# TCSTVAL valuation engines passed 00046 failed 00000
+# exit 0

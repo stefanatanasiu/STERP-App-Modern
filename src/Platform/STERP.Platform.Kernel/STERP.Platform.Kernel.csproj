@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Platform.Kernel</RootNamespace>
+    <Description>STERP platform kernel: outcome model, SQLIO/SqlHelper data access semantics, COBOL numeric/date/text semantics, shared kernel services (PERMCHK, PERIODCK, NUMGEN, IDEMPOT, AUDITLOG, EXCPRAIS, PARMGET, DATECALC, TERMCALC, FXCONV, RNDALLOC, GL posting gateway), job and module abstractions.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <PackageReference Include="Dapper" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Microsoft.Extensions.* abstractions (configuration, logging, DI) come from the shared framework -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

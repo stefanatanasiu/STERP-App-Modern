@@ -1,0 +1,8 @@
+# po-enquiry
+ok 1 - the commitment enquiry only groups by ORDER, BUDGET or SUPPLIER -- REQ: PO-017
+ok 2 - the open commitment is 550.00 after release and cancellation -- REQ: PO-017, D-08
+ok 3 - invoiced 400.00 and accrued 200.00 are reported separately -- REQ: PO-017, PO-014
+ok 4 - the budget grouping reports the same 550.00 -- REQ: PO-017, PO-024
+ok 5 - the open order enquiry carries outstanding, GRNI and commitment -- REQ: PO-024, PO-014
+ok 6 - overdue schedules report both the original and the current promise -- REQ: PO-022, D-09
+ok 7 - no open order reports a negative outstanding quantity -- REQ: PO-008, PO-011

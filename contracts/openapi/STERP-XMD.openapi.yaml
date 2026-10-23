@@ -1,0 +1,3898 @@
+openapi: "3.1.0"
+info:
+  title: "STERP Cross-module control and reporting API (STERP-XMD)"
+  version: "1.0.0+a06-20261020T112437Z-034eff00"
+  description: "Slice XMD (wave W4) of the modernized STERP ERP: the online business chain trace (legacy CHAINTRC through XmdService.ChainTrace) and its set-based twin rpt.usp_ChainTrace, plus the batch jobs of the cross-module control suite (RECONCTL, EXCPAGE, OBLIGREG, KPIOTIF, CHAINRPT, CONVLOAD, CASHFCST, VATAUDIT) and the job streams XMDCLOSE and XMDCONV. The evidenced legacy behaviour is the contract: return codes, reason codes, messages, data effects and spool content must equal the legacy result for the same inputs and database state after the normalization of 01-shared-platform-contracts.md section 11. Specification: memory/STERP-App/agent-06/application-specs/STERP-XMD.md. Generic run status, SYSOUT, spool and JSON result resources are PLATFORM paths /api/jobs/v1/runs/{jobRunId}[/sysout|/spool|/result] on STERP.Jobs and are not redefined here."
+servers:
+  - url: "https://localhost:7101"
+    description: "STERP.Api (online)"
+security:
+  - windows: []
+tags:
+  - name: "Business Chain Trace"
+    description: "Legacy frmChainTrace (menu RPT.CONTROLS.CHAIN 'Business chain trace'): CHAINTRC TRACE and rpt.usp_ChainTrace."
+  - name: "Control account reconciliation"
+    description: "Catalogue RPT-015 / program RECONCTL (menu RPT.CONTROLS.RECON)."
+  - name: "Exception ageing and escalation"
+    description: "Catalogue RPT-016 / program EXCPAGE (menu RPT.CONTROLS.EXCP)."
+  - name: "Statutory obligations register"
+    description: "Catalogue XMD.OBLIGREG / program OBLIGREG (menu RPT.CONTROLS.OBLIG)."
+  - name: "On time in full (KPI)"
+    description: "Catalogue XMD.KPIOTIF / program KPIOTIF (menu RPT.CONTROLS.KPI)."
+  - name: "Chain trace report"
+    description: "Catalogue XMD.CHAINRPT / program CHAINRPT (menu RPT.CONTROLS.CHAINRPT)."
+  - name: "Legacy conversion load"
+    description: "Catalogue XMD.CONVLOAD / program CONVLOAD (menu RPT.CONTROLS.CONV) and stream XMDCONV."
+  - name: "Cash forecast"
+    description: "Catalogue RPT-004 / program CASHFCST."
+  - name: "VAT detail and return review"
+    description: "Catalogue RPT-007 and RPT-017 / program VATAUDIT."
+  - name: "Job streams"
+    description: "Command-file streams jobs/XMDCLOSE.cmd and jobs/XMDCONV.cmd run by the PLATFORM stream runner."
+paths:
+  "/api/xmd/v1/business-chains/trace":
+    post:
+      operationId: "xmd_traceBusinessChain"
+      summary: "Trace the business chain of one document (CHAINTRC TRACE)"
+      description: "Returns the ordered steps of the order-to-cash (ORDER/SALESORDER), procure-to-pay (PO/PURCHASE) or assembly (KIT) chain of one document, with its financial effects, reversal count and completeness judgement, exactly as legacy CHAINTRC function TRACE (STERP-App/cobol/online/xmd/CHAINTRC.cob:60-535) answered the facade XmdService.ChainTrace (STERP-App/dotnet/STERP.Business/Xmd/XmdService.vb:54-68). Rules: validation order company XMD0001, reference XMD0002, type XMD0003 (type upper-cased; CHAINTRC.cob:103-134), RC 8 -> 422 with no SQL; head step from so.DeliverySchedule / po.PurchaseSchedule aggregates or kit.ExecutionKit (missing -> broken, RC 16 XMD0016 -> 404); one operational step per so.Despatch / po.Receipt row or one 'Material issue' aggregate for a kit; one JOURNAL step per fin.Journal row whose ISNULL(SourceRef,'') equals the reference (no status filter), kind REVERSAL when IsReversal = 1; at most 24 steps (truncated -> RC 4 XMD0005); no journal -> broken, RC 4 XMD0004; complete when more than one operational step and at least one journal (CHAINTRC.cob:385-413). Notes are cut to 60 characters, quantities truncated to 3 and values to 2 decimals. Carried legacy behaviour: the response docType is CT-DOC-TYPE as CHAINTRC leaves it (DESPATCH, RECEIPT or KITLINE once the head step was found); an SQL error on the head query is reported as RC 16 XMD0016; list and journal query errors are silent (Agent 04 BRF-CHAINTRC-01/02/07). Read-only. Specification FR-STERP-XMD-010."
+      tags:
+        - "Business Chain Trace"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdChainTraceRequest"
+            examples:
+              salesOrder:
+                summary: "Demo workflow 1 order SOS900008 (STC/RDG)"
+                value:
+                  docType: "ORDER"
+                  docRef: "SOS900008"
+              kit:
+                summary: "An execution kit (reference illustrative)"
+                value:
+                  docType: "KIT"
+                  docRef: "KIT-26-0001"
+              unsupportedType:
+                summary: "Type offered by the legacy picker but refused by CHAINTRC (XMD0003)"
+                value:
+                  docType: "INVOICE"
+                  docRef: "SI-26-1001"
+      responses:
+        "200":
+          description: "RC 0 (severity OK) or RC 4 (severity WARNING: XMD0004 no posted financial effect, XMD0005 truncated) with the chain."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/XmdChainTraceEnvelope"
+              examples:
+                complete:
+                  summary: "Illustrative values - the answer depends on the database state; parity with legacy CHAINTRC is the contract"
+                  value:
+                    outcome:
+                      returnCode: 0
+                      severity: "OK"
+                      reasonCode: ""
+                      message: ""
+                      messageCount: 0
+                      documentRef: null
+                      correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    data:
+                      docType: "DESPATCH"
+                      docRef: "SOS900008"
+                      chainType: "O2C"
+                      chainName: "Order to cash"
+                      party: "C0090"
+                      stepCount: 3
+                      maxSteps: 24
+                      truncated: "N"
+                      complete: "Y"
+                      broken: "N"
+                      reversals: 0
+                      totalGbp: 1104.0
+                      steps:
+                        - seq: 1
+                          stage: "Sales order schedules"
+                          docType: "ORDER"
+                          reference: "SOS900008"
+                          date: "2026-10-09"
+                          status: "ACCEPTED"
+                          quantity: 24.0
+                          valueGbp: 0.0
+                          kind: "OPERATION"
+                          note: "Scheduled 24.000000    despatched 24.000000    cancelled lin"
+                        - seq: 2
+                          stage: "Despatch"
+                          docType: "DESPATCH"
+                          reference: "DSP-26-0101"
+                          date: "2026-10-12"
+                          status: "CONFIRMED"
+                          quantity: 0.0
+                          valueGbp: 1104.0
+                          kind: "OPERATION"
+                          note: ""
+                        - seq: 3
+                          stage: "Financial effect"
+                          docType: "JOURNAL"
+                          reference: "JNL-26-004410"
+                          date: "2026-10-12"
+                          status: "POSTED"
+                          quantity: 0.0
+                          valueGbp: 1104.0
+                          kind: "FINANCIAL"
+                          note: "Event SO.DESPATCH              raised by SO"
+                noFinancialEffect:
+                  summary: "RC 4 XMD0004 - operational steps but no journal (illustrative)"
+                  value:
+                    outcome:
+                      returnCode: 4
+                      severity: "WARNING"
+                      reasonCode: "XMD0004"
+                      message: "The chain has no posted financial effect yet."
+                      messageCount: 0
+                      documentRef: null
+                      correlationId: "5b0d7c1e-2a44-4f0e-8d0b-1c6a9e2f7a31"
+                    data:
+                      docType: "RECEIPT"
+                      docRef: "POS900003"
+                      chainType: "P2P"
+                      chainName: "Procure to pay"
+                      party: "S0004"
+                      stepCount: 2
+                      maxSteps: 24
+                      truncated: "N"
+                      complete: "N"
+                      broken: "Y"
+                      reversals: 0
+                      totalGbp: 0.0
+                      steps:
+                        - seq: 1
+                          stage: "Purchase order schedules"
+                          docType: "PO"
+                          reference: "POS900003"
+                          date: "2026-10-20"
+                          status: "APPROVED"
+                          quantity: 100.0
+                          valueGbp: 0.0
+                          kind: "OPERATION"
+                          note: "Ordered 100.000000   received 40.000000    unreceived commit"
+                        - seq: 2
+                          stage: "Receipt and GRNI"
+                          docType: "RECEIPT"
+                          reference: "GRN-26-0042"
+                          date: "2026-10-14"
+                          status: "CONFIRMED"
+                          quantity: 0.0
+                          valueGbp: 860.0
+                          kind: "OPERATION"
+                          note: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          description: "RC 16 XMD0016: head document not found (or the head query failed - BRF-CHAINTRC-01) or nothing recorded for the reference."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/ProblemDetails"
+              example:
+                type: "https://sterp.local/problems/not-found"
+                title: "Not found"
+                status: 404
+                detail: "No sales order schedule carries that number."
+                returnCode: 16
+                reasonCode: "XMD0016"
+                severity: "NOT FOUND"
+                messageCount: 0
+                correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        "422":
+          description: "RC 8: XMD0001 (company), XMD0002 (reference), XMD0003 (type), XMD0008 (function; unreachable through this operation)."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/ProblemDetails"
+              examples:
+                noReference:
+                  value:
+                    type: "https://sterp.local/problems/business-rule"
+                    title: "Business rule refused the request"
+                    status: 422
+                    detail: "A document reference is required."
+                    returnCode: 8
+                    reasonCode: "XMD0002"
+                    severity: "ERROR"
+                    messageCount: 0
+                    correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+                unsupportedType:
+                  value:
+                    type: "https://sterp.local/problems/business-rule"
+                    title: "Business rule refused the request"
+                    status: 422
+                    detail: "Document type must be ORDER, PO or KIT."
+                    returnCode: 8
+                    reasonCode: "XMD0003"
+                    severity: "ERROR"
+                    messageCount: 0
+                    correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                    traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-010"
+        - "FR-STERP-XMD-012"
+      x-sterp-legacy:
+        forms:
+          - "frmChainTrace.TraceClicked (STERP-App/dotnet/STERP.Desktop/Forms/Xmd/frmChainTrace.vb:52-62)"
+          - "frmChainTrace.OnConfirm (STERP-App/dotnet/STERP.Desktop/Forms/Xmd/frmChainTrace.vb:47-49)"
+        facade:
+          - "XmdService.ChainTrace (STERP-App/dotnet/STERP.Business/Xmd/XmdService.vb:54-68)"
+          - "XmdService.Copy/NewTable/Steps/Text/Num (STERP-App/dotnet/STERP.Business/Xmd/XmdService.vb:19-46,90-133)"
+        programs:
+          - "CHAINTRC function TRACE (STERP-App/cobol/online/xmd/CHAINTRC.cob:60-535)"
+          - "COMMAREA CHAINTRCCA (STERP-App/cobol/copy/CHAINTRCCA.cpy:16-41)"
+        procedures: []
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only. CHAINTRC issues no SQLIO BEGN: the head, list and journal SELECTs run in autocommit on the request connection; no row is written; IDEMPOT is not called (Idempotency-Key is only echoed as the correlation id)."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.ENQUIRY.VIEW"
+        sources:
+          - "menu:RPT.CONTROLS.CHAIN=FIN.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/xmd/v1/business-chains/steps":
+    post:
+      operationId: "xmd_listBusinessChainSteps"
+      summary: "Whole chain from rpt.usp_ChainTrace (legacy 'Whole chain' button)"
+      description: "Reproduces XmdService.ChainTraceList (STERP-App/dotnet/STERP.Business/Xmd/XmdService.vb:75-79): probes OBJECT_ID('rpt.usp_ChainTrace') as ServiceBase.Deployed did (absent -> deployed=false, empty list), then executes rpt.usp_ChainTrace @CompanyCode, @DocType, @Reference only (no @UserCode, so no permission check; @MaxSteps default 24) with the SqlHelper rules (empty string -> NULL, timeout 120 s) and returns result set 1 only (at most 24 rows ordered by SortGroup, SortDate, SortRef, RowId; STERP-App/db/procs/rpt/usp_ChainTrace.sql:13-179). THROW 50801/50802/50803 ('STERP-E-080n: ...') -> 422 with reasonCode E-0801..E-0803. The result differs from CHAINTRC in ordering, notes, kit component step and party and is reproduced as is (specification section 4.2; SME-685). Specification FR-STERP-XMD-011."
+      tags:
+        - "Business Chain Trace"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdChainStepsRequest"
+            examples:
+              salesOrder:
+                summary: "Demo workflow 1 order"
+                value:
+                  docType: "ORDER"
+                  reference: "SOS900008"
+      responses:
+        "200":
+          description: "Result set 1 of rpt.usp_ChainTrace (direct list)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/XmdChainStepList"
+              examples:
+                steps:
+                  summary: "Illustrative values - parity with the procedure result on the same database state is the contract"
+                  value:
+                    items:
+                      - stepNo: 1
+                        stage: "Sales order schedules"
+                        stepKind: "OPERATION"
+                        documentType: "ORDER"
+                        reference: "SOS900008"
+                        stepDate: "2026-10-09"
+                        status: "ACCEPTED"
+                        quantity: 24.0
+                        amountGbp: 0.0
+                        note: "Scheduled 24.000000 despatched 24.000000 cancelled lines 0"
+                      - stepNo: 2
+                        stage: "Despatch"
+                        stepKind: "OPERATION"
+                        documentType: "DESPATCH"
+                        reference: "DSP-26-0101"
+                        stepDate: "2026-10-12"
+                        status: "CONFIRMED"
+                        quantity: null
+                        amountGbp: 1104.0
+                        note: "Customer C0090"
+                      - stepNo: 3
+                        stage: "Financial effect"
+                        stepKind: "FINANCIAL"
+                        documentType: "JOURNAL"
+                        reference: "JNL-26-004410"
+                        stepDate: "2026-10-12"
+                        status: "POSTED"
+                        quantity: null
+                        amountGbp: 1104.0
+                        note: "Event SO.DESPATCH raised by SO"
+                    count: 3
+                    deployed: true
+                notDeployed:
+                  summary: "Procedure absent (legacy warning 'rpt.usp_ChainTrace is not deployed on this database.')"
+                  value:
+                    items: []
+                    count: 0
+                    deployed: false
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          description: "Procedure THROW 50801-50803 (BusinessRuleException)."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/ProblemDetails"
+              example:
+                type: "https://sterp.local/problems/business-rule"
+                title: "Business rule refused the request"
+                status: 422
+                detail: "Document type must be ORDER, PO or KIT."
+                returnCode: null
+                reasonCode: "E-0803"
+                severity: "E"
+                messageCount: null
+                correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-011"
+        - "FR-STERP-XMD-012"
+      x-sterp-legacy:
+        forms:
+          - "frmChainTrace.ListClicked (STERP-App/dotnet/STERP.Desktop/Forms/Xmd/frmChainTrace.vb:66-85)"
+        facade:
+          - "XmdService.ChainTraceList (STERP-App/dotnet/STERP.Business/Xmd/XmdService.vb:75-79)"
+          - "XmdService.IsSetTraceable (STERP-App/dotnet/STERP.Business/Xmd/XmdService.vb:142-148)"
+          - "ServiceBase.Deployed / SqlHelper.ObjectExists (STERP-App/dotnet/STERP.Business/ServiceBase.vb:59-61; STERP-App/dotnet/STERP.Data/SqlHelper.cs:148-156)"
+        programs: []
+        procedures:
+          - "rpt.usp_ChainTrace (STERP-App/db/procs/rpt/usp_ChainTrace.sql:13-179)"
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only. The OBJECT_ID probe and the procedure call each run on their own connection in autocommit (SqlHelper); rpt.usp_ChainTrace has no persistent writes (XACT_ABORT ON, table variable only)."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.ENQUIRY.VIEW"
+        sources:
+          - "menu:RPT.CONTROLS.CHAIN=FIN.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/xmd/v1/jobs/RECONCTL/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitReconctlRun"
+      summary: "Submit control-account reconciliation RECONCTL (catalogue RPT-015)"
+      description: "Runs RECONCTL (STERP-App/cobol/batch/xmd/RECONCTL.cob:206-661) for the eight control families AR, AP, INVENTORY, WIP, GRNI, VAT, BANK, ACCRUAL at one cutoff: GL side = SUM(DR - CR) of POSTED journal lines up to the cutoff by account ControlType; subsidiary side per family; difference = subsidiary - signed GL; DIFFERENCE when beyond the tolerance (XMD.RECON.TOLERANCE or TOL, default 0.01), NO CONTROL when no account of the type is posted, else AGREED; every non-agreed family raises (COMMIT) or counts (PREVIEW) a WARNING exception RECONCILIATION DIFFERENCE owned by the family role; COMMIT deletes the OPEN rpt.ReconciliationRun rows of the company/control/cutoff and inserts one row per family. RC 0 RECONCILED, 4 UNRECONCILED/undated/subsidiary or insert failure, 12 spool or GL failure (can be lowered to 4 by later failures, BRF-RECONCTL-02). Permission: catalogue row RPT-015 (FIN.ENQUIRY.VIEW) through core.usp_UiCheckAccess. Also a step of XMDCLOSE (STEP010) and of FIN's MONTHEND (STEP050) through the in-process job-step contract. Result JSON: #/components/schemas/XmdReconctlResult; spool RECONCTL-<CO>-<stamp>.lst. Specification FR-STERP-XMD-020."
+      tags:
+        - "Control account reconciliation"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdReconctlParameters"
+            examples:
+              workflow1Step8:
+                summary: "Demo workflow 1 step 8 / workflow 6 step 5 (FINCTRL, STC)"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  MODE: "PREVIEW"
+              workflow4Step7:
+                summary: "Demo workflow 4 step 7 (FINCTRL, CAL)"
+                value:
+                  CO: "CAL"
+                  ASAT: "20261031"
+                  MODE: "PREVIEW"
+              commit:
+                summary: "Write rpt.ReconciliationRun rows and raise exceptions"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  MODE: "COMMIT"
+                  TOL: "0.01"
+      responses:
+        "202":
+          description: "Run accepted and registered (core.usp_JobRunStart); poll the PLATFORM run resource."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41237
+                jobName: "RECONCTL"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:02:11.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41237"
+                  sysout: "/api/jobs/v1/runs/41237/sysout"
+                  spool: "/api/jobs/v1/runs/41237/spool"
+                  result: "/api/jobs/v1/runs/41237/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-020"
+        - "FR-STERP-XMD-013"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher.RunClicked (STERP-App/dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:83-110) via menu RPT.CONTROLS.RECON"
+        facade:
+          - "ReportService.Run (STERP-App/dotnet/STERP.Business/System/ReportService.vb:98-181)"
+        programs:
+          - "RECONCTL (STERP-App/cobol/batch/xmd/RECONCTL.cob:206-661)"
+          - "XMDBATPR (STERP-App/cobol/copy/XMDBATPR.cpy:28-316)"
+        procedures:
+          - "core.usp_RaiseException (via EXCPRAIS)"
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (via JOBLOG)"
+        reports:
+          - "RPT-015 (STERP-App/db/seed/97-xmd-reports.sql:56-58)"
+        jobs:
+          - "XMDCLOSE STEP010 (STERP-App/jobs/XMDCLOSE.cmd:20-25)"
+          - "MONTHEND STEP050 (STERP-App/jobs/MONTHEND.cmd:61)"
+      x-sterp-job-result: "#/components/schemas/XmdReconctlResult"
+      x-sterp-permission:
+        - "FIN.ENQUIRY.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "No SQLIO BEGN in RECONCTL: every statement autocommits. Per non-agreed family one EXCPRAIS call (core.usp_RaiseException, own unit); in COMMIT per family a DELETE of OPEN rpt.ReconciliationRun rows then an INSERT, as two separate units (SME-670); JOBLOG START/END separate. A failure leaves earlier families' rows committed."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.ENQUIRY.VIEW"
+        sources:
+          - "menu:RPT.CONTROLS.RECON=FIN.ENQUIRY.VIEW"
+          - "report:RPT-015=FIN.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/xmd/v1/jobs/EXCPAGE/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitExcpageRun"
+      summary: "Submit exception ageing and escalation EXCPAGE (catalogue RPT-016)"
+      description: "Runs EXCPAGE (STERP-App/cobol/batch/xmd/EXCPAGE.cob:186-531): lists OPEN/ACKNOWLEDGED core.ExceptionItem rows raised on or before ASAT (optional OWNER filter) by owner with age in days, flags NO OWNER / PAST DUE / ESCALATE (later flag wins; age > DAYS escalates; default DAYS = XMD.EXCEPTION.ESCALATE.DAYS, else 30), buckets 0-7/8-30/31-60/61+, escalates ESCALATE and NO OWNER items by raising (COMMIT) or counting a WARNING EXCEPTION ESCALATION owned by FINCTRL and, in COMMIT, stamps EscalatedAt/AgeDays once (WHERE EscalatedAt IS NULL); then the RPT-016 approvals, audit (counts only) and data-quality sections, whose date bound is the shared date field left by the listing (SME-1986, reproduced). RC 0 unless the spool or the listing query fails (12). Permission: catalogue RPT-016 (FIN.ENQUIRY.VIEW). Step STEP030 of XMDCLOSE. Result JSON: #/components/schemas/XmdExcpageResult. Specification FR-STERP-XMD-021."
+      tags:
+        - "Exception ageing and escalation"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdExcpageParameters"
+            examples:
+              workflow6Step5:
+                summary: "Demo workflow 6 step 5 (FINCTRL, STC)"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  MODE: "PREVIEW"
+              commitForOwner:
+                summary: "Escalate one owner's items"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  MODE: "COMMIT"
+                  OWNER: "CREDMGR"
+                  DAYS: "30"
+      responses:
+        "202":
+          description: "Run accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41238
+                jobName: "EXCPAGE"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:03:40.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41238"
+                  sysout: "/api/jobs/v1/runs/41238/sysout"
+                  spool: "/api/jobs/v1/runs/41238/spool"
+                  result: "/api/jobs/v1/runs/41238/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-021"
+        - "FR-STERP-XMD-013"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher.RunClicked (STERP-App/dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:83-110) via menu RPT.CONTROLS.EXCP"
+        facade:
+          - "ReportService.Run (STERP-App/dotnet/STERP.Business/System/ReportService.vb:98-181)"
+        programs:
+          - "EXCPAGE (STERP-App/cobol/batch/xmd/EXCPAGE.cob:186-531)"
+          - "XMDBATPR (STERP-App/cobol/copy/XMDBATPR.cpy:28-316)"
+        procedures:
+          - "core.usp_RaiseException (via EXCPRAIS)"
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (via JOBLOG)"
+        reports:
+          - "RPT-016 (STERP-App/db/seed/97-xmd-reports.sql:59-61)"
+        jobs:
+          - "XMDCLOSE STEP030 (STERP-App/jobs/XMDCLOSE.cmd:36-42)"
+      x-sterp-job-result: "#/components/schemas/XmdExcpageResult"
+      x-sterp-permission:
+        - "FIN.ENQUIRY.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "No SQLIO BEGN: each escalation (core.usp_RaiseException) and each EscalatedAt/AgeDays UPDATE autocommits on its own; reads are not isolated from those writes beyond READ COMMITTED (RCSI)."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.ENQUIRY.VIEW"
+        sources:
+          - "menu:RPT.CONTROLS.EXCP=FIN.ENQUIRY.VIEW"
+          - "report:RPT-016=FIN.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/xmd/v1/jobs/OBLIGREG/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitObligregRun"
+      summary: "Submit the statutory obligations register OBLIGREG (catalogue XMD.OBLIGREG)"
+      description: "Runs OBLIGREG (STERP-App/cobol/batch/xmd/OBLIGREG.cob:169-709): reads the company profile (ARD default 03-31, legal form default LTD, payment-practices and packaging flags), derives the period ends, derives VATRETURN (up to 6 latest VAT periods), ANNUALACCTS (+6 months PLC, else +9), CORPTAXPAY (+9 months +1 day), CORPTAX (+12 months), CONFSTMT (+14 days), PAYPRACTICES and PACKAGINGDATA obligations with DATECALC shifts, overlays core.StatutoryObligation (status, evidence, owner), flags OVERDUE (HOLD priority 1, RC >= 4) and DUE SOON within DAYS (WARNING priority 3) and raises (COMMIT) or counts STATUTORY OBLIGATION exceptions, and in COMMIT MERGEs every derived obligation into core.StatutoryObligation (new rows OPEN). RC 8 when the company is not on file (run continues), 12 spool. Permission: catalogue XMD.OBLIGREG (FIN.ENQUIRY.VIEW). Step STEP020 of XMDCLOSE. Result JSON: #/components/schemas/XmdObligregResult. Specification FR-STERP-XMD-022."
+      tags:
+        - "Statutory obligations register"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdObligregParameters"
+            examples:
+              workflow6Step5:
+                summary: "Demo workflow 6 step 5 (FINCTRL, STC)"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  MODE: "PREVIEW"
+              commit:
+                summary: "Upsert the register"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  MODE: "COMMIT"
+                  DAYS: "30"
+      responses:
+        "202":
+          description: "Run accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41239
+                jobName: "OBLIGREG"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:04:02.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41239"
+                  sysout: "/api/jobs/v1/runs/41239/sysout"
+                  spool: "/api/jobs/v1/runs/41239/spool"
+                  result: "/api/jobs/v1/runs/41239/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-022"
+        - "FR-STERP-XMD-013"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher.RunClicked (STERP-App/dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:83-110) via menu RPT.CONTROLS.OBLIG"
+        facade:
+          - "ReportService.Run (STERP-App/dotnet/STERP.Business/System/ReportService.vb:98-181)"
+        programs:
+          - "OBLIGREG (STERP-App/cobol/batch/xmd/OBLIGREG.cob:169-709)"
+          - "DATECALC ADDMONTH/ADDDAYS (via OBLIGREG.cob:662-690)"
+          - "XMDBATPR (STERP-App/cobol/copy/XMDBATPR.cpy:28-316)"
+        procedures:
+          - "core.usp_RaiseException (via EXCPRAIS)"
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (via JOBLOG)"
+        reports:
+          - "XMD.OBLIGREG (STERP-App/db/seed/97-xmd-reports.sql:66-68)"
+        jobs:
+          - "XMDCLOSE STEP020 (STERP-App/jobs/XMDCLOSE.cmd:28-33)"
+      x-sterp-job-result: "#/components/schemas/XmdObligregResult"
+      x-sterp-permission:
+        - "FIN.ENQUIRY.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "No SQLIO BEGN: each EXCPRAIS call and each MERGE core.StatutoryObligation autocommits separately; an upsert failure sets RC 4 and the run continues."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.ENQUIRY.VIEW"
+        sources:
+          - "menu:RPT.CONTROLS.OBLIG=FIN.ENQUIRY.VIEW"
+          - "report:XMD.OBLIGREG=FIN.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/xmd/v1/jobs/KPIOTIF/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitKpiotifRun"
+      summary: "Submit on-time-in-full KPI KPIOTIF (catalogue XMD.KPIOTIF)"
+      description: "Runs KPIOTIF (STERP-App/cobol/batch/xmd/KPIOTIF.cob:179-497): prints the published OTIF.CUSTOMER and OTIF.SUPPLIER definitions from rpt.MetricDefinition, measures customer schedules by original promise date (actual = latest confirmed despatch of the line/schedule) and supplier schedules by original confirmed date (actual = latest confirmed receipt of the whole order; early tolerance XMD.OTIF.EARLY.DAYS working days via DATECALC ADDBUS, fallback promise - 7), judges NOT DELIVERED / LATE / EARLY / SHORT / LATE/SHORT / OTIF and prints per side eligible, OTIF, late, short, open and OTIF % = ROUNDED (OTIF x 100) / eligible to 4 decimals or UNDEFINED. Window FROM..TO (TO default ASAT, FROM default TO - 10000 as yyyymmdd arithmetic); SITE is accepted and unused; DETAIL=Y lists every schedule. Read-only. RC 4 on definition or cohort query errors. Permission: catalogue XMD.KPIOTIF (FIN.ENQUIRY.VIEW). Result JSON: #/components/schemas/XmdKpiotifResult. Specification FR-STERP-XMD-023."
+      tags:
+        - "On time in full (KPI)"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdKpiotifParameters"
+            examples:
+              year:
+                summary: "Twelve months to 31 October 2026 (STC)"
+                value:
+                  CO: "STC"
+                  FROM: "20251101"
+                  TO: "20261031"
+                  DETAIL: "N"
+      responses:
+        "202":
+          description: "Run accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41240
+                jobName: "KPIOTIF"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:05:00.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41240"
+                  sysout: "/api/jobs/v1/runs/41240/sysout"
+                  spool: "/api/jobs/v1/runs/41240/spool"
+                  result: "/api/jobs/v1/runs/41240/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-023"
+        - "FR-STERP-XMD-013"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher.RunClicked (STERP-App/dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:83-110) via menu RPT.CONTROLS.KPI"
+        facade:
+          - "ReportService.Run (STERP-App/dotnet/STERP.Business/System/ReportService.vb:98-181)"
+        programs:
+          - "KPIOTIF (STERP-App/cobol/batch/xmd/KPIOTIF.cob:179-497)"
+          - "DATECALC ADDBUS (via KPIOTIF.cob:453-468)"
+          - "XMDBATPR (STERP-App/cobol/copy/XMDBATPR.cpy:28-316)"
+        procedures:
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (via JOBLOG)"
+        reports:
+          - "XMD.KPIOTIF (STERP-App/db/seed/97-xmd-reports.sql:69-71)"
+        jobs: []
+      x-sterp-job-result: "#/components/schemas/XmdKpiotifResult"
+      x-sterp-permission:
+        - "FIN.ENQUIRY.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only (SELECTs in autocommit); only the run registration rows are written."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.ENQUIRY.VIEW"
+        sources:
+          - "menu:RPT.CONTROLS.KPI=FIN.ENQUIRY.VIEW"
+          - "report:XMD.KPIOTIF=FIN.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/xmd/v1/jobs/CHAINRPT/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitChainrptRun"
+      summary: "Submit the printed chain trace CHAINRPT (catalogue XMD.CHAINRPT)"
+      description: "Runs CHAINRPT (STERP-App/cobol/batch/xmd/CHAINRPT.cob:129-228): calls the same chain-trace component as xmd_traceBusinessChain (legacy CALL 'CHAINTRC', CHAINRPT.cob:184) with TYPE (default ORDER) and REF, prints the chain name, counterparty and state (INCOMPLETE CHAIN when broken, CHAIN COMPLETE when complete, else PARTIALLY COMPLETE - also when the trace was refused) and every returned step whatever the trace RC, with the reversal count. The job RC is the trace RC when above 4 (console STERP-W-1001 <reason> <message>), else 0 (XMD0004/XMD0005 not propagated); 12 on spool failure. Read-only. Permission: catalogue XMD.CHAINRPT (FIN.ENQUIRY.VIEW). Result JSON: #/components/schemas/XmdChainrptResult. Specification FR-STERP-XMD-024."
+      tags:
+        - "Chain trace report"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdChainrptParameters"
+            examples:
+              salesOrder:
+                summary: "Demo workflow 1 order"
+                value:
+                  CO: "STC"
+                  TYPE: "ORDER"
+                  REF: "SOS900008"
+      responses:
+        "202":
+          description: "Run accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41241
+                jobName: "CHAINRPT"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:06:15.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41241"
+                  sysout: "/api/jobs/v1/runs/41241/sysout"
+                  spool: "/api/jobs/v1/runs/41241/spool"
+                  result: "/api/jobs/v1/runs/41241/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-024"
+        - "FR-STERP-XMD-013"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher.RunClicked (STERP-App/dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:83-110) via menu RPT.CONTROLS.CHAINRPT"
+        facade:
+          - "ReportService.Run (STERP-App/dotnet/STERP.Business/System/ReportService.vb:98-181)"
+        programs:
+          - "CHAINRPT (STERP-App/cobol/batch/xmd/CHAINRPT.cob:129-228)"
+          - "CHAINTRC (STERP-App/cobol/online/xmd/CHAINTRC.cob:60-535)"
+          - "XMDBATPR (STERP-App/cobol/copy/XMDBATPR.cpy:28-316)"
+        procedures:
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (via JOBLOG)"
+        reports:
+          - "XMD.CHAINRPT (STERP-App/db/seed/97-xmd-reports.sql:72-74)"
+        jobs: []
+      x-sterp-job-result: "#/components/schemas/XmdChainrptResult"
+      x-sterp-permission:
+        - "FIN.ENQUIRY.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only: the in-process chain trace runs its SELECTs in autocommit on the job connection; only run registration rows are written."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.ENQUIRY.VIEW"
+        sources:
+          - "menu:RPT.CONTROLS.CHAINRPT=FIN.ENQUIRY.VIEW"
+          - "report:XMD.CHAINRPT=FIN.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/xmd/v1/jobs/CONVLOAD/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitConvloadRun"
+      summary: "Submit the legacy conversion load CONVLOAD (catalogue XMD.CONVLOAD)"
+      description: "Runs CONVLOAD (STERP-App/cobol/batch/xmd/CONVLOAD.cob:242-1361) on one fixed-width extract (layout FL-067: AROP/APOP open items, STKB opening stock, GLTB trial balance): batch reference CONV-<base name>-<cutover>; lines sorted by type, natural key and arrival; per record ACCEPTED / REJECTED (legacy reason texts) / DUPLICATE (in file or already in the ledger) / LOADED (restart: already VALID and processed in stg.ImportRow of this batch). PREVIEW (or any non-COMMIT mode) validates and reports only. COMMIT merges stg.ImportBatch, then in one unit of work writes the staging rows, ar/ap.OpenItem at the cut over (FX from core.FxRate, default 1; GBP rounded by SQL Server), opening stock through the ITM STKMOVE OPENING contract (correlation CVL|<base>|<cutover>|<sequence>) and fin.OpeningBalance rows, proves the accepted trial balance (|DR - CR| > 0.004 -> RC 8 and an ERROR CONVERSION DIFFERENCE exception inside the unit), rolls back when RC > 4 else commits, and finally updates the batch counts with Status PARTIAL or COMMITTED (also after a rollback, SME-663). Re-running the same file and cut over loads nothing twice. RC 0, 4 (rejections/duplicates), 8 (input open, out of balance, open-item failure), 12 (spool, batch, begin, commit, STKMOVE severe). Permission: catalogue XMD.CONVLOAD (FIN.JOURNAL.POST). Steps of XMDCONV. Result JSON: #/components/schemas/XmdConvloadResult. Specification FR-STERP-XMD-025 and FR-STERP-XMD-026."
+      tags:
+        - "Legacy conversion load"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdConvloadParameters"
+            examples:
+              workflow4Step2Preview:
+                summary: "Demo workflow 4 step 2 - preview the Caledon open sales items"
+                value:
+                  CO: "CAL"
+                  FILE: "data\\legacy\\CALAROPN.DAT"
+                  CUTOVER: "20260331"
+                  MODE: "PREVIEW"
+              workflow4Step2Commit:
+                summary: "Demo workflow 4 step 2 - commit, then commit again (restart loads nothing twice)"
+                value:
+                  CO: "CAL"
+                  FILE: "data\\legacy\\CALAROPN.DAT"
+                  CUTOVER: "20260331"
+                  MODE: "COMMIT"
+              trialBalance:
+                summary: "Opening trial balance extract"
+                value:
+                  CO: "CAL"
+                  FILE: "data\\legacy\\CALGLTB.DAT"
+                  CUTOVER: "20260331"
+                  MODE: "COMMIT"
+      responses:
+        "202":
+          description: "Run accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41242
+                jobName: "CONVLOAD"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:07:30.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41242"
+                  sysout: "/api/jobs/v1/runs/41242/sysout"
+                  spool: "/api/jobs/v1/runs/41242/spool"
+                  result: "/api/jobs/v1/runs/41242/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-025"
+        - "FR-STERP-XMD-026"
+        - "FR-STERP-XMD-013"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher.RunClicked (STERP-App/dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:83-110) via menu RPT.CONTROLS.CONV"
+        facade:
+          - "ReportService.Run (STERP-App/dotnet/STERP.Business/System/ReportService.vb:98-181)"
+        programs:
+          - "CONVLOAD (STERP-App/cobol/batch/xmd/CONVLOAD.cob:242-1361)"
+          - "STKMOVE OPENING (STERP-App/cobol/online/itm/STKMOVE.cob, contract IC-ITM-STKMOVE)"
+          - "XMDBATPR (STERP-App/cobol/copy/XMDBATPR.cpy:28-316)"
+        procedures:
+          - "inv.usp_PostStockMovement (via STKMOVE)"
+          - "core.usp_RaiseException (via EXCPRAIS)"
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (via JOBLOG)"
+        reports:
+          - "XMD.CONVLOAD (STERP-App/db/seed/97-xmd-reports.sql:75-77)"
+        jobs:
+          - "XMDCONV STEP010-STEP023 (STERP-App/jobs/XMDCONV.cmd:23-60)"
+      x-sterp-job-result: "#/components/schemas/XmdConvloadResult"
+      x-sterp-permission:
+        - "FIN.JOURNAL.POST"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "COMMIT: (1) JOBLOG START autocommit; (2) MERGE stg.ImportBatch and BatchId read autocommit; (3) one unit of work (legacy SQLIO BEGN, CONVLOAD.cob:395-411) holding every stg.ImportRow MERGE, ar/ap.OpenItem and fin.OpeningBalance INSERT, the ITM STKMOVE calls (same connection and transaction, STKMOVE uses a savepoint) and the out-of-balance exception; (4) ROLLBACK when RC > 4 else COMMIT (CONVLOAD.cob:1230-1256); (5) UPDATE stg.ImportBatch autocommit; (6) JOBLOG END. PREVIEW: reads only."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.JOURNAL.POST"
+        sources:
+          - "menu:RPT.CONTROLS.CONV=FIN.JOURNAL.POST"
+          - "report:XMD.CONVLOAD=FIN.JOURNAL.POST"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/xmd/v1/jobs/CASHFCST/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitCashfcstRun"
+      summary: "Submit the cash forecast CASHFCST (catalogue RPT-004)"
+      description: "Runs CASHFCST (STERP-App/cobol/batch/xmd/CASHFCST.cob:327-1167): window FROM (default ASAT) .. TO (default FROM + 90 days; TO < FROM -> reset, RC 4); scenario BASE/UPSIDE/DOWNSIDE (unknown -> BASE, RC 4; slip XMD.CASH.SLIPDAYS default 14: DOWNSIDE delays receipts, UPSIDE delays payments); opening funds = StatementBalance of ACTIVE GBP bank accounts (BANK filter); CONTRACTUAL receipts (unsettled AR items) and payments (unsettled AP items not under an in-flight instruction), superseded AP figure, CONFIRMED payments (in-flight instructions with a value date), EXPECTED VAT (latest return Box 5 at payment due dates) and corporation tax (open CORPTAXPAY obligations at XMD.CASH.CORPTAX); dates before FROM moved to FROM, flows beyond TO dropped; daily running balance, lowest balance, FUNDED/SHORTFALL (no RC effect) and the console proof line STERP-I-0404. Read-only; SQL errors set RC 12 but the forecast is still printed. Permission: catalogue RPT-004 (FIN.BANK.RECONCILE). Result JSON: #/components/schemas/XmdCashfcstResult. Specification FR-STERP-XMD-027."
+      tags:
+        - "Cash forecast"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdCashfcstParameters"
+            examples:
+              quarter:
+                summary: "Legacy test window (TXMDCASH.cob:121-156)"
+                value:
+                  CO: "STC"
+                  FROM: "20261001"
+                  TO: "20261231"
+                  SCENARIO: "BASE"
+              downside:
+                summary: "Downside scenario for one bank account"
+                value:
+                  CO: "STC"
+                  BANK: "GBP1"
+                  SCENARIO: "DOWNSIDE"
+      responses:
+        "202":
+          description: "Run accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41243
+                jobName: "CASHFCST"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:08:45.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41243"
+                  sysout: "/api/jobs/v1/runs/41243/sysout"
+                  spool: "/api/jobs/v1/runs/41243/spool"
+                  result: "/api/jobs/v1/runs/41243/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-027"
+        - "FR-STERP-XMD-013"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher.RunClicked (STERP-App/dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:83-110) via the catalogue (no menu row)"
+        facade:
+          - "ReportService.Run (STERP-App/dotnet/STERP.Business/System/ReportService.vb:98-181)"
+        programs:
+          - "CASHFCST (STERP-App/cobol/batch/xmd/CASHFCST.cob:327-1167)"
+          - "XMDBATPR (STERP-App/cobol/copy/XMDBATPR.cpy:28-316)"
+        procedures:
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (via JOBLOG)"
+        reports:
+          - "RPT-004 (STERP-App/db/seed/97-xmd-reports.sql:38-40)"
+        jobs: []
+      x-sterp-job-result: "#/components/schemas/XmdCashfcstResult"
+      x-sterp-permission:
+        - "FIN.BANK.RECONCILE"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only (SELECTs in autocommit); only run registration rows are written."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.BANK.RECONCILE"
+        sources:
+          - "report:RPT-004=FIN.BANK.RECONCILE"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/xmd/v1/jobs/VATAUDIT/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitVatauditRun"
+      summary: "Submit the VAT detail / MTD audit trail VATAUDIT (catalogue RPT-007, RPT-017)"
+      description: "Runs VATAUDIT (STERP-App/cobol/batch/xmd/VATAUDIT.cob:435-1210): VATPERIOD (else PERIOD) required (blank -> RC 8 STERP-E-0103; unknown period -> RC 8 STERP-E-0202, ends before registration with JOBLOG END run id 0); MODE DETAIL (default, also PREVIEW/blank/unknown with STERP-W-0102) lists every fin.VatTransaction of the period by box with recovery, late and adjustment flags and totals (none -> RC 4); MODE MTD lists the 9 boxes of the latest fin.VatReturn version from fin.VatReturnBox (header values for missing boxes; console STERP-I-MTDBOX lines), error corrections, postponed import VAT and submission evidence; both prove the declared VAT against the VAT control accounts (and box 3 - box 4 in MTD) within TOL / XMD.RECON.TOLERANCE / 0.01 (difference -> UNRECONCILED, RC 4). Writes nothing. Permission: catalogue RPT-007/RPT-017 (FIN.VAT.SUBMIT). Result JSON: #/components/schemas/XmdVatauditResult. Specification FR-STERP-XMD-028."
+      tags:
+        - "VAT detail and return review"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdVatauditParameters"
+            examples:
+              detail:
+                summary: "Legacy test period 26A3 (TXMDVAT.cob:255-278)"
+                value:
+                  CO: "STC"
+                  VATPERIOD: "26A3"
+                  MODE: "DETAIL"
+              mtd:
+                summary: "Demo workflow 6 step 2 period 26A2, MTD trail"
+                value:
+                  CO: "STC"
+                  VATPERIOD: "26A2"
+                  MODE: "MTD"
+      responses:
+        "202":
+          description: "Run accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41244
+                jobName: "VATAUDIT"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:09:10.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41244"
+                  sysout: "/api/jobs/v1/runs/41244/sysout"
+                  spool: "/api/jobs/v1/runs/41244/spool"
+                  result: "/api/jobs/v1/runs/41244/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-028"
+        - "FR-STERP-XMD-013"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher.RunClicked (STERP-App/dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:83-110) via the catalogue (no menu row)"
+        facade:
+          - "ReportService.Run (STERP-App/dotnet/STERP.Business/System/ReportService.vb:98-181)"
+        programs:
+          - "VATAUDIT (STERP-App/cobol/batch/xmd/VATAUDIT.cob:435-1210)"
+          - "XMDBATPR (STERP-App/cobol/copy/XMDBATPR.cpy:28-316)"
+        procedures:
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (via JOBLOG)"
+        reports:
+          - "RPT-007 (STERP-App/db/seed/97-xmd-reports.sql:47-49)"
+          - "RPT-017 (STERP-App/db/seed/97-xmd-reports.sql:62-64)"
+        jobs: []
+      x-sterp-job-result: "#/components/schemas/XmdVatauditResult"
+      x-sterp-permission:
+        - "FIN.VAT.SUBMIT"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Read-only (SELECTs in autocommit); only run registration rows are written (none when the period check fails before registration)."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf:
+          - "FIN.VAT.SUBMIT"
+        sources:
+          - "report:RPT-007=FIN.VAT.SUBMIT"
+          - "report:RPT-017=FIN.VAT.SUBMIT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/xmd/v1/jobs/XMDCLOSE/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitXmdcloseRun"
+      summary: "Submit the close pack stream XMDCLOSE (RECONCTL, OBLIGREG, EXCPAGE)"
+      description: "Runs the stream jobs/XMDCLOSE.cmd (STERP-App/jobs/XMDCLOSE.cmd:15-52) under the PLATFORM stream runner (contracts 8.4): STEP010 RECONCTL CO ASAT MODE USER [TOL], STEP020 OBLIGREG CO ASAT MODE USER DAYS, STEP030 EXCPAGE CO ASAT MODE USER [OWNER] DAYS, all at one shared cutoff; a step code >= 8 ends the stream (ABEND); the stream code is MAXCC and the status OK/WARNING/FAILED/ABENDED (JOBEND). Stream defaults from SETENV: CO STC, MODE PREVIEW, ASAT = job date, DAYS 0 - and because DAYS is always defined it is always passed, so a submission without DAYS runs OBLIGREG with a 0-day window and EXCPAGE with escalation age 0 (SETENV.cmd:39, XMDCLOSE.cmd:31,40; decision D-XMD-07, proposal BC-XMD-03). RESTART=STEP010|STEP020|STEP030. No legacy permission (no catalogue row; command-line stream). The stream is registered once as SETENV did; each step program registers its own run. Result JSON: #/components/schemas/XmdStreamResult. Specification FR-STERP-XMD-029."
+      tags:
+        - "Job streams"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdXmdcloseParameters"
+            examples:
+              workflow6Step5:
+                summary: "Demo workflow 6 step 5 as one stream (STC, 31 October 2026)"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  MODE: "PREVIEW"
+              restart:
+                summary: "Restart at the exception ageing step"
+                value:
+                  CO: "STC"
+                  ASAT: "20261031"
+                  MODE: "PREVIEW"
+                  DAYS: "30"
+                  RESTART: "STEP030"
+      responses:
+        "202":
+          description: "Stream accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41245
+                jobName: "XMDCLOSE"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:10:00.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41245"
+                  sysout: "/api/jobs/v1/runs/41245/sysout"
+                  spool: "/api/jobs/v1/runs/41245/spool"
+                  result: "/api/jobs/v1/runs/41245/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-029"
+      x-sterp-legacy:
+        forms: []
+        facade: []
+        programs:
+          - "RECONCTL"
+          - "OBLIGREG"
+          - "EXCPAGE"
+        procedures:
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (SETENV.cmd:98-100, JOBEND.cmd:26)"
+        reports: []
+        jobs:
+          - "XMDCLOSE (STERP-App/jobs/XMDCLOSE.cmd:15-52)"
+          - "SETENV/RUNSTEP/JOBEND (STERP-App/jobs/SETENV.cmd:11-101, RUNSTEP.cmd:15-50, JOBEND.cmd:13-27)"
+      x-sterp-job-result: "#/components/schemas/XmdStreamResult"
+      x-sterp-permission: []
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Each step program keeps its own units of work (RECONCTL, OBLIGREG, EXCPAGE: statement-level autocommit); nothing spans steps; the stream row is registered at start and closed by the JOBEND equivalent."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf: []
+        sources: []
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "no permission-coded legacy entry leads to this operation (shell/kernel service or API-only)"
+  "/api/xmd/v1/jobs/XMDCONV/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "xmd_submitXmdconvRun"
+      summary: "Submit the conversion stream XMDCONV (four CONVLOAD files, preview then commit)"
+      description: "Runs the stream jobs/XMDCONV.cmd (STERP-App/jobs/XMDCONV.cmd:16-76) under the PLATFORM stream runner: STEP010-STEP013 CONVLOAD in PREVIEW for data\\legacy\\CALGLTB.DAT, CALAROPN.DAT, CALAPOPN.DAT and CALSTOCK.DAT with CUTOVER (default 20260331) and USER; unless MODE equals COMMIT (case-insensitive) the SYSOUT line '//*  MODE=PREVIEW - THE COMMIT PASS IS BYPASSED' ends the stream; otherwise STEP020-STEP023 commit the same files in ledger order and STEP030 runs the read-only @SQL summary of stg.ImportRow exactly as written (against the repository schema it references absent columns and ends with code 8 - inferred, D-XMD-11). Condition rule, MAXCC, JOBEND status and RESTART labels per contracts 8.4. Resubmission is safe: committed records come back LOADED. No legacy permission (no catalogue row). Result JSON: #/components/schemas/XmdStreamResult. Specification FR-STERP-XMD-030."
+      tags:
+        - "Job streams"
+        - "Legacy conversion load"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/XmdXmdconvParameters"
+            examples:
+              preview:
+                summary: "Caledon cut over, preview pass only"
+                value:
+                  CO: "CAL"
+                  MODE: "PREVIEW"
+              commit:
+                summary: "Caledon cut over, preview then commit (jobs\\XMDCONV.cmd CO=CAL MODE=COMMIT)"
+                value:
+                  CO: "CAL"
+                  MODE: "COMMIT"
+                  CUTOVER: "20260331"
+      responses:
+        "202":
+          description: "Stream accepted and registered."
+          headers:
+            Location:
+              description: "/api/jobs/v1/runs/{jobRunId} on STERP.Jobs"
+              schema:
+                type: "string"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 41246
+                jobName: "XMDCONV"
+                status: "RUNNING"
+                startedAt: "2026-10-31T18:12:00.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/41246"
+                  sysout: "/api/jobs/v1/runs/41246/sysout"
+                  spool: "/api/jobs/v1/runs/41246/spool"
+                  result: "/api/jobs/v1/runs/41246/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-XMD-030"
+      x-sterp-legacy:
+        forms: []
+        facade: []
+        programs:
+          - "CONVLOAD (8 steps)"
+        procedures:
+          - "core.usp_JobRunStart / core.usp_JobRunEnd (SETENV.cmd:98-100, JOBEND.cmd:26)"
+        reports: []
+        jobs:
+          - "XMDCONV (STERP-App/jobs/XMDCONV.cmd:16-76)"
+          - "SETENV/RUNSTEP/JOBEND (STERP-App/jobs/SETENV.cmd:11-101, RUNSTEP.cmd:15-50, JOBEND.cmd:13-27)"
+      x-sterp-job-result: "#/components/schemas/XmdStreamResult"
+      x-sterp-permission: []
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Each CONVLOAD step has its own units of work (see xmd_submitConvloadRun); a failed COMMIT step rolls back only its own file; STEP030 is a single read-only statement; nothing spans steps."
+      x-sterp-wave: "W4"
+      x-sterp-screen-gate:
+        anyOf: []
+        sources: []
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "no permission-coded legacy entry leads to this operation (shell/kernel service or API-only)"
+components:
+  securitySchemes:
+    windows:
+      type: "http"
+      scheme: "negotiate"
+      description: "Windows integrated authentication (Kerberos/NTLM). Browsers send the signed-on Windows identity automatically; curl: add --negotiate -u : (contracts section 5.1)."
+  parameters:
+    XSterpCompany:
+      name: "X-STERP-Company"
+      in: "header"
+      required: true
+      description: "Company code of the session (legacy SterpSession.CompanyCode -> CA-COMPANY / @CompanyCode). Must be in the caller's access list (core.usp_GetUserContext result set 2); otherwise 403 API0002."
+      schema:
+        type: "string"
+        maxLength: 10
+        x-sterp-legacy-field: "CA-COMPANY PIC X(10)"
+      example: "STC"
+    XSterpSite:
+      name: "X-STERP-Site"
+      in: "header"
+      required: false
+      description: "Site code of the session (legacy SterpSession.SiteCode -> CA-SITE). Required by site-scoped operations; must pair with the company in the access list."
+      schema:
+        type: "string"
+        maxLength: 10
+        x-sterp-legacy-field: "CA-SITE PIC X(10)"
+      example: "RDG"
+    XSterpBusinessDate:
+      name: "X-STERP-Business-Date"
+      in: "header"
+      required: false
+      description: "Business date (legacy SterpSession.BusinessDate -> CA-BUSINESS-DATE yyyyMMdd). Default: server local date, as legacy DateTime.Today (CobolGateway.cs:77)."
+      schema:
+        type: "string"
+        format: "date"
+        x-sterp-legacy-field: "CA-BUSINESS-DATE PIC 9(8)"
+      example: "2026-10-07"
+    XSterpRunAs:
+      name: "X-STERP-Run-As"
+      in: "header"
+      required: false
+      description: "SYSADM 'Continue as' user code (LoginService.SignOnAs). Honoured only when the authenticated user resolves to SYSADM; otherwise 403 API0003."
+      schema:
+        type: "string"
+        maxLength: 20
+        x-sterp-legacy-field: "CA-USER PIC X(20)"
+      example: "SALESREP"
+    IdempotencyKey:
+      name: "Idempotency-Key"
+      in: "header"
+      required: false
+      description: "Legacy correlation id (CA-CORRELATION-ID X(36)); default a new GUID per request (CobolGateway.cs:78). Send one stable key per user instruction where the legacy reused a correlation id (COM-015)."
+      schema:
+        type: "string"
+        maxLength: 36
+        x-sterp-legacy-field: "CA-CORRELATION-ID PIC X(36)"
+      example: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+  schemas:
+    Outcome:
+      type: "object"
+      description: "Legacy STCAHDR result (STERP-App/cobol/copy/STCAHDR.cpy:12-32; CobolResult.cs:6-26). returnCode 0 OK, 4 WARNING, 6 HOLD (HTTP 202). Failures (8, 12, 16) are returned as ProblemDetails."
+      required:
+        - "returnCode"
+        - "severity"
+        - "reasonCode"
+        - "message"
+        - "messageCount"
+        - "correlationId"
+      properties:
+        returnCode:
+          type: "integer"
+          enum:
+            - 0
+            - 4
+            - 6
+          x-sterp-legacy-field: "CA-RETURN-CODE PIC 9(2)"
+        severity:
+          type: "string"
+          enum:
+            - "OK"
+            - "WARNING"
+            - "HOLD"
+        reasonCode:
+          type: "string"
+          maxLength: 8
+          x-sterp-legacy-field: "CA-REASON-CODE PIC X(8)"
+        message:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "CA-MESSAGE PIC X(200)"
+        messageCount:
+          type: "integer"
+          x-sterp-legacy-field: "CA-MSG-COUNT PIC 9(2)"
+        documentRef:
+          type:
+            - "string"
+            - "null"
+          maxLength: 10
+          x-sterp-legacy-field: "CA-REQ-REF PIC X(10)"
+        correlationId:
+          type: "string"
+          maxLength: 36
+          x-sterp-legacy-field: "CA-CORRELATION-ID PIC X(36)"
+    ProblemDetails:
+      type: "object"
+      description: "RFC 9457 problem (contracts 4.6-4.7). type = https://sterp.local/problems/{business-rule|severe|not-found|validation|forbidden|unauthenticated|not-implemented}; detail = legacy message; reasonCode = legacy reason (or API#### for target-only conditions)."
+      required:
+        - "type"
+        - "title"
+        - "status"
+      properties:
+        type:
+          type: "string"
+          format: "uri"
+        title:
+          type: "string"
+        status:
+          type: "integer"
+        detail:
+          type:
+            - "string"
+            - "null"
+        instance:
+          type:
+            - "string"
+            - "null"
+        returnCode:
+          type:
+            - "integer"
+            - "null"
+          description: "legacy CA-RETURN-CODE (8, 12, 16 or other)"
+        reasonCode:
+          type:
+            - "string"
+            - "null"
+        severity:
+          type:
+            - "string"
+            - "null"
+          enum:
+            - "ERROR"
+            - "SEVERE"
+            - "NOT FOUND"
+            - "E"
+            - "W"
+            - "I"
+            - null
+        messageCount:
+          type:
+            - "integer"
+            - "null"
+        correlationId:
+          type:
+            - "string"
+            - "null"
+        traceId:
+          type:
+            - "string"
+            - "null"
+        errors:
+          type:
+            - "object"
+            - "null"
+          additionalProperties:
+            type: "array"
+            items:
+              type: "string"
+        data:
+          description: "Optional (contracts 4.7): for COBOL-backed operations whose legacy screen reads the COMMAREA after a refusal, the same data object the success envelope would carry."
+      example:
+        type: "https://sterp.local/problems/business-rule"
+        title: "Business rule refused the request"
+        status: 422
+        detail: "Period 202602 is hard closed."
+        returnCode: 8
+        reasonCode: "PER0003"
+        severity: "ERROR"
+        messageCount: 1
+        correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+        traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+    JobRunAccepted:
+      type: "object"
+      description: "Returned with HTTP 202 by every job submission (contracts 8.3). Poll /api/jobs/v1/runs/{jobRunId} on STERP.Jobs."
+      required:
+        - "jobRunId"
+        - "jobName"
+        - "status"
+      properties:
+        jobRunId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "core.JobRun.JobRunId bigint"
+        jobName:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "core.JobRun.JobName varchar(40)"
+        status:
+          type: "string"
+          enum:
+            - "RUNNING"
+            - "OK"
+            - "WARNING"
+            - "FAILED"
+            - "ABENDED"
+        startedAt:
+          type: "string"
+          format: "x-sterp-local-date-time"
+        links:
+          type: "object"
+          properties:
+            self:
+              type: "string"
+            sysout:
+              type: "string"
+            spool:
+              type: "string"
+            result:
+              type: "string"
+    ListEnvelope:
+      type: "object"
+      description: "Complete legacy result set in legacy order (contracts 4.10). Use allOf with an 'items' array of your row schema."
+      required:
+        - "items"
+        - "count"
+      properties:
+        items:
+          type: "array"
+          items: {}
+        count:
+          type: "integer"
+    XmdChainTraceRequest:
+      type: "object"
+      description: "Input of CHAINTRC function TRACE (COMMAREA CHAINTRCCA, STERP-App/cobol/copy/CHAINTRCCA.cpy:19-20). The company is CA-COMPANY taken from X-STERP-Company. CT-MAX-STEPS is not accepted: the facade sends 24 and CHAINTRC forces 24 (XmdService.vb:59; CHAINTRC.cob:80). Absent properties mean spaces; values are normalized as the legacy COMMAREA marshalling (contracts 4.4: Windows-1252, right-truncated to the length, space-padded)."
+      properties:
+        docType:
+          type: "string"
+          description: "Document type, upper-cased by CHAINTRC. ORDER or SALESORDER -> order to cash; PO or PURCHASE -> procure to pay; KIT -> assembly; anything else, blank included, is refused with RC 8 XMD0003 (CHAINTRC.cob:116-134). The legacy screen sends the picker text trimmed and upper-cased."
+          x-sterp-legacy-field: "CT-DOC-TYPE PIC X(12)"
+          x-sterp-length: 12
+          examples:
+            - "ORDER"
+        docRef:
+          type: "string"
+          description: "Document reference: sales order number (so.DeliverySchedule.OrderNumber), purchase order number (po.PurchaseSchedule.OrderNumber) or kit reference (kit.ExecutionKit.KitRef); also matched against fin.Journal.SourceRef. Blank is refused with RC 8 XMD0002 (CHAINTRC.cob:109-114)."
+          x-sterp-legacy-field: "CT-DOC-REF PIC X(40)"
+          x-sterp-length: 40
+          examples:
+            - "SOS900008"
+      example:
+        docType: "ORDER"
+        docRef: "SOS900008"
+    XmdChainTraceStep:
+      type: "object"
+      x-sterp-legacy-field: "CT-STEP (group)"
+      description: "One step of the chain (CHAINTRCCA.cpy:31-41)."
+      properties:
+        seq:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "CT-SEQ PIC 9(2)"
+          x-sterp-digits: 2
+          x-sterp-signed: false
+        stage:
+          type: "string"
+          description: "Sales order schedules | Despatch | Purchase order schedules | Receipt and GRNI | Execution kit | Material issue | Financial effect | Reversal or credit"
+          x-sterp-legacy-field: "CT-STAGE PIC X(24)"
+          x-sterp-length: 24
+        docType:
+          type: "string"
+          description: "ORDER, DESPATCH, PO, RECEIPT, KIT, KITLINE or JOURNAL."
+          x-sterp-legacy-field: "CT-DOC-T PIC X(12)"
+          x-sterp-length: 12
+        reference:
+          type: "string"
+          x-sterp-legacy-field: "CT-REF PIC X(40)"
+          x-sterp-length: 40
+        date:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          description: "0 (no date) is returned as null."
+          x-sterp-legacy-field: "CT-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        status:
+          type: "string"
+          x-sterp-legacy-field: "CT-STATUS PIC X(12)"
+          x-sterp-length: 12
+        quantity:
+          type: "number"
+          format: "decimal"
+          description: "Truncated (not rounded) to 3 decimals."
+          x-sterp-legacy-field: "CT-QTY PIC S9(11)V9(3)"
+          x-sterp-digits: 14
+          x-sterp-scale: 3
+          x-sterp-signed: true
+        valueGbp:
+          type: "number"
+          format: "decimal"
+          description: "Truncated (not rounded) to 2 decimals."
+          x-sterp-legacy-field: "CT-VALUE PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        kind:
+          type: "string"
+          enum:
+            - "OPERATION"
+            - "FINANCIAL"
+            - "REVERSAL"
+          x-sterp-legacy-field: "CT-KIND PIC X(10)"
+          x-sterp-length: 10
+        note:
+          type: "string"
+          x-sterp-legacy-field: "CT-NOTE PIC X(60)"
+          x-sterp-length: 60
+    XmdChainTraceResult:
+      type: "object"
+      description: "Body of the CHAINTRCCA COMMAREA after CHAINTRC TRACE (bytes 400+). Returned for RC 0 and RC 4 only; steps holds entries 1..stepCount (at most 24), as the facade copied them (XmdService.vb:61-66)."
+      x-sterp-legacy-copybook: "CHAINTRCCA"
+      properties:
+        docType:
+          type: "string"
+          description: "CT-DOC-TYPE as CHAINTRC leaves it: DESPATCH, RECEIPT or KITLINE once the head step was found (CHAINTRC.cob:204,257,307), otherwise the upper-cased request type."
+          x-sterp-legacy-field: "CT-DOC-TYPE PIC X(12)"
+          x-sterp-length: 12
+        docRef:
+          type: "string"
+          x-sterp-legacy-field: "CT-DOC-REF PIC X(40)"
+          x-sterp-length: 40
+        chainType:
+          type: "string"
+          enum:
+            - "O2C"
+            - "P2P"
+            - "ASSEMBLY"
+          x-sterp-legacy-field: "CT-CHAIN-TYPE PIC X(12)"
+          x-sterp-length: 12
+        chainName:
+          type: "string"
+          enum:
+            - "Order to cash"
+            - "Procure to pay"
+            - "Make an assembly"
+          x-sterp-legacy-field: "CT-CHAIN-NAME PIC X(40)"
+          x-sterp-length: 40
+        party:
+          type: "string"
+          description: "First non-blank customer (O2C) or supplier (P2P) of the listed despatches/receipts; the parent item code for an assembly."
+          x-sterp-legacy-field: "CT-PARTY PIC X(20)"
+          x-sterp-length: 20
+        stepCount:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "CT-STEP-CNT PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        maxSteps:
+          type: "integer"
+          format: "int32"
+          description: "Always 24."
+          x-sterp-legacy-field: "CT-MAX-STEPS PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        truncated:
+          type: "string"
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "CT-TRUNCATED PIC X"
+          x-sterp-length: 1
+        complete:
+          type: "string"
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "CT-COMPLETE PIC X"
+          x-sterp-length: 1
+        broken:
+          type: "string"
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "CT-BROKEN PIC X"
+          x-sterp-length: 1
+        reversals:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "CT-REVERSALS PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        totalGbp:
+          type: "number"
+          format: "decimal"
+          description: "Sum of TotalDebitGBP of the journal steps only."
+          x-sterp-legacy-field: "CT-TOTAL-GBP PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        steps:
+          type: "array"
+          maxItems: 24
+          x-sterp-legacy-field: "CT-STEP OCCURS 24"
+          items:
+            "$ref": "#/components/schemas/XmdChainTraceStep"
+    XmdChainTraceEnvelope:
+      type: "object"
+      description: "Outcome envelope (contracts 4.6) with the chain."
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/XmdChainTraceResult"
+    XmdChainStepsRequest:
+      type: "object"
+      description: "Parameters of rpt.usp_ChainTrace as the legacy facade passed them (XmdService.vb:77-78): @CompanyCode from X-STERP-Company, @DocType, @Reference. @UserCode, @MaxSteps, @StepsOnly and @SummaryOnly are never passed (defaults NULL, 24, 0, 0). An empty string is sent as NULL (SqlHelper.cs:33)."
+      properties:
+        docType:
+          type: "string"
+          description: "ORDER, PO or KIT from the legacy screen (gate XmdService.IsSetTraceable); the procedure also accepts SALESORDER and PURCHASE and throws 50803 for anything else."
+          x-sterp-legacy-field: "rpt.usp_ChainTrace @DocType varchar(12)"
+          x-sterp-length: 12
+          examples:
+            - "ORDER"
+        reference:
+          type: "string"
+          x-sterp-legacy-field: "rpt.usp_ChainTrace @Reference varchar(40)"
+          x-sterp-length: 40
+          examples:
+            - "SOS900008"
+      example:
+        docType: "ORDER"
+        reference: "SOS900008"
+    XmdChainStepRow:
+      type: "object"
+      description: "One row of result set 1 of rpt.usp_ChainTrace (db/procs/rpt/usp_ChainTrace.sql:167-171)."
+      properties:
+        stepNo:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "StepNo ROW_NUMBER() bigint"
+        stage:
+          type: "string"
+          x-sterp-legacy-field: "Stage varchar(24)"
+          x-sterp-length: 24
+        stepKind:
+          type: "string"
+          enum:
+            - "OPERATION"
+            - "FINANCIAL"
+            - "REVERSAL"
+          x-sterp-legacy-field: "StepKind varchar(10)"
+          x-sterp-length: 10
+        documentType:
+          type: "string"
+          x-sterp-legacy-field: "DocumentType varchar(12)"
+          x-sterp-length: 12
+        reference:
+          type: "string"
+          x-sterp-legacy-field: "Reference varchar(40)"
+          x-sterp-length: 40
+        stepDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "StepDate date"
+        status:
+          type:
+            - "string"
+            - "null"
+          x-sterp-legacy-field: "Status varchar(12)"
+          x-sterp-length: 12
+        quantity:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-legacy-field: "Quantity decimal(19,6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        amountGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "AmountGBP decimal(18,2)"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        note:
+          type:
+            - "string"
+            - "null"
+          x-sterp-legacy-field: "Note varchar(60)"
+          x-sterp-length: 60
+    XmdChainStepList:
+      description: "Direct list response (contracts 4.10): result set 1 of rpt.usp_ChainTrace in procedure order (at most 24 rows), plus the legacy deployment probe."
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          required:
+            - "deployed"
+          properties:
+            items:
+              type: "array"
+              maxItems: 24
+              items:
+                "$ref": "#/components/schemas/XmdChainStepRow"
+            deployed:
+              type: "boolean"
+              description: "false when OBJECT_ID('rpt.usp_ChainTrace') is NULL (legacy ServiceBase.Deployed -> SqlHelper.ObjectExists returned false and the facade returned Nothing); items is then empty."
+              x-sterp-legacy-field: "SqlHelper.ObjectExists('rpt.usp_ChainTrace') (XmdService.vb:76)"
+    XmdReconctlParameters:
+      type: "object"
+      description: "KEY=VALUE arguments of RECONCTL (catalogue RPT-015 ParamSpec CO,ASAT,MODE,USER,TOL; suite keys of XMDBATPR 9500). Values are strings in the legacy formats; blank values are dropped; unknown keys are passed on and ignored."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          description: "Company; default X-STERP-Company (program default STC). Must be in the caller's access list."
+          x-sterp-legacy-field: "CMDARGS CO -> XB-CO PIC X(10)"
+          x-sterp-length: 10
+        ASAT:
+          type: "string"
+          description: "Cutoff yyyymmdd (NUMVAL, not validated); default the host date."
+          x-sterp-legacy-field: "CMDARGS ASAT -> XB-ASAT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        MODE:
+          type: "string"
+          description: "PREVIEW (default) or COMMIT; upper-cased; only COMMIT writes."
+          x-sterp-legacy-field: "CMDARGS MODE -> XB-MODE PIC X(10)"
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user (caller or run-as), as frmReportLauncher did."
+          x-sterp-legacy-field: "CMDARGS USER -> XB-USER PIC X(20)"
+          x-sterp-length: 20
+        TOL:
+          type: "string"
+          description: "Tolerance in GBP (NUMVAL into 2 decimals, not validated); default parameter XMD.RECON.TOLERANCE, else 0.01."
+          x-sterp-legacy-field: "CMDARGS TOL -> XB-TOLERANCE PIC S9(9)V99"
+        SITE:
+          type: "string"
+          description: "Accepted by the suite, not used by RECONCTL."
+          x-sterp-legacy-field: "CMDARGS SITE -> XB-SITE PIC X(10)"
+          x-sterp-length: 10
+      example:
+        CO: "STC"
+        ASAT: "20261031"
+        MODE: "PREVIEW"
+    XmdExcpageParameters:
+      type: "object"
+      description: "KEY=VALUE arguments of EXCPAGE (catalogue RPT-016 ParamSpec CO,ASAT,MODE,USER,OWNER,DAYS)."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS CO -> XB-CO PIC X(10)"
+          x-sterp-length: 10
+        ASAT:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS ASAT -> XB-ASAT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        MODE:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS MODE -> XB-MODE PIC X(10)"
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user."
+          x-sterp-legacy-field: "CMDARGS USER -> XB-USER PIC X(20)"
+          x-sterp-length: 20
+        OWNER:
+          type: "string"
+          description: "Owner user or role filter; default ALL; first 20 characters, case kept."
+          x-sterp-legacy-field: "CMDARGS OWNER -> S-OWNER PIC X(20)"
+          x-sterp-length: 20
+        DAYS:
+          type: "string"
+          description: "Escalation age in days; default parameter XMD.EXCEPTION.ESCALATE.DAYS, else 30; stored unsigned without decimals."
+          x-sterp-legacy-field: "CMDARGS DAYS -> S-DAYS PIC 9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: false
+        SITE:
+          type: "string"
+          description: "Passed to EXCPRAIS as the exception site."
+          x-sterp-legacy-field: "CMDARGS SITE -> XB-SITE PIC X(10)"
+          x-sterp-length: 10
+      example:
+        CO: "STC"
+        ASAT: "20261031"
+        MODE: "PREVIEW"
+    XmdObligregParameters:
+      type: "object"
+      description: "KEY=VALUE arguments of OBLIGREG (catalogue XMD.OBLIGREG ParamSpec CO,ASAT,MODE,USER,DAYS)."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS CO -> XB-CO PIC X(10)"
+          x-sterp-length: 10
+        ASAT:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS ASAT -> XB-ASAT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        MODE:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS MODE -> XB-MODE PIC X(10)"
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user."
+          x-sterp-legacy-field: "CMDARGS USER -> XB-USER PIC X(20)"
+          x-sterp-length: 20
+        DAYS:
+          type: "string"
+          description: "Due-soon window in days; default parameter XMD.OBLIG.ESCALATE.DAYS, else 30; stored unsigned without decimals."
+          x-sterp-legacy-field: "CMDARGS DAYS -> S-WINDOW PIC 9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: false
+        SITE:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS SITE -> XB-SITE PIC X(10)"
+          x-sterp-length: 10
+      example:
+        CO: "STC"
+        ASAT: "20261031"
+        MODE: "PREVIEW"
+    XmdKpiotifParameters:
+      type: "object"
+      description: "KEY=VALUE arguments of KPIOTIF (catalogue XMD.KPIOTIF ParamSpec CO,FROM,TO,USER,SITE,DETAIL)."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS CO -> XB-CO PIC X(10)"
+          x-sterp-length: 10
+        FROM:
+          type: "string"
+          description: "Window start yyyymmdd; default TO - 10000 (yyyymmdd arithmetic, not validated)."
+          x-sterp-legacy-field: "CMDARGS FROM -> XB-FROM PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        TO:
+          type: "string"
+          description: "Window end yyyymmdd; default ASAT."
+          x-sterp-legacy-field: "CMDARGS TO -> XB-TO PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user."
+          x-sterp-legacy-field: "CMDARGS USER -> XB-USER PIC X(20)"
+          x-sterp-length: 20
+        SITE:
+          type: "string"
+          description: "Accepted and never used (SME-691)."
+          x-sterp-legacy-field: "CMDARGS SITE -> XB-SITE PIC X(10)"
+          x-sterp-length: 10
+        DETAIL:
+          type: "string"
+          description: "First character Y lists every schedule; otherwise only non-OTIF schedules."
+          x-sterp-legacy-field: "CMDARGS DETAIL -> WS-DETAIL PIC X"
+        ASAT:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS ASAT -> XB-ASAT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+      example:
+        CO: "STC"
+        FROM: "20251101"
+        TO: "20261031"
+        DETAIL: "N"
+    XmdChainrptParameters:
+      type: "object"
+      description: "KEY=VALUE arguments of CHAINRPT (catalogue XMD.CHAINRPT ParamSpec CO,TYPE,REF,USER)."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS CO -> XB-CO PIC X(10)"
+          x-sterp-length: 10
+        TYPE:
+          type: "string"
+          description: "Document type; default ORDER; first 12 characters upper-cased."
+          x-sterp-legacy-field: "CMDARGS TYPE -> XB-TYPE PIC X(20) -> CT-DOC-TYPE PIC X(12)"
+          x-sterp-length: 12
+        REF:
+          type: "string"
+          description: "Document reference; first 40 characters; no default (missing -> trace RC 8 XMD0002)."
+          x-sterp-legacy-field: "CMDARGS REF -> XB-CODE PIC X(40) -> CT-DOC-REF PIC X(40)"
+          x-sterp-length: 40
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user."
+          x-sterp-legacy-field: "CMDARGS USER -> XB-USER PIC X(20)"
+          x-sterp-length: 20
+        SITE:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS SITE -> XB-SITE PIC X(10)"
+          x-sterp-length: 10
+        ASAT:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS ASAT -> XB-ASAT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+      example:
+        CO: "STC"
+        TYPE: "ORDER"
+        REF: "SOS900008"
+    XmdConvloadParameters:
+      type: "object"
+      description: "KEY=VALUE arguments of CONVLOAD (catalogue XMD.CONVLOAD ParamSpec CO,FILE,CUTOVER,MODE,USER)."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS CO -> XB-CO PIC X(10)"
+          x-sterp-length: 10
+        FILE:
+          type: "string"
+          description: "Extract path; default data\\legacy\\CALAROPN.DAT; a relative path resolves against the legacy application root (configuration Xmd:LegacyRoot)."
+          x-sterp-legacy-field: "CMDARGS FILE -> WS-LEG-NAME PIC X(200)"
+          x-sterp-length: 200
+        CUTOVER:
+          type: "string"
+          description: "Cut-over date yyyymmdd (NUMVAL, not validated); default ASAT. Parameter XMD.CONV.CUTOVER is not read."
+          x-sterp-legacy-field: "CMDARGS CUTOVER -> WS-CUTOVER PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        MODE:
+          type: "string"
+          description: "PREVIEW (default) changes nothing; COMMIT loads."
+          x-sterp-legacy-field: "CMDARGS MODE -> XB-MODE PIC X(10)"
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user."
+          x-sterp-legacy-field: "CMDARGS USER -> XB-USER PIC X(20)"
+          x-sterp-length: 20
+        ASAT:
+          type: "string"
+          description: "Run as-at date (stock posting date, open-period test); default the host date."
+          x-sterp-legacy-field: "CMDARGS ASAT -> XB-ASAT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        SITE:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS SITE -> XB-SITE PIC X(10)"
+          x-sterp-length: 10
+      example:
+        CO: "CAL"
+        FILE: "data\\legacy\\CALAROPN.DAT"
+        CUTOVER: "20260331"
+        MODE: "PREVIEW"
+    XmdCashfcstParameters:
+      type: "object"
+      description: "KEY=VALUE arguments of CASHFCST (catalogue RPT-004 ParamSpec CO,BANK,FROM,TO,SCENARIO,USER,MODE)."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS CO -> XB-CO PIC X(10)"
+          x-sterp-length: 10
+        BANK:
+          type: "string"
+          description: "Optional bank account code (first 10 characters, upper-cased); filters opening funds and payment instructions only."
+          x-sterp-legacy-field: "CMDARGS BANK -> WS-BANK PIC X(10)"
+          x-sterp-length: 10
+        FROM:
+          type: "string"
+          description: "Window start; default ASAT."
+          x-sterp-legacy-field: "CMDARGS FROM -> XB-FROM PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        TO:
+          type: "string"
+          description: "Window end; default FROM + 90 calendar days; earlier than FROM -> reset to FROM with RC 4."
+          x-sterp-legacy-field: "CMDARGS TO -> XB-TO PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        SCENARIO:
+          type: "string"
+          description: "BASE (default), UPSIDE or DOWNSIDE; anything else runs BASE with RC 4."
+          x-sterp-legacy-field: "CMDARGS SCENARIO -> WS-SCEN PIC X(10)"
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user."
+          x-sterp-legacy-field: "CMDARGS USER -> XB-USER PIC X(20)"
+          x-sterp-length: 20
+        MODE:
+          type: "string"
+          description: "Accepted; no effect on CASHFCST."
+          x-sterp-legacy-field: "CMDARGS MODE -> XB-MODE PIC X(10)"
+          x-sterp-length: 10
+        ASAT:
+          type: "string"
+          description: "When absent ASAT becomes FROM."
+          x-sterp-legacy-field: "CMDARGS ASAT -> XB-ASAT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+      example:
+        CO: "STC"
+        FROM: "20261001"
+        TO: "20261231"
+        SCENARIO: "BASE"
+    XmdVatauditParameters:
+      type: "object"
+      description: "KEY=VALUE arguments of VATAUDIT (catalogue RPT-007 and RPT-017 ParamSpec CO,VATPERIOD,MODE,USER)."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "CMDARGS CO -> XB-CO PIC X(10)"
+          x-sterp-length: 10
+        VATPERIOD:
+          type: "string"
+          description: "VAT period key (first 10 characters, upper-cased); required (blank -> run RC 8 STERP-E-0103)."
+          x-sterp-legacy-field: "CMDARGS VATPERIOD -> S-PERIOD-KEY PIC X(10)"
+          x-sterp-length: 10
+        PERIOD:
+          type: "string"
+          description: "Alias used when VATPERIOD is absent."
+          x-sterp-legacy-field: "CMDARGS PERIOD -> S-PERIOD-KEY PIC X(10)"
+          x-sterp-length: 10
+        MODE:
+          type: "string"
+          description: "DETAIL (default; also PREVIEW, blank and unknown values) or MTD."
+          x-sterp-legacy-field: "CMDARGS MODE -> XB-MODE PIC X(10)"
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user."
+          x-sterp-legacy-field: "CMDARGS USER -> XB-USER PIC X(20)"
+          x-sterp-length: 20
+        TOL:
+          type: "string"
+          description: "Proof tolerance; default parameter XMD.RECON.TOLERANCE, else 0.01."
+          x-sterp-legacy-field: "CMDARGS TOL -> XB-TOLERANCE PIC S9(9)V99"
+      example:
+        CO: "STC"
+        VATPERIOD: "26A3"
+        MODE: "DETAIL"
+    XmdXmdcloseParameters:
+      type: "object"
+      description: "Stream parameters of jobs/XMDCLOSE.cmd (SETENV KEY=VALUE pairs). DAYS defaults to 0 and is always passed to OBLIGREG and EXCPAGE (SETENV.cmd:39; XMDCLOSE.cmd:31,40)."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          description: "Default X-STERP-Company (stream default STC)."
+          x-sterp-legacy-field: "SETENV P_CO"
+          x-sterp-length: 10
+        ASAT:
+          type: "string"
+          description: "Shared cutoff yyyymmdd; default the job date."
+          x-sterp-legacy-field: "SETENV P_ASAT"
+          x-sterp-legacy-format: "yyyyMMdd"
+        MODE:
+          type: "string"
+          description: "PREVIEW (default) or COMMIT for every step."
+          x-sterp-legacy-field: "SETENV P_MODE"
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user (stream default OPS)."
+          x-sterp-legacy-field: "SETENV P_USER"
+        TOL:
+          type: "string"
+          description: "Passed to RECONCTL only when supplied."
+          x-sterp-legacy-field: "SETENV P_TOL"
+        DAYS:
+          type: "string"
+          description: "Passed to OBLIGREG and EXCPAGE; default 0."
+          x-sterp-legacy-field: "SETENV P_DAYS (default 0)"
+        OWNER:
+          type: "string"
+          description: "Passed to EXCPAGE only when supplied."
+          x-sterp-legacy-field: "SETENV P_OWNER"
+        RESTART:
+          type: "string"
+          enum:
+            - "STEP010"
+            - "STEP020"
+            - "STEP030"
+          description: "Restart label; MAXCC restarts from 0."
+          x-sterp-legacy-field: "SETENV P_RESTART"
+      example:
+        CO: "STC"
+        ASAT: "20261031"
+        MODE: "PREVIEW"
+    XmdXmdconvParameters:
+      type: "object"
+      description: "Stream parameters of jobs/XMDCONV.cmd. The four files are fixed by the stream (data\\legacy\\CALGLTB.DAT, CALAROPN.DAT, CALAPOPN.DAT, CALSTOCK.DAT); no ASAT is passed to the steps."
+      additionalProperties:
+        type: "string"
+      properties:
+        CO:
+          type: "string"
+          x-sterp-legacy-field: "SETENV P_CO"
+          x-sterp-length: 10
+        MODE:
+          type: "string"
+          description: "COMMIT (case-insensitive) runs the commit pass after the preview pass; any other value bypasses it."
+          x-sterp-legacy-field: "SETENV P_MODE"
+        USER:
+          type: "string"
+          description: "Replaced by the effective STERP user (stream default OPS)."
+          x-sterp-legacy-field: "SETENV P_USER"
+        CUTOVER:
+          type: "string"
+          description: "Cut-over date; default 20260331 (XMDCONV.cmd:18)."
+          x-sterp-legacy-field: "XMDCONV P_CUTOVER"
+          x-sterp-legacy-format: "yyyyMMdd"
+        RESTART:
+          type: "string"
+          enum:
+            - "STEP010"
+            - "STEP011"
+            - "STEP012"
+            - "STEP013"
+            - "STEP020"
+            - "STEP021"
+            - "STEP022"
+            - "STEP023"
+            - "STEP030"
+          x-sterp-legacy-field: "SETENV P_RESTART"
+      example:
+        CO: "CAL"
+        MODE: "COMMIT"
+        CUTOVER: "20260331"
+    XmdReconctlResult:
+      type: "object"
+      description: "JSON result of a RECONCTL run (GET /api/jobs/v1/runs/{id}/result), mirroring the spool listing FL-072 (RECONCTL.cob:106-203). The spool listing is the parity oracle."
+      properties:
+        cutoff:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "XB-ASAT PIC 9(8) (S-ASAT PIC X(10) printed)"
+          x-sterp-legacy-format: "yyyyMMdd"
+        period:
+          type: "string"
+          description: "yyyy/pp plus the first 4 characters of the period status, or UNDATED."
+          x-sterp-legacy-field: "S-PERIOD PIC X(12)"
+          x-sterp-length: 12
+        mode:
+          type: "string"
+          x-sterp-legacy-field: "S-MODE PIC X(10)"
+          x-sterp-length: 10
+        tolerance:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "XB-TOLERANCE PIC S9(9)V99"
+          x-sterp-digits: 11
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        families:
+          type: "array"
+          maxItems: 8
+          items:
+            type: "object"
+            properties:
+              code:
+                type: "string"
+                enum:
+                  - "AR"
+                  - "AP"
+                  - "INVENTORY"
+                  - "WIP"
+                  - "GRNI"
+                  - "VAT"
+                  - "BANK"
+                  - "ACCRUAL"
+                x-sterp-legacy-field: "D-CODE PIC X(10)"
+                x-sterp-length: 10
+              description:
+                type: "string"
+                x-sterp-legacy-field: "D-DESC PIC X(32)"
+                x-sterp-length: 32
+              accounts:
+                type: "string"
+                description: "Lowest account code, '..' appended when several."
+                x-sterp-legacy-field: "D-ACCTS PIC X(16)"
+                x-sterp-length: 16
+              subsidiaryGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-SUB PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              ledgerGbp:
+                type: "number"
+                format: "decimal"
+                description: "GL balance multiplied by the family sign."
+                x-sterp-legacy-field: "D-GL PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              differenceGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-DIFF PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              status:
+                type: "string"
+                enum:
+                  - "AGREED"
+                  - "DIFFERENCE"
+                  - "NO CONTROL"
+                x-sterp-legacy-field: "D-STATUS PIC X(12)"
+                x-sterp-length: 12
+              ownerRole:
+                type: "string"
+                x-sterp-legacy-field: "D-OWNER PIC X(20)"
+                x-sterp-length: 20
+              note:
+                type: "string"
+                x-sterp-legacy-field: "D-NOTE PIC X(96)"
+                x-sterp-length: 96
+        totalSubsidiaryGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-SUB PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        totalLedgerGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-GL PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        netDifferenceGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-DIFF PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        unreconciledCount:
+          type: "integer"
+          x-sterp-legacy-field: "XB-DIFFS PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        exceptionCount:
+          type: "integer"
+          description: "Exceptions raised (COMMIT) or listed (other modes)."
+          x-sterp-legacy-field: "XB-RAISED PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        runStatus:
+          type: "string"
+          enum:
+            - "RECONCILED"
+            - "UNRECONCILED"
+          x-sterp-legacy-field: "RPT-STATUS-TEXT (STRPTWS)"
+        returnCode:
+          type: "integer"
+          x-sterp-legacy-field: "XB-RC PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+    XmdExcpageResult:
+      type: "object"
+      description: "JSON result of an EXCPAGE run, mirroring the spool listing FL-069 (EXCPAGE.cob:54-95, 131-183)."
+      properties:
+        asAt:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "XB-ASAT PIC 9(8) (S-ASAT PIC X(10))"
+          x-sterp-legacy-format: "yyyyMMdd"
+        owner:
+          type: "string"
+          x-sterp-legacy-field: "S-OWNER PIC X(20)"
+          x-sterp-length: 20
+        escalationDays:
+          type: "integer"
+          x-sterp-legacy-field: "S-DAYS PIC 9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: false
+        mode:
+          type: "string"
+          x-sterp-legacy-field: "S-MODE PIC X(10)"
+          x-sterp-length: 10
+        exceptions:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              owner:
+                type: "string"
+                x-sterp-legacy-field: "D-OWNER PIC X(20)"
+                x-sterp-length: 20
+              exceptionId:
+                type: "integer"
+                format: "int64"
+                x-sterp-legacy-field: "D-ID PIC 9(9)"
+                x-sterp-digits: 9
+                x-sterp-signed: false
+              module:
+                type: "string"
+                x-sterp-legacy-field: "D-MODULE PIC X(6)"
+                x-sterp-length: 6
+              severity:
+                type: "string"
+                x-sterp-legacy-field: "D-SEVERITY PIC X(8)"
+                x-sterp-length: 8
+              category:
+                type: "string"
+                x-sterp-legacy-field: "D-CATEGORY PIC X(30)"
+                x-sterp-length: 30
+              documentType:
+                type: "string"
+                x-sterp-legacy-field: "D-DOCTYPE PIC X(12)"
+                x-sterp-length: 12
+              documentRef:
+                type: "string"
+                x-sterp-legacy-field: "D-DOCREF PIC X(24)"
+                x-sterp-length: 24
+              raised:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-RAISED PIC X(10) (dd/mm/yyyy)"
+              due:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-DUE PIC X(10) (computed, not printed)"
+              ageDays:
+                type: "integer"
+                x-sterp-legacy-field: "D-AGE PIC S9(5)"
+                x-sterp-digits: 5
+                x-sterp-signed: true
+              amountGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-AMOUNT PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              status:
+                type: "string"
+                x-sterp-legacy-field: "D-STATUS PIC X(12)"
+                x-sterp-length: 12
+              flag:
+                type: "string"
+                enum:
+                  - ""
+                  - "NO OWNER"
+                  - "PAST DUE"
+                  - "ESCALATE"
+                x-sterp-legacy-field: "D-FLAG PIC X(10)"
+                x-sterp-length: 10
+              message:
+                type: "string"
+                x-sterp-legacy-field: "D-TEXT PIC X(100)"
+                x-sterp-length: 100
+        count0to7:
+          type: "integer"
+          x-sterp-legacy-field: "B-0007 PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        count8to30:
+          type: "integer"
+          x-sterp-legacy-field: "B-0830 PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        count31to60:
+          type: "integer"
+          x-sterp-legacy-field: "B-3160 PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        count61plus:
+          type: "integer"
+          x-sterp-legacy-field: "B-61UP PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        value0to7Gbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "B-V0007 PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        value8to30Gbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "B-V0830 PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        value31to60Gbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "B-V3160 PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        value61plusGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "B-V61UP PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        unowned:
+          type: "integer"
+          x-sterp-legacy-field: "B-UNOWNED PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        holds:
+          type: "integer"
+          x-sterp-legacy-field: "B-HOLDS PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        escalated:
+          type: "integer"
+          x-sterp-legacy-field: "XB-ESCALATED PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        approvalsPending:
+          type: "integer"
+          x-sterp-legacy-field: "R-APPROVALS PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        approvalsOlderThan5Days:
+          type: "integer"
+          x-sterp-legacy-field: "R-APPR-OLD PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        auditedWithAuthority:
+          type: "integer"
+          x-sterp-legacy-field: "R-OVERRIDES PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        restrictedAuditRows:
+          type: "integer"
+          description: "Count only; values are never reported."
+          x-sterp-legacy-field: "R-SENSITIVE PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        categories:
+          type: "array"
+          maxItems: 16
+          items:
+            type: "object"
+            properties:
+              category:
+                type: "string"
+                description: "First 36 characters; '(none)' for NULL."
+                x-sterp-legacy-field: "R-LABEL PIC X(52)"
+                x-sterp-length: 52
+              count:
+                type: "integer"
+                x-sterp-legacy-field: "R-VALUE PIC S9(9)"
+                x-sterp-digits: 9
+                x-sterp-signed: true
+        returnCode:
+          type: "integer"
+          x-sterp-legacy-field: "XB-RC PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+    XmdObligregResult:
+      type: "object"
+      description: "JSON result of an OBLIGREG run, mirroring the spool listing FL-071 (OBLIGREG.cob:83-102, 110-166)."
+      properties:
+        asAt:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "XB-ASAT PIC 9(8) (S-ASAT PIC X(10))"
+          x-sterp-legacy-format: "yyyyMMdd"
+        accountingPeriodEnd:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "S-ARD PIC X(10)"
+        window:
+          type: "integer"
+          x-sterp-legacy-field: "S-WINDOW PIC 9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: false
+        mode:
+          type: "string"
+          x-sterp-legacy-field: "S-MODE PIC X(10)"
+          x-sterp-length: 10
+        obligations:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              code:
+                type: "string"
+                enum:
+                  - "VATRETURN"
+                  - "ANNUALACCTS"
+                  - "CORPTAXPAY"
+                  - "CORPTAX"
+                  - "CONFSTMT"
+                  - "PAYPRACTICES"
+                  - "PACKAGINGDATA"
+                x-sterp-legacy-field: "D-CODE PIC X(20)"
+                x-sterp-length: 20
+              description:
+                type: "string"
+                x-sterp-legacy-field: "D-DESC PIC X(42)"
+                x-sterp-length: 42
+              period:
+                type: "string"
+                x-sterp-legacy-field: "D-PERIOD PIC X(20)"
+                x-sterp-length: 20
+              dueDate:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-DUE PIC X(10)"
+              daysToDue:
+                type: "integer"
+                x-sterp-legacy-field: "D-DAYS PIC S9(5)"
+                x-sterp-digits: 5
+                x-sterp-signed: true
+              status:
+                type: "string"
+                description: "Register status (OPEN, COMPLETE, ...) or NO EVIDENCE."
+                x-sterp-legacy-field: "D-STATUS PIC X(12)"
+                x-sterp-length: 12
+              owner:
+                type: "string"
+                x-sterp-legacy-field: "D-OWNER PIC X(14)"
+                x-sterp-length: 14
+              evidence:
+                type: "string"
+                x-sterp-legacy-field: "D-EVIDENCE PIC X(30)"
+                x-sterp-length: 30
+              flag:
+                type: "string"
+                enum:
+                  - ""
+                  - "OVERDUE"
+                  - "DUE SOON"
+                x-sterp-legacy-field: "D-FLAG PIC X(12)"
+                x-sterp-length: 12
+        openCount:
+          type: "integer"
+          x-sterp-legacy-field: "C-OPEN PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        completeCount:
+          type: "integer"
+          x-sterp-legacy-field: "C-DONE PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        overdueCount:
+          type: "integer"
+          x-sterp-legacy-field: "C-LATE PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        dueSoonCount:
+          type: "integer"
+          x-sterp-legacy-field: "C-SOON PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        escalatedCount:
+          type: "integer"
+          x-sterp-legacy-field: "XB-ESCALATED PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        returnCode:
+          type: "integer"
+          x-sterp-legacy-field: "XB-RC PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+    XmdKpiotifResult:
+      type: "object"
+      description: "JSON result of a KPIOTIF run, mirroring the spool listing FL-070 (KPIOTIF.cob:65-97, 240-275, 476-497)."
+      properties:
+        from:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "XB-FROM PIC 9(8) (S-FROM PIC X(10))"
+          x-sterp-legacy-format: "yyyyMMdd"
+        to:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "XB-TO PIC 9(8) (S-TO PIC X(10))"
+          x-sterp-legacy-format: "yyyyMMdd"
+        basis:
+          type: "string"
+          x-sterp-legacy-field: "S-BASIS PIC X(60)"
+          x-sterp-length: 60
+        definitions:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              metricCode:
+                type: "string"
+                x-sterp-legacy-field: "rpt.MetricDefinition.MetricCode varchar(30)"
+                x-sterp-length: 30
+              name:
+                type: "string"
+                x-sterp-legacy-field: "rpt.MetricDefinition.Name varchar(80)"
+                x-sterp-length: 80
+              text:
+                type: "string"
+                description: "First 110 characters of Definition + ' Zero denominator: ' + ZeroDenominatorRule."
+                x-sterp-legacy-field: "rpt.MetricDefinition.Definition varchar(600) + ZeroDenominatorRule varchar(100)"
+        sides:
+          type: "array"
+          maxItems: 2
+          items:
+            type: "object"
+            properties:
+              label:
+                type: "string"
+                x-sterp-legacy-field: "U-LABEL PIC X(40)"
+                x-sterp-length: 40
+              eligible:
+                type: "integer"
+                x-sterp-legacy-field: "U-DUE PIC S9(7)"
+                x-sterp-digits: 7
+                x-sterp-signed: true
+              otif:
+                type: "integer"
+                x-sterp-legacy-field: "U-OTIF PIC S9(7)"
+                x-sterp-digits: 7
+                x-sterp-signed: true
+              late:
+                type: "integer"
+                x-sterp-legacy-field: "U-LATE PIC S9(7)"
+                x-sterp-digits: 7
+                x-sterp-signed: true
+              short:
+                type: "integer"
+                x-sterp-legacy-field: "U-SHORT PIC S9(7)"
+                x-sterp-digits: 7
+                x-sterp-signed: true
+              early:
+                type: "integer"
+                x-sterp-legacy-field: "U-EARLY PIC S9(7)"
+                x-sterp-digits: 7
+                x-sterp-signed: true
+              open:
+                type: "integer"
+                x-sterp-legacy-field: "U-OPEN PIC S9(7)"
+                x-sterp-digits: 7
+                x-sterp-signed: true
+              percentage:
+                type: "string"
+                description: "First 7 characters of the 6-decimal edit of XB-PCT ROUNDED + ' pc', or UNDEFINED."
+                x-sterp-legacy-field: "U-PCT PIC X(12) from XB-PCT PIC S9(5)V9(4)"
+                x-sterp-length: 12
+        schedules:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              side:
+                type: "string"
+                x-sterp-legacy-field: "D-SIDE PIC X(10)"
+                x-sterp-length: 10
+              party:
+                type: "string"
+                x-sterp-legacy-field: "D-PARTY PIC X(20)"
+                x-sterp-length: 20
+              order:
+                type: "string"
+                x-sterp-legacy-field: "D-ORDER PIC X(20)"
+                x-sterp-length: 20
+              line:
+                type: "integer"
+                x-sterp-legacy-field: "D-LINE PIC 9(4)"
+                x-sterp-digits: 4
+                x-sterp-signed: false
+              schedule:
+                type: "integer"
+                x-sterp-legacy-field: "D-SCHED PIC 9(4)"
+                x-sterp-digits: 4
+                x-sterp-signed: false
+              promiseDate:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-PROMISE PIC X(10)"
+              actualDate:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-ACTUAL PIC X(10)"
+              quantity:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-QTY PIC S9(11)V9(3)"
+                x-sterp-digits: 14
+                x-sterp-scale: 3
+                x-sterp-signed: true
+              delivered:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-DONE PIC S9(11)V9(3)"
+                x-sterp-digits: 14
+                x-sterp-scale: 3
+                x-sterp-signed: true
+              daysLate:
+                type: "integer"
+                x-sterp-legacy-field: "D-DAYS PIC S9(5)"
+                x-sterp-digits: 5
+                x-sterp-signed: true
+              result:
+                type: "string"
+                enum:
+                  - "OTIF"
+                  - "LATE"
+                  - "EARLY"
+                  - "SHORT"
+                  - "LATE/SHORT"
+                  - "NOT DELIVERED"
+                x-sterp-legacy-field: "D-RESULT PIC X(12)"
+                x-sterp-length: 12
+              reason:
+                type: "string"
+                x-sterp-legacy-field: "D-REASON PIC X(28)"
+                x-sterp-length: 28
+        returnCode:
+          type: "integer"
+          x-sterp-legacy-field: "XB-RC PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+    XmdChainrptResult:
+      type: "object"
+      description: "JSON result of a CHAINRPT run, mirroring the spool listing FL-065 (CHAINRPT.cob:47-127)."
+      properties:
+        documentType:
+          type: "string"
+          x-sterp-legacy-field: "S-TYPE PIC X(12)"
+          x-sterp-length: 12
+        reference:
+          type: "string"
+          x-sterp-legacy-field: "S-REF PIC X(40)"
+          x-sterp-length: 40
+        chainName:
+          type: "string"
+          x-sterp-legacy-field: "S-CHAIN PIC X(40)"
+          x-sterp-length: 40
+        counterparty:
+          type: "string"
+          x-sterp-legacy-field: "S-PARTY PIC X(20)"
+          x-sterp-length: 20
+        state:
+          type: "string"
+          enum:
+            - "INCOMPLETE CHAIN"
+            - "CHAIN COMPLETE"
+            - "PARTIALLY COMPLETE"
+          x-sterp-legacy-field: "S-STATE PIC X(28)"
+          x-sterp-length: 28
+        statusText:
+          type: "string"
+          enum:
+            - "INCOMPLETE"
+            - "COMPLETE"
+            - "PARTIAL"
+          x-sterp-legacy-field: "RPT-STATUS-TEXT (STRPTWS)"
+        steps:
+          type: "array"
+          maxItems: 24
+          items:
+            type: "object"
+            properties:
+              seq:
+                type: "integer"
+                x-sterp-legacy-field: "D-SEQ PIC 9(2)"
+                x-sterp-digits: 2
+                x-sterp-signed: false
+              stage:
+                type: "string"
+                x-sterp-legacy-field: "D-STAGE PIC X(24)"
+                x-sterp-length: 24
+              documentType:
+                type: "string"
+                x-sterp-legacy-field: "D-DOCT PIC X(12)"
+                x-sterp-length: 12
+              reference:
+                type: "string"
+                description: "First 30 of the 40 reference characters."
+                x-sterp-legacy-field: "D-REF PIC X(30)"
+                x-sterp-length: 30
+              date:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-DATE PIC X(10) (dd/mm/yyyy; 00/00/0000 -> null)"
+              status:
+                type: "string"
+                x-sterp-legacy-field: "D-STATUS PIC X(12)"
+                x-sterp-length: 12
+              quantity:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-QTY PIC S9(11)V9(3) (printed ZZZ,ZZ9.999)"
+                x-sterp-digits: 14
+                x-sterp-scale: 3
+                x-sterp-signed: true
+              valueGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-VALUE PIC S9(13)V99 (printed Z,ZZZ,ZZ9.99-)"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              kind:
+                type: "string"
+                x-sterp-legacy-field: "D-KIND PIC X(10)"
+                x-sterp-length: 10
+              note:
+                type: "string"
+                x-sterp-legacy-field: "D-NOTE PIC X(60)"
+                x-sterp-length: 60
+        stepsTraced:
+          type: "integer"
+          x-sterp-legacy-field: "XB-ROWS-OUT PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        reversalSteps:
+          type: "integer"
+          x-sterp-legacy-field: "XB-DIFFS PIC S9(9) (= CT-REVERSALS)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        returnCode:
+          type: "integer"
+          x-sterp-legacy-field: "XB-RC PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+    XmdConvloadResult:
+      type: "object"
+      description: "JSON result of a CONVLOAD run, mirroring the spool listing FL-066 (CONVLOAD.cob:128-150, 157-239)."
+      properties:
+        file:
+          type: "string"
+          x-sterp-legacy-field: "S-FILE PIC X(60)"
+          x-sterp-length: 60
+        cutover:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "WS-CUTOVER PIC 9(8) (S-CUT PIC X(10))"
+          x-sterp-legacy-format: "yyyyMMdd"
+        mode:
+          type: "string"
+          x-sterp-legacy-field: "S-MODE PIC X(10)"
+          x-sterp-length: 10
+        batchRef:
+          type: "string"
+          x-sterp-legacy-field: "S-BATCH PIC X(40) (WS-BATCH-REF)"
+          x-sterp-length: 40
+        records:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              seq:
+                type: "integer"
+                description: "Arrival sequence in the extract."
+                x-sterp-legacy-field: "D-SEQ PIC 9(6)"
+                x-sterp-digits: 6
+                x-sterp-signed: false
+              type:
+                type: "string"
+                x-sterp-legacy-field: "D-TYPE PIC X(4)"
+                x-sterp-length: 4
+              key:
+                type: "string"
+                x-sterp-legacy-field: "D-KEY PIC X(44)"
+                x-sterp-length: 44
+              party:
+                type: "string"
+                description: "Party (AROP/APOP), site (STKB) or cost centre (GLTB)."
+                x-sterp-legacy-field: "D-PARTY PIC X(12)"
+                x-sterp-length: 12
+              date:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-DATE PIC X(10)"
+              currency:
+                type: "string"
+                x-sterp-legacy-field: "D-CCY PIC X(3)"
+                x-sterp-length: 3
+              value:
+                type: "number"
+                format: "decimal"
+                description: "Document amount (own currency), stock value or GL net."
+                x-sterp-legacy-field: "D-VALUE PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              outcome:
+                type: "string"
+                enum:
+                  - "ACCEPTED"
+                  - "REJECTED"
+                  - "DUPLICATE"
+                  - "LOADED"
+                x-sterp-legacy-field: "D-OUTCOME PIC X(10)"
+                x-sterp-length: 10
+              reason:
+                type: "string"
+                x-sterp-legacy-field: "D-REASON PIC X(52)"
+                x-sterp-length: 52
+        read:
+          type: "integer"
+          x-sterp-legacy-field: "XB-ROWS-IN PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        accepted:
+          type: "integer"
+          x-sterp-legacy-field: "XB-ACCEPTED PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        rejected:
+          type: "integer"
+          x-sterp-legacy-field: "XB-REJECTED PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        duplicate:
+          type: "integer"
+          x-sterp-legacy-field: "XB-DUPLICATE PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        alreadyLoaded:
+          type: "integer"
+          x-sterp-legacy-field: "XB-SKIPPED PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        posted:
+          type: "integer"
+          description: "Reset to 0 after a rollback."
+          x-sterp-legacy-field: "XB-POSTED PIC S9(9)"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        acceptedValue:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-ACCEPT-VAL PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        rejectedValue:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-REJECT-VAL PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        totalDebitGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-DR PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        totalCreditGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-CR PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        proofGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-PROOF PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        proofStatus:
+          type: "string"
+          enum:
+            - "IN BALANCE"
+            - "OUT OF BALANCE"
+            - "NO TRIAL BALANCE"
+          x-sterp-legacy-field: "RPT-STATUS-TEXT (STRPTWS)"
+        returnCode:
+          type: "integer"
+          x-sterp-legacy-field: "XB-RC PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+    XmdCashfcstResult:
+      type: "object"
+      description: "JSON result of a CASHFCST run, mirroring the spool listing FL-063 and the console proof line (CASHFCST.cob:79-170, 1041-1167)."
+      properties:
+        from:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "XB-FROM PIC 9(8) (S-FROM PIC X(10))"
+          x-sterp-legacy-format: "yyyyMMdd"
+        to:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "XB-TO PIC 9(8) (S-TO PIC X(10))"
+          x-sterp-legacy-format: "yyyyMMdd"
+        scenario:
+          type: "string"
+          enum:
+            - "BASE"
+            - "UPSIDE"
+            - "DOWNSIDE"
+          x-sterp-legacy-field: "S-SCEN PIC X(10)"
+          x-sterp-length: 10
+        bank:
+          type: "string"
+          description: "Bank code or ALL ACTIVE."
+          x-sterp-legacy-field: "S-BANK PIC X(12)"
+          x-sterp-length: 12
+        period:
+          type: "string"
+          x-sterp-legacy-field: "S-PERIOD PIC X(12)"
+          x-sterp-length: 12
+        slip:
+          type: "string"
+          x-sterp-legacy-field: "S-SLIP PIC X(10)"
+          x-sterp-length: 10
+        accounts:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              code:
+                type: "string"
+                x-sterp-legacy-field: "B-CODE PIC X(10)"
+                x-sterp-length: 10
+              name:
+                type: "string"
+                x-sterp-legacy-field: "B-NAME PIC X(30)"
+                x-sterp-length: 30
+              currency:
+                type: "string"
+                x-sterp-legacy-field: "B-CCY PIC X(3)"
+                x-sterp-length: 3
+              statementDate:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "B-STMT-DATE PIC X(10)"
+              balanceGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "B-BAL PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              note:
+                type: "string"
+                x-sterp-legacy-field: "B-NOTE PIC X(30)"
+                x-sterp-length: 30
+        flows:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              date:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-DATE PIC X(10)"
+              source:
+                type: "string"
+                x-sterp-legacy-field: "D-SRC PIC X(8)"
+                x-sterp-length: 8
+              reference:
+                type: "string"
+                x-sterp-legacy-field: "D-REF PIC X(22)"
+                x-sterp-length: 22
+              party:
+                type: "string"
+                x-sterp-legacy-field: "D-PARTY PIC X(20)"
+                x-sterp-length: 20
+              category:
+                type: "string"
+                enum:
+                  - "CONTRACTUAL"
+                  - "CONFIRMED"
+                  - "EXPECTED"
+                x-sterp-legacy-field: "D-CAT PIC X(12)"
+                x-sterp-length: 12
+              inGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-IN PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              outGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-OUT PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              note:
+                type: "string"
+                x-sterp-legacy-field: "D-NOTE PIC X(18)"
+                x-sterp-length: 18
+        days:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              date:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "Y-DATE PIC X(10)"
+              contractualGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "Y-CONTR PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              confirmedGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "Y-CONF PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              expectedGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "Y-EXP PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              inGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "Y-IN PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              outGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "Y-OUT PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              closingGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "Y-CLOSE PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+        contractualInGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-CONTR-IN PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        contractualOutGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-CONTR-OUT PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        confirmedOutGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-CONF-OUT PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        expectedInGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-EXP-IN PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        expectedOutGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-EXP-OUT PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        closingGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-CLOSE PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        supersededItems:
+          type: "integer"
+          x-sterp-legacy-field: "T-SUPP-ITEMS PIC S9(5)"
+          x-sterp-digits: 5
+          x-sterp-signed: true
+        supersededGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-SUPP-AMT PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        lowestBalanceDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "S-LOW-DATE PIC X(10)"
+        forecastStatus:
+          type: "string"
+          enum:
+            - "FUNDED"
+            - "SHORTFALL"
+          x-sterp-legacy-field: "RPT-STATUS-TEXT (STRPTWS)"
+        proofLine:
+          type: "string"
+          description: "Console line STERP-I-0404 ITEMS=nnnnn CONF=nnnnn SUPP=nnnnn OUTTOT=... (CASHFCST.cob:1156-1163)."
+          x-sterp-legacy-field: "WS-PROOF (CASHFCST.cob:169)"
+        returnCode:
+          type: "integer"
+          x-sterp-legacy-field: "XB-RC PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+    XmdVatauditResult:
+      type: "object"
+      description: "JSON result of a VATAUDIT run, mirroring the spool listing FL-073 and the console MTD box lines (VATAUDIT.cob:64-183)."
+      properties:
+        periodKey:
+          type: "string"
+          x-sterp-legacy-field: "S-PERIOD-KEY PIC X(10)"
+          x-sterp-length: 10
+        start:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "S-START PIC X(10)"
+        end:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "S-END PIC X(10)"
+        filingDue:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "S-DUE PIC X(10)"
+        paymentDue:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "S-PAYDUE PIC X(10)"
+        periodStatus:
+          type: "string"
+          x-sterp-legacy-field: "S-STATUS PIC X(12)"
+          x-sterp-length: 12
+        frequency:
+          type: "string"
+          x-sterp-legacy-field: "S-FREQ PIC X(12)"
+          x-sterp-length: 12
+        registration:
+          type: "string"
+          x-sterp-legacy-field: "S-REGNO PIC X(20)"
+          x-sterp-length: 20
+        scheme:
+          type: "string"
+          x-sterp-legacy-field: "S-SCHEME PIC X(12)"
+          x-sterp-length: 12
+        mode:
+          type: "string"
+          enum:
+            - "DETAIL"
+            - "MTD"
+          x-sterp-legacy-field: "S-MODE PIC X(10)"
+          x-sterp-length: 10
+        tolerance:
+          type: "string"
+          x-sterp-legacy-field: "S-TOL PIC X(12)"
+          x-sterp-length: 12
+        transactions:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              box:
+                type: "string"
+                x-sterp-legacy-field: "D-BOX PIC X(3)"
+                x-sterp-length: 3
+              vatCode:
+                type: "string"
+                x-sterp-legacy-field: "D-CODE PIC X(8)"
+                x-sterp-length: 8
+              taxPoint:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "D-TAXPOINT PIC X(10)"
+              mechanism:
+                type: "string"
+                x-sterp-legacy-field: "D-MECH PIC X(8)"
+                x-sterp-length: 8
+              document:
+                type: "string"
+                x-sterp-legacy-field: "D-DOC PIC X(18)"
+                x-sterp-length: 18
+              party:
+                type: "string"
+                x-sterp-legacy-field: "D-PARTY PIC X(8)"
+                x-sterp-length: 8
+              netGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-NET PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              vatGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-VAT PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              recoveryFlag:
+                type: "string"
+                enum:
+                  - "OUTPUT"
+                  - "BLOCKED"
+                  - "RECOVER"
+                  - "PART REC"
+                x-sterp-legacy-field: "D-REC-FLAG PIC X(10)"
+                x-sterp-length: 10
+              lateFlag:
+                type: "string"
+                x-sterp-legacy-field: "D-LATE-FLAG PIC X(5)"
+                x-sterp-length: 5
+              adjustment:
+                type: "string"
+                x-sterp-legacy-field: "D-ADJ-FLAG PIC X(14)"
+                x-sterp-length: 14
+        boxes:
+          type: "array"
+          maxItems: 9
+          items:
+            type: "object"
+            properties:
+              box:
+                type: "string"
+                x-sterp-legacy-field: "M-BOX PIC X(3)"
+                x-sterp-length: 3
+              caption:
+                type: "string"
+                x-sterp-legacy-field: "M-CAPTION PIC X(48)"
+                x-sterp-length: 48
+              valueGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "M-VALUE PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              contributing:
+                type: "integer"
+                x-sterp-legacy-field: "M-CNT PIC S9(7)"
+                x-sterp-digits: 7
+                x-sterp-signed: true
+              late:
+                type: "integer"
+                x-sterp-legacy-field: "M-LATE PIC S9(7)"
+                x-sterp-digits: 7
+                x-sterp-signed: true
+              source:
+                type: "string"
+                x-sterp-legacy-field: "M-SOURCE PIC X(14)"
+                x-sterp-length: 14
+              note:
+                type: "string"
+                x-sterp-legacy-field: "M-NOTE PIC X(60)"
+                x-sterp-length: 60
+        corrections:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              originalPeriod:
+                type: "string"
+                x-sterp-legacy-field: "E-ORIG PIC X(10)"
+                x-sterp-length: 10
+              discovered:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "E-FOUND PIC X(10)"
+              netErrorGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "E-NET PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              turnoverGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "E-TURNOVER PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              method:
+                type: "string"
+                x-sterp-legacy-field: "E-METHOD PIC X(12)"
+                x-sterp-length: 12
+              status:
+                type: "string"
+                x-sterp-legacy-field: "E-STATUS PIC X(12)"
+                x-sterp-length: 12
+              deliberate:
+                type: "string"
+                enum:
+                  - "DELIBERATE"
+                  - "careless"
+                x-sterp-legacy-field: "E-DELIB PIC X(10)"
+                x-sterp-length: 10
+              disclosure:
+                type: "string"
+                x-sterp-legacy-field: "E-DISC PIC X(20)"
+                x-sterp-length: 20
+              reason:
+                type: "string"
+                x-sterp-legacy-field: "E-REASON PIC X(54)"
+                x-sterp-length: 54
+        postponedImportVat:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              vatCode:
+                type: "string"
+                x-sterp-legacy-field: "P-CODE PIC X(8)"
+                x-sterp-length: 8
+              taxPoint:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "P-TAXPOINT PIC X(10)"
+              document:
+                type: "string"
+                x-sterp-legacy-field: "P-DOC PIC X(18)"
+                x-sterp-length: 18
+              party:
+                type: "string"
+                x-sterp-legacy-field: "P-PARTY PIC X(10)"
+                x-sterp-length: 10
+              netGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "P-NET PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              vatGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "P-VAT PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              recoverableGbp:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "P-REC PIC S9(13)V99"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              evidence:
+                type: "string"
+                x-sterp-legacy-field: "P-EVIDENCE PIC X(20)"
+                x-sterp-length: 20
+        submission:
+          type: "object"
+          properties:
+            returnId:
+              type: "string"
+              x-sterp-legacy-field: "R-ID PIC X(12)"
+              x-sterp-length: 12
+            version:
+              type: "string"
+              x-sterp-legacy-field: "R-VERSION PIC X(6)"
+              x-sterp-length: 6
+            status:
+              type: "string"
+              x-sterp-legacy-field: "R-STATUS PIC X(14)"
+              x-sterp-length: 14
+            submissionRef:
+              type: "string"
+              x-sterp-legacy-field: "R-SUBREF PIC X(40)"
+              x-sterp-length: 40
+            hmrcResponse:
+              type: "string"
+              x-sterp-legacy-field: "R-HMRC PIC X(60)"
+              x-sterp-length: 60
+            preparedBy:
+              type: "string"
+              x-sterp-legacy-field: "R-PREPARED PIC X(20)"
+              x-sterp-length: 20
+            approvedBy:
+              type: "string"
+              x-sterp-legacy-field: "R-APPROVED PIC X(20)"
+              x-sterp-length: 20
+            submitted:
+              type:
+                - "string"
+                - "null"
+              format: "date"
+              x-sterp-legacy-field: "R-SUBMITTED PIC X(10)"
+        totalNetGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-NET PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        totalVatGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "T-VAT PIC S9(13)V99"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        lines:
+          type: "integer"
+          x-sterp-legacy-field: "T-CNT PIC S9(7)"
+          x-sterp-digits: 7
+          x-sterp-signed: true
+        lateLines:
+          type: "integer"
+          x-sterp-legacy-field: "T-LATE PIC S9(7)"
+          x-sterp-digits: 7
+          x-sterp-signed: true
+        adjustments:
+          type: "integer"
+          x-sterp-legacy-field: "T-ADJ PIC S9(7)"
+          x-sterp-digits: 7
+          x-sterp-signed: true
+        blockedRecovery:
+          type: "integer"
+          x-sterp-legacy-field: "T-BLOCKED PIC S9(7)"
+          x-sterp-digits: 7
+          x-sterp-signed: true
+        proofStatus:
+          type: "string"
+          enum:
+            - "RECONCILED"
+            - "UNRECONCILED"
+          x-sterp-legacy-field: "WS-PROOF (VATAUDIT.cob:170-179) / RPT-STATUS-TEXT"
+        returnCode:
+          type: "integer"
+          x-sterp-legacy-field: "XB-RC PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+    XmdStreamResult:
+      type: "object"
+      description: "JSON result of an XMDCLOSE or XMDCONV stream run, mirroring the SYSOUT log written by SETENV/RUNSTEP/JOBEND (jobs/SETENV.cmd:83-96, jobs/RUNSTEP.cmd:22-48, jobs/JOBEND.cmd:13-27)."
+      properties:
+        jobName:
+          type: "string"
+          enum:
+            - "XMDCLOSE"
+            - "XMDCONV"
+          x-sterp-legacy-field: "SETENV JOBNAME"
+        steps:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              step:
+                type: "string"
+                x-sterp-legacy-field: "RUNSTEP STEPNAME (STEPnnn)"
+              program:
+                type: "string"
+                description: "Program name or @SQL."
+                x-sterp-legacy-field: "RUNSTEP STEPPGM"
+              parameters:
+                type: "string"
+                x-sterp-legacy-field: "RUNSTEP STEPPARM"
+              conditionCode:
+                type: "integer"
+                x-sterp-legacy-field: "RUNSTEP LASTCC"
+              jobRunId:
+                type:
+                  - "integer"
+                  - "null"
+                format: "int64"
+                x-sterp-legacy-field: "core.JobRun.JobRunId of the step program run"
+        maxcc:
+          type: "integer"
+          x-sterp-legacy-field: "RUNSTEP MAXCC"
+        status:
+          type: "string"
+          enum:
+            - "OK"
+            - "WARNING"
+            - "FAILED"
+            - "ABENDED"
+          x-sterp-legacy-field: "JOBEND JOBSTAT"
+        terminatedByCondCode:
+          type: "boolean"
+          description: "true when the stream went to ABEND after a step code >= 8."
+          x-sterp-legacy-field: "SYSOUT line '//*  STREAM TERMINATED BY COND CODE n'"
+  responses:
+    BadRequest:
+      description: "Malformed request or context header (API0001, API0004)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: "Not authenticated (API0401)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Forbidden:
+      description: "No STERP user (API0010), company/site not permitted (API0002), run-as refused (API0003), or a legacy permission refusal."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    NotFound:
+      description: "Legacy RC 16 (NOT FOUND)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    BusinessRule:
+      description: "Legacy RC 08 or procedure THROW 'STERP-<s>-<code>: text' - no business effect."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Severe:
+      description: "Legacy RC 12 (SQL0001 and other severe errors) or SYS0001."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    NotImplemented:
+      description: "API0501 - the operation belongs to a slice not yet delivered, or a job stream step is in an undelivered slice."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"

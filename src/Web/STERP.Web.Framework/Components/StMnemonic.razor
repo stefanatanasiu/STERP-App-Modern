@@ -1,0 +1,46 @@
+@* A caption with its Windows access key underlined ("Stoc&amp;k Control"); "&amp;&amp;" shows one ampersand. *@
+@foreach (var part in Parts())
+{
+    if (part.Key)
+    {
+        <u>@part.Text</u>
+    }
+    else
+    {
+        @part.Text
+    }
+}
+
+@code {
+    [Parameter] public string Text { get; set; } = "";
+
+    private IEnumerable<(bool Key, string Text)> Parts()
+    {
+        var buffer = new System.Text.StringBuilder();
+        var keyDone = false;
+        for (var i = 0; i < Text.Length; i++)
+        {
+            var c = Text[i];
+            if (c == '&' && i + 1 < Text.Length)
+            {
+                if (Text[i + 1] == '&')
+                {
+                    buffer.Append('&');
+                    i++;
+                    continue;
+                }
+                if (!keyDone)
+                {
+                    if (buffer.Length > 0) { yield return (false, buffer.ToString()); buffer.Clear(); }
+                    yield return (true, Text[i + 1].ToString());
+                    keyDone = true;
+                    i++;
+                    continue;
+                }
+                continue;
+            }
+            buffer.Append(c);
+        }
+        if (buffer.Length > 0) yield return (false, buffer.ToString());
+    }
+}

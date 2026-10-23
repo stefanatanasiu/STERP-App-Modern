@@ -1,0 +1,15 @@
+# kit-costing
+ok 1 - issued, returned and scrapped are each reported in their own right -- REQ: KIT-020
+ok 2 - residual is issued less returned plus absorbed less completed -- REQ: KIT-020
+ok 3 - a kit issued 100.00, returned 20.00 and scrapped 10.00 carries 80.00 residual -- REQ: KIT-020  AC: AC-081
+ok 4 - scrapped material stays inside the issued cost and is not deducted again -- REQ: KIT-014, KIT-020  AC: AC-081
+ok 5 - planned cost is the requirement at plan, and variance measures actual against it -- REQ: KIT-020
+ok 6 - a cancelled requirement line drops out of the planned cost -- REQ: KIT-005, KIT-020
+ok 7 - a single issue is counted once however many material lines the kit carries -- REQ: KIT-020
+ok 8 - the parent is charged the subassembly value once, not that value plus its children -- REQ: KIT-020  AC: AC-081
+ok 9 - the parent residual carries the subassembly once -- REQ: KIT-020  AC: AC-081
+ok 10 - the historical child material stays on the subassembly kit where it was spent -- REQ: KIT-020  AC: AC-081
+ok 11 - a cost summary as at a date ignores what was posted after it -- REQ: KIT-020, KIT-022
+ok 12 - a kit with no movements reports zero values, not an empty row -- REQ: KIT-020
+ok 13 - a cost summary answers for one company only -- REQ: KIT-020, COM-001
+ok 14 - the residual formula holds for every kit in the company, not only the built cases -- REQ: KIT-020

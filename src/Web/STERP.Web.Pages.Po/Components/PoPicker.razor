@@ -1,0 +1,45 @@
+@using Sterp.Web.Framework.Format
+@* UiStyle.Caption + UiStyle.Picker (UiStyle.vb): the caption at (CaptionX, Y + 3) and a drop-down list (DropDownList style)
+   at (X, Y) of the legacy form; the items are the picker texts, the first selected by default. *@
+<span style="@($"position:absolute;left:{CaptionX}px;top:{Y + 3}px;width:{CaptionWidth}px;height:15px;white-space:nowrap;overflow:hidden")"><label for="@Id"><StMnemonic Text="@Name" /></label>@Colon</span>
+<select id="@Id" class="st-input" aria-label="@UkFormat.LabelText(Caption)" data-sterp-field="@Field"
+        style="@($"position:absolute;left:{X}px;top:{Y}px;width:{Width}px;height:21px")" @onchange="OnChange">
+    @foreach (var item in Items)
+    {
+        <option value="@item" selected="@(string.Equals(item, Value, StringComparison.Ordinal))">@item</option>
+    }
+</select>
+
+@code {
+    [Parameter, EditorRequired] public string Caption { get; set; } = "";
+
+    [Parameter] public int CaptionX { get; set; }
+
+    [Parameter] public int CaptionWidth { get; set; } = 90;
+
+    [Parameter] public int X { get; set; }
+
+    [Parameter] public int Y { get; set; }
+
+    [Parameter] public int Width { get; set; } = 120;
+
+    [Parameter] public IReadOnlyList<string> Items { get; set; } = [];
+
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter, EditorRequired] public string Id { get; set; } = "";
+
+    [Parameter] public string? Field { get; set; }
+
+    private string Name => Caption.EndsWith(':') ? Caption[..^1] : Caption;
+
+    private string Colon => Caption.EndsWith(':') ? ":" : "";
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString() ?? "";
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

@@ -1,0 +1,312 @@
+[
+  {
+    "MenuCode": "FILE",
+    "ParentMenuCode": null,
+    "Caption": "\u0026File",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYSTEM",
+    "ParentMenuCode": null,
+    "Caption": "\u0026System",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Creditors",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM",
+    "ParentMenuCode": null,
+    "Caption": "Stoc\u0026k Control",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 80,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Reports",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 120,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WINDOW",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Window",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 130,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "HELP",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Help",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 140,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.SUPPLIER.VERIFY",
+    "ParentMenuCode": "AP",
+    "Caption": "\u0026Supplier and Bank Verification...",
+    "FormClass": "frmSupplierVerify",
+    "FormArgument": null,
+    "PermissionCode": "AP.SUPPLIER.VIEW",
+    "SortOrder": 10,
+    "Shortcut": "F5"
+  },
+  {
+    "MenuCode": "AP.RPT",
+    "ParentMenuCode": "AP",
+    "Caption": "Creditors Repor\u0026ts",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT.AGED",
+    "ParentMenuCode": "AP.RPT",
+    "Caption": "\u0026Aged Creditors...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "APAGED",
+    "PermissionCode": "AP.ENQUIRY.VIEW",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT.PPR",
+    "ParentMenuCode": "AP.RPT",
+    "Caption": "\u0026Payment Practices Report...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "APPPR",
+    "PermissionCode": "AP.PRACTICES.REPORT",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT.VAT6M",
+    "ParentMenuCode": "AP.RPT",
+    "Caption": "Six Month \u0026Unpaid Input VAT...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "APVAT6M",
+    "PermissionCode": "AP.ENQUIRY.VIEW",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FILE.COMPANY",
+    "ParentMenuCode": "FILE",
+    "Caption": "Select \u0026Company / Site...",
+    "FormClass": null,
+    "FormArgument": "$COMPANY",
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FILE.RUNAS",
+    "ParentMenuCode": "FILE",
+    "Caption": "Continue as \u0026User...",
+    "FormClass": null,
+    "FormArgument": "$RUNAS",
+    "PermissionCode": null,
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FILE.SPOOL",
+    "ParentMenuCode": "FILE",
+    "Caption": "View \u0026Spool File...",
+    "FormClass": "frmSpoolViewer",
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 30,
+    "Shortcut": "Ctrl\u002BO"
+  },
+  {
+    "MenuCode": "FILE.PRINTSET",
+    "ParentMenuCode": "FILE",
+    "Caption": "P\u0026rinter Setup...",
+    "FormClass": null,
+    "FormArgument": "$PRINTSETUP",
+    "PermissionCode": null,
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FILE.EXIT",
+    "ParentMenuCode": "FILE",
+    "Caption": "E\u0026xit",
+    "FormClass": null,
+    "FormArgument": "$EXIT",
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": "Alt\u002BF4"
+  },
+  {
+    "MenuCode": "HELP.CONTENTS",
+    "ParentMenuCode": "HELP",
+    "Caption": "\u0026Contents",
+    "FormClass": null,
+    "FormArgument": "$HELP",
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": "F1"
+  },
+  {
+    "MenuCode": "HELP.ABOUT",
+    "ParentMenuCode": "HELP",
+    "Caption": "\u0026About STERP - Stefan\u0027s ERP...",
+    "FormClass": null,
+    "FormArgument": "$ABOUT",
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.REPORTS",
+    "ParentMenuCode": "ITM",
+    "Caption": "Stock Re\u0026ports...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "itm",
+    "PermissionCode": "RPT.RUN",
+    "SortOrder": 300,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.LAUNCH",
+    "ParentMenuCode": "RPT",
+    "Caption": "\u0026Run Report...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": null,
+    "PermissionCode": "RPT.RUN",
+    "SortOrder": 10,
+    "Shortcut": "Ctrl\u002BR"
+  },
+  {
+    "MenuCode": "RPT.SPOOL",
+    "ParentMenuCode": "RPT",
+    "Caption": "\u0026Spool File Viewer...",
+    "FormClass": "frmSpoolViewer",
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.MAINT",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "File Main\u0026tenance...",
+    "FormClass": "frmMaintLauncher",
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 140,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.APPROVAL",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "\u0026Approvals Inbox...",
+    "FormClass": "frmApprovals",
+    "FormArgument": null,
+    "PermissionCode": "SYS.APPROVAL.VIEW",
+    "SortOrder": 200,
+    "Shortcut": "F8"
+  },
+  {
+    "MenuCode": "SYS.EXCEPTION",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "\u0026Exception Worklist...",
+    "FormClass": "frmExceptions",
+    "FormArgument": null,
+    "PermissionCode": "SYS.EXCEPTION.VIEW",
+    "SortOrder": 210,
+    "Shortcut": "F9"
+  },
+  {
+    "MenuCode": "XMD.JOBS",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Job streams",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 900,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.CASCADE",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "\u0026Cascade",
+    "FormClass": null,
+    "FormArgument": "$CASCADE",
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.TILEH",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "Tile \u0026Horizontally",
+    "FormClass": null,
+    "FormArgument": "$TILEH",
+    "PermissionCode": null,
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.TILEV",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "Tile \u0026Vertically",
+    "FormClass": null,
+    "FormArgument": "$TILEV",
+    "PermissionCode": null,
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.ARRANGE",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "\u0026Arrange Icons",
+    "FormClass": null,
+    "FormArgument": "$ARRANGE",
+    "PermissionCode": null,
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.CLOSEALL",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "C\u0026lose All",
+    "FormClass": null,
+    "FormArgument": "$CLOSEALL",
+    "PermissionCode": null,
+    "SortOrder": 50,
+    "Shortcut": null
+  }
+]

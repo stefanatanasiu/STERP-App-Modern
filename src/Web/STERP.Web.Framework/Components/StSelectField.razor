@@ -1,0 +1,46 @@
+@using Sterp.Web.Framework.Format
+@* A captioned drop-down list (UiStyle.Picker, ComboBoxStyle.DropDownList). Items are (value, text) pairs. *@
+<span class="@(Inline ? "st-filter" : "st-field")" data-sterp-field="@Field">
+    <label for="@Id" style="@(LabelWidth > 0 ? $"width:{LabelWidth}px;display:inline-block" : null)"><StMnemonic Text="@Caption" /></label>
+    <select id="@Id" class="st-input" aria-label="@UkFormat.LabelText(Caption)" disabled="@Disabled" size="@(Rows > 1 ? Rows : null)"
+            style="width:@(Width)px;@(Rows > 1 ? "height:auto" : null)" @onchange="OnChange">
+        @foreach (var item in Items)
+        {
+            <option value="@item.Value" selected="@(string.Equals(item.Value, Value, StringComparison.Ordinal))">@item.Text</option>
+        }
+    </select>
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Caption { get; set; } = "";
+
+    [Parameter] public IReadOnlyList<(string Value, string Text)> Items { get; set; } = [];
+
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter] public string Id { get; set; } = "s-" + Guid.NewGuid().ToString("N")[..8];
+
+    [Parameter] public string? Field { get; set; }
+
+    [Parameter] public int Width { get; set; } = 120;
+
+    [Parameter] public int LabelWidth { get; set; }
+
+    /// <summary>More than one row turns the drop-down into a list box (frmLogin lstAccess).</summary>
+    [Parameter] public int Rows { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public bool Inline { get; set; }
+
+    /// <summary>Items whose value and text are the same.</summary>
+    public static IReadOnlyList<(string Value, string Text)> Of(params string[] values) => values.Select(v => (v, v)).ToList();
+
+    private async Task OnChange(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString() ?? "";
+        await ValueChanged.InvokeAsync(Value);
+    }
+}

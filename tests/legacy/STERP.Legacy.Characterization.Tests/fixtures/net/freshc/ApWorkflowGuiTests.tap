@@ -1,0 +1,7 @@
+ok - ap workflow GUI: Bacs catalogue and actual launcher expose only company and stored run # SKIP writing tests require a dedicated STERP_QA_AP_ database, not production/shared GUI QA
+ok - ap workflow GUI: bank change, callback, proposal and file actions are wired  # REQ: AP-002,AP-011,AP-013,AP-027
+ok - ap workflow GUI: bank evidence preserves pending state and permission boundaries # SKIP writing tests require a dedicated STERP_QA_AP_ database, not production/shared GUI QA
+ok - ap workflow GUI: bank identifiers and evidence refuse native-width overflow without writing # SKIP writing tests require a dedicated STERP_QA_AP_ database, not production/shared GUI QA
+ok - ap workflow GUI: payment menus reach the real form without granting proposal authority # SKIP writing tests require a dedicated STERP_QA_AP_ database, not production/shared GUI QA
+ok - ap workflow GUI: reserve and release retain the existing proposal header # SKIP writing tests require a dedicated STERP_QA_AP_ database, not production/shared GUI QA
+ok - ap workflow GUI: treasury approvals, instructions and local Bacs launcher # SKIP writing tests require a dedicated STERP_QA_AP_ database, not production/shared GUI QA

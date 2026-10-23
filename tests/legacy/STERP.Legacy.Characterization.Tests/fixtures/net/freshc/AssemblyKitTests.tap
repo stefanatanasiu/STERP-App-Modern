@@ -1,0 +1,4 @@
+ok - acc: a return comes back against the document it left on, within what was shipped  # REQ: XMD-004,XMD-008,SO-020 AC: AC-100
+ok - acc: an item is retired under control and never while it is still demanded # SKIP no active item holding stock is seeded for STC
+ok - acc: define to assemble - trial fit, release, issue, complete, genealogy and cost # SKIP the kit could not be created here (KIT0004): The bill of material is not complete, so no released material requirement can be produced.
+ok - acc: the kit kind decides what may be changed, and a frozen kit refuses a change  # REQ: KIT-001,KIT-002,KIT-004,KIT-024 AC: AC-076

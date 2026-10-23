@@ -1,0 +1,3969 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-PLATFORM",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-PLATFORM-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-001-AC1",
+          "ac": 1,
+          "title": "Both hosts start on the build-db.ps1 database and readiness reports the schema drift check with no core differences",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "health"
+          ],
+          "steps": [
+            {
+              "save": "api",
+              "call": "api_getReadiness"
+            },
+            {
+              "save": "jobs",
+              "call": "jobs_getReadiness"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "api",
+              "status": 200
+            },
+            {
+              "on": "api",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "api",
+              "json": "$.driftDifferences",
+              "count": 0
+            },
+            {
+              "on": "jobs",
+              "status": 200
+            },
+            {
+              "on": "jobs",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "jobs",
+              "json": "$.driftDifferences",
+              "count": 0
+            }
+          ],
+          "derivation": "AC1 words (drift check reports every core object with the repository columns, types, nullability and parameters) with contracts 6.11 and the api_getReadiness/jobs_getReadiness 200 examples (checks database and schema-drift Healthy, driftDifferences []) on the database built from STERP-App/db (00-core tables, procs/core, functions/core, triggers/core, triggers/po-approval-state.sql).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-001-AC2",
+          "ac": 2,
+          "title": "Menu load runs the legacy core.usp_UiMenuLoad and leaves the core object set unchanged (no DDL)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "menu",
+              "call": "platform_getMenu"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "menu",
+              "status": 200
+            },
+            {
+              "sql": "SELECT CASE WHEN EXISTS (SELECT 1 FROM sys.dm_exec_procedure_stats WHERE database_id = DB_ID() AND object_id = OBJECT_ID('core.usp_UiMenuLoad')) THEN 1 ELSE 0 END",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.objects WHERE schema_id = SCHEMA_ID('core') AND type IN ('U','P','FN','IF','TF','TR')",
+              "equals": 78
+            }
+          ],
+          "derivation": "AC2 words with STERP-PLATFORM.md sections 7.1/8.1 (platform_getMenu executes core.usp_UiMenuLoad @UserCode, @CompanyCode, @SiteCode, usp_UiMenuLoad.sql:4-66) and the repository core definitions (35 tables, 34 procedures, 3 functions, 6 triggers under STERP-App/db); Profiler/Extended Events are outside the DSL, so the plan-cache entry of the legacy procedure and the unchanged core object count stand in for the trace.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-001-AC3",
+          "ac": 3,
+          "title": "Generic maintenance CHANGE of core.Company CAL fires tr_Company_Audit: Source TRIGGER, attributed to ModifiedBy",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "audit"
+          ],
+          "steps": [
+            {
+              "save": "save",
+              "call": "platform_saveMaintenanceRow",
+              "path": {
+                "maintCode": "CORE.COMPANY"
+              },
+              "body": {
+                "mode": "CHANGE",
+                "values": {
+                  "CompanyCode": "CAL",
+                  "Name": "Caledon Assemblies Ltd",
+                  "TradingName": "Caledon Assemblies",
+                  "IsActive": "1"
+                }
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "save",
+              "status": 200
+            },
+            {
+              "on": "save",
+              "json": "$.action",
+              "equals": "CHANGE"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'core.Company' AND EntityKey = 'CAL' AND CompanyCode = 'CAL' AND Action = 'UPDATE' AND Source = 'TRIGGER' AND UserCode = 'SYSADM'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT TOP (1) NewValue FROM core.AuditLog WHERE EntityType = 'core.Company' AND EntityKey = 'CAL' AND Source = 'TRIGGER' AND UserCode = 'SYSADM' ORDER BY AuditId DESC",
+              "equals": "Caledon Assemblies Ltd|09233471|GB233471029|INVOICE|FRS102|1"
+            }
+          ],
+          "derivation": "AC3 words with tr_CoreMasters.sql:6-15 (UserCode = COALESCE(i.ModifiedBy, i.CreatedBy, d.ModifiedBy, SUSER_SNAME()), Action UPDATE, NewValue = CONCAT_WS of Name, RegisteredNumber, VatRegNo, VatScheme, AccountingFramework, IsActive, Source 'TRIGGER'), usp_UiMaintSave.sql:71-82 (CHANGE sets ModifiedBy = @UserCode), the platform_saveMaintenanceRow request example and the CAL seed row (01-core-companies.sql:11-12).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-002-AC1",
+          "ac": 1,
+          "title": "SYSADM menu bar: File, System, Reports, Window and Help branches show the seeded captions and shortcuts",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation",
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "file",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "File"
+                }
+              ]
+            },
+            {
+              "save": "system",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "System"
+                }
+              ]
+            },
+            {
+              "save": "reports",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "Reports"
+                }
+              ]
+            },
+            {
+              "save": "window",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "Window"
+                }
+              ]
+            },
+            {
+              "save": "help",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "Help"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "file",
+              "text": "Select Company / Site..."
+            },
+            {
+              "on": "file",
+              "text": "Continue as User..."
+            },
+            {
+              "on": "file",
+              "text": "View Spool File..."
+            },
+            {
+              "on": "file",
+              "text": "Ctrl+O"
+            },
+            {
+              "on": "file",
+              "text": "Printer Setup..."
+            },
+            {
+              "on": "file",
+              "text": "Exit"
+            },
+            {
+              "on": "file",
+              "text": "Alt+F4"
+            },
+            {
+              "on": "system",
+              "text": "System Parameters..."
+            },
+            {
+              "on": "system",
+              "text": "Companies..."
+            },
+            {
+              "on": "system",
+              "text": "Number Series..."
+            },
+            {
+              "on": "system",
+              "text": "File Maintenance..."
+            },
+            {
+              "on": "system",
+              "text": "Approvals Inbox..."
+            },
+            {
+              "on": "system",
+              "text": "F8"
+            },
+            {
+              "on": "system",
+              "text": "Exception Worklist..."
+            },
+            {
+              "on": "system",
+              "text": "F9"
+            },
+            {
+              "on": "system",
+              "text": "Audit Enquiry..."
+            },
+            {
+              "on": "system",
+              "text": "Engine Diagnostics..."
+            },
+            {
+              "on": "reports",
+              "text": "Run Report..."
+            },
+            {
+              "on": "reports",
+              "text": "Ctrl+R"
+            },
+            {
+              "on": "reports",
+              "text": "Spool File Viewer..."
+            },
+            {
+              "on": "reports",
+              "text": "Job Monitor..."
+            },
+            {
+              "on": "window",
+              "text": "Cascade"
+            },
+            {
+              "on": "window",
+              "text": "Tile Horizontally"
+            },
+            {
+              "on": "window",
+              "text": "Tile Vertically"
+            },
+            {
+              "on": "window",
+              "text": "Arrange Icons"
+            },
+            {
+              "on": "window",
+              "text": "Close All"
+            },
+            {
+              "on": "help",
+              "text": "Contents"
+            },
+            {
+              "on": "help",
+              "text": "F1"
+            },
+            {
+              "on": "help",
+              "text": "About STERP - Stefan's ERP..."
+            }
+          ],
+          "derivation": "AC1 words with the seeded rows of 05-core-menu-system.sql:21-64 (captions rendered without the & access key, Shortcut Ctrl+O, Alt+F4, F8, F9, Ctrl+R, F1) built into the bar as frmMain.vb:39-66 does; SortOrder sequencing is not observable through text assertions and is pinned through platform_getMenu by FR-STERP-PLATFORM-034.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-002-AC2",
+          "ac": 2,
+          "title": "System > Companies opens generic maintenance for CORE.COMPANY once; a second selection re-activates it",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "twice",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "System",
+                    "Companies..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Companies..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "closed",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "System",
+                    "Companies..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Companies..."
+                  ]
+                },
+                {
+                  "press": "F3"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "twice",
+              "text": "[CORE.COMPANY]"
+            },
+            {
+              "on": "twice",
+              "text": "Registered name"
+            },
+            {
+              "on": "closed",
+              "notText": "Registered name"
+            }
+          ],
+          "derivation": "AC2 words with 05-core-menu-system.sql:34 (SYS.COMPANY -> frmGenericMaint CORE.COMPANY), frmMain.vb:81-90 (an open page of the same class and argument is activated, not opened again), the page title '<Title>  [<MaintCode>]' (frmGenericMaint.vb:51) and the column caption 'Registered name' (06-core-maintdefs.sql:47); one F3 after two selections leaves no Companies page, proving a single instance.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-002-AC3",
+          "ac": 3,
+          "title": "Reports > Job Monitor and System > Job Monitor share one job monitor page",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "both",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Reports",
+                    "Job Monitor..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Job Monitor..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "closed",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Reports",
+                    "Job Monitor..."
+                  ]
+                },
+                {
+                  "menu": [
+                    "System",
+                    "Job Monitor..."
+                  ]
+                },
+                {
+                  "press": "F3"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "both",
+              "text": "View spool"
+            },
+            {
+              "on": "closed",
+              "notText": "View spool"
+            }
+          ],
+          "derivation": "AC3 words with 05-core-menu-system.sql:50,55 (SYS.JOBS and RPT.JOBS both frmJobMonitor without argument), frmMain.vb:81-90 and the job monitor tool 'View spool' (frmJobMonitor.vb:26); after both selections a single F3 closes the only job monitor page.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-002-AC4",
+          "ac": 4,
+          "title": "A menu row whose FormClass has no registered page shows STERP-E-0004",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "navigation",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT core.MenuItem (MenuCode, ParentMenuCode, Caption, FormClass, FormArgument, PermissionCode, SortOrder, Shortcut, IsActive, CreatedBy) VALUES ('SYS.A07NOPAGE', 'SYSTEM', 'Parity Missing Screen...', 'frmParityMissing', NULL, NULL, 250, NULL, 1, 'A07')"
+            },
+            {
+              "save": "page",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "System",
+                    "Parity Missing Screen..."
+                  ]
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "text": "STERP-E-0004: Screen frmParityMissing is not installed in this release."
+            }
+          ],
+          "derivation": "AC4 words with frmMain.vb:91-95 and contracts 9.2 (unknown class -> 'STERP-E-0004: Screen <class> is not installed in this release.'); every seeded FormClass has a page in STERP-WEB section 7.2, so a core.MenuItem row (14-MenuItem.sql columns) with an unregistered class is arranged.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-010-AC1",
+          "ac": 1,
+          "title": "A program ending RC 04 with a reason (PERCLOSE REOPEN CLS0033) returns HTTP 200 envelope returnCode 4 WARNING",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_reopenPeriod",
+              "path": {
+                "fiscalYear": "2026",
+                "periodNo": "6"
+              },
+              "body": {
+                "reason": "Late supplier credit note must be posted in September",
+                "reviewer": "FINCTRL"
+              },
+              "idempotencyKey": "A07-PLAT-010-AC1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "CLS0033",
+                "messageContains": "Period reopened under the approved calendar policy"
+              }
+            }
+          ],
+          "derivation": "AC1 words with contracts 4.6 (RC 04 -> 200 envelope WARNING); SOA0012 is set only by SOACCEPT DEPOSIT (SOACCEPT.cob:1136-1214), which no binding operation exposes (STERP-SO dispositions), so the mapping is pinned with PERCLOSE REOPEN whose fin_reopenPeriod 200 example returns RC 4 CLS0033 for the soft-closed period 2026/06 of the fresh seed (09-fin-period-vat.sql:22, PERCLOSE.cob:580-639).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-010-AC2",
+          "ac": 2,
+          "title": "A program ending RC 06 (POAPPRV CHECK of a pending approval) returns HTTP 202 envelope HOLD with the legacy message",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "po_checkPurchaseOrderApproval",
+              "path": {
+                "orderNumber": "PO00000002"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "APV0005",
+                "messageContains": "Order PO00000002 is still awaiting an approval decision"
+              }
+            }
+          ],
+          "derivation": "AC2 words with contracts 4.6 (RC 06 -> 202 HOLD, not CA-FAILED, SME-038), the po_checkPurchaseOrderApproval 202 example (APV0005 'Order PO00000002 is still awaiting an approval decision', POAPPRV.cob:545-614) and DEMO-WORKFLOWS.md:93 (PO00000002 awaiting approval in the demonstration dataset).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-010-AC3",
+          "ac": 3,
+          "title": "Procedure THROW 50021 STERP-E-0021 on an already decided approval becomes 422 problem E-0021, severity E",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET IDENTITY_INSERT core.Approval ON; INSERT core.Approval (ApprovalId, CompanyCode, DocumentType, DocumentRef, ApprovalType, Amount, CurrencyCode, AmountGBP, ContentHash, RequiredPermission, RequestedBy, Status, DecidedBy, DecidedAt, Comment) VALUES (990021, 'STC', 'A07TEST', 'A07-PLAT-010-AC3', 'A07TEST', 100.00, 'GBP', 100.00, 'A07-HASH-010-AC3', 'SYS.APPROVE.T4', 'BUYER', 'APPROVED', 'PURMGR', SYSDATETIME(), 'Arranged decided approval'); SET IDENTITY_INSERT core.Approval OFF;"
+            },
+            {
+              "save": "r",
+              "call": "platform_decideApproval",
+              "path": {
+                "approvalId": "990021"
+              },
+              "body": {
+                "decision": "APPROVED",
+                "comment": "A07 parity: decided again"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-0021"
+              }
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "severity": "E"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.detail",
+              "equals": "That approval is no longer pending, so it cannot be decided again."
+            }
+          ],
+          "derivation": "AC3 words with usp_RequestApproval.sql:41-43 (THROW 50021 'STERP-E-0021: That approval is no longer pending, so it cannot be decided again.' before any authority check), BusinessRuleException.cs:24-44 and contracts 4.6/4.7; the decided approval is arranged in core.Approval (09-Approval.sql) with an explicit id because generated ids cannot be passed between steps.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-010-AC4",
+          "ac": 4,
+          "title": "Exhausted ARRC series: NUMGEN keeps the prefixed STERP-E-0004 driver text as RC 12 SQL0001 (HTTP 500)",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE core.NumberSeries SET NextNumber = MaxNumber + 1 WHERE CompanyCode = 'STC' AND SeriesCode = 'ARRC'"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 PLAT 010 AC4",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-010-AC4"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 500,
+                "type": "severe",
+                "reasonCode": "SQL0001",
+                "detailContains": "[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]STERP-E-0004: The number series is exhausted"
+              }
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 12
+              }
+            }
+          ],
+          "derivation": "AC4 words with usp_NextDocumentNumber.sql:20-24 (THROW 50004 'STERP-E-0004: The number series is exhausted...'), NUMGEN.cob:312-327 (text not starting 'STERP-E-' -> SQL0001 RC 12), the default Sterp:Kernel:LegacyDriverMessagePrefix '[Microsoft][ODBC Driver 18 for SQL Server][SQL Server]' (FR-STERP-PLATFORM-010 [inferred]) and RCPTALOC.cob:401-421 passing the NUMGEN outcome through; contracts 4.6 maps RC 12 to 500 severe.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-010-AC5",
+          "ac": 5,
+          "title": "With an empty legacy driver prefix the same failure is the NUMGEN business refusal NUM0008 RC 08 (HTTP 422)",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE core.NumberSeries SET NextNumber = MaxNumber + 1 WHERE CompanyCode = 'STC' AND SeriesCode = 'ARRC'"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 PLAT 010 AC5",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-010-AC5"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "NUM0008",
+                "detailContains": "STERP-E-0004: The number series is exhausted"
+              }
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 8
+              }
+            }
+          ],
+          "derivation": "AC5 words with NUMGEN.cob:318-321 (text starting 'STERP-E-' -> NUM0008 RC 08) and RCPTALOC.cob:414-419; the scenario needs the target hosts started with Sterp:Kernel:LegacyDriverMessagePrefix set to empty (characterization configuration), which the scenario DSL cannot set, so it passes only in that configuration.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-011-AC1",
+          "ac": 1,
+          "title": "RCPTALOC unit: receipt and open item commit together; a refusal inside the unit leaves neither row",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "commit",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 011 AC1 C",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-011-AC1-C"
+            },
+            {
+              "sql": "UPDATE fin.Account SET Status = 'BLOCKED' WHERE CompanyCode = 'STC' AND AccountCode = '1300'"
+            },
+            {
+              "save": "rollback",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 011 AC1 R",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-011-AC1-R"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "commit",
+              "status": 200
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt r JOIN ar.OpenItem o ON o.CompanyCode = r.CompanyCode AND o.ItemType = 'RECEIPT' AND o.DocumentNumber = r.ReceiptNumber WHERE r.CorrelationId = 'A07-PLAT-011-AC1-C'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CorrelationId = 'A07-PLAT-011-AC1-R'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.OpenItem o JOIN core.DocumentNumber d ON d.CompanyCode = o.CompanyCode AND d.DocumentNumber = o.DocumentNumber WHERE d.SeriesCode = 'ARRC' AND d.CorrelationId = 'A07-PLAT-011-AC1-R' AND o.ItemType = 'RECEIPT'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC1 words with RCPTALOC.cob:284-311 (BEGN, INSERT ar.Receipt, INSERT ar.OpenItem, cash posting, COMT; 9500-ROLLBACK on a refusal) and usp_PostJournal.sql:37-40 (a non-ACTIVE account refuses the posting inside the unit, XACT_ABORT ON); the refusal is arranged by blocking fin.Account 1300, the BANK leg of event AR.RECEIPT (10-fin-eventmap.sql:55).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-011-AC2",
+          "ac": 2,
+          "title": "Work committed outside the RCPTALOC unit (IDEMPOT claim, NUMGEN draw) survives the unit's rollback",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "sql": "UPDATE fin.Account SET Status = 'BLOCKED' WHERE CompanyCode = 'STC' AND AccountCode = '1300'"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 011 AC2",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-011-AC2"
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT COUNT(*) FROM core.DocumentNumber WHERE CompanyCode = 'STC' AND SeriesCode = 'ARRC' AND CorrelationId = 'A07-PLAT-011-AC2'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT Status FROM core.IdempotencyKey WHERE CorrelationId = 'A07-PLAT-011-AC2'",
+              "equals": "INPROGRESS"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CorrelationId = 'A07-PLAT-011-AC2'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC2 words (SME-013 two-level characterization) with RCPTALOC.cob:261-311 (IDEMPOT BEGIN and NUMGEN ARRC finish before BEGN; usp_NextDocumentNumber.sql:11 owns its transaction when outermost); no binding operation lets a test put a callee COMT inside an open caller unit and then force the caller's ROLB (SOINVRUN/ARINVPST, STERP-SO section 4.9, needs an unarrangeable write-back failure), so only the nearest observable - work committed before the unit surviving its rollback - is pinned.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-011-AC3",
+          "ac": 3,
+          "title": "A 300-character promise narrative reaches SQL Server as its first 256 characters",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "",
+                "promiseAmt": 500.0,
+                "promiseDate": "2026-10-30",
+                "narrative": "A07P011AC301234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+              },
+              "idempotencyKey": "A07-PLAT-011-AC3"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "sql": "SELECT TOP (1) CONCAT(LEN(a.Narrative), ':', RIGHT(a.Narrative, 6)) FROM ar.CollectionAction a JOIN ar.CollectionCase c ON c.CaseId = a.CaseId WHERE c.CompanyCode = 'STC' AND c.CustomerCode = 'C0009' AND a.ActionType = 'PROMISE' AND a.Narrative LIKE 'A07P011AC3%' ORDER BY a.ActionId DESC",
+              "equals": "256:012345"
+            }
+          ],
+          "derivation": "AC3 words with SQLIOCA.cpy:22-56 (SQLIO-PARM-VAL X(256)) and c/sterpsql.c:63-71, STERP-AR.md FR-STERP-AR-041 (free text cut to 256 characters on the way to SQL, BR-ARDISPUT-051), DS-NARRATIVE X(400) (ARDISPUTCA.cpy:42) and ar.CollectionAction.Narrative varchar(400) (05-Collection.sql), so only the SQLIO bind limit shortens the 300-character text.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-011-AC4",
+          "ac": 4,
+          "title": "An ARENQ SNGL fetch renders the customer name unchanged in its slot (truncation case unreachable)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "asAt": "2026-10-19"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.customerName",
+              "equals": "Pennine Cycle Distribution Ltd"
+            }
+          ],
+          "derivation": "AC4 words with SQLIO.cob FTCH (columns left-justified and truncated or space-padded to the caller's widths, NULL as spaces); no program behind a binding operation fetches a value wider than its slot (ARENQ.cob:265-300 fetches LegalName varchar(120) into a 120-byte slot, 50-ar-customers.sql:12), so the 40-character truncation and NULL-as-spaces are pinned only by the kernel component golden master and this scenario pins an unchanged SNGL fetch.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-011-AC5",
+          "ac": 5,
+          "title": "SNGL for a customer key that does not exist answers not found: ARENQ RC 16 ENQ0010 (HTTP 404)",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C9999"
+              },
+              "query": {
+                "asAt": "2026-10-19"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "ENQ0010",
+                "detailContains": "Customer C9999 is not on the sales ledger"
+              }
+            }
+          ],
+          "derivation": "AC5 words with SQLIO.cob SNGL (EXEC + FTCH + CLOS, SQLCODE 100 when no row) and ARENQ.cob:283-298 (SQLIO-NOTFOUND -> RC 16 ENQ0010 'Customer <code> is not on the sales ledger'); contracts 4.6 maps RC 16 to 404 not-found; the closed slot itself is internal.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-011-AC6",
+          "ac": 6,
+          "title": "SQLIO-backed reads run only supported functions; the invalid-function branch is unreachable",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "asAt": "2026-10-19"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.customer",
+              "equals": "C0001"
+            }
+          ],
+          "derivation": "AC6 words with SQLIO.cob:47-176 (unknown function -> SQLCODE -1, SQLSTATE HY000, 'SQLIO: INVALID FUNCTION <code>'); every program behind a binding operation moves a literal supported function (EXEC, FTCH, SNGL, MORE, CLOS, BEGN, COMT, ROLB, TSTA), so function ABCD is pinned only by the kernel component golden master and this scenario pins a successful SQLIO-backed read.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-012-AC1",
+          "ac": 1,
+          "title": "PERMCHK refusal: GLCLERK soft-closing 2026/07 gets RC 06 PRM0006 with the STERP-E-0001 procedure reason",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_softClosePeriod",
+              "path": {
+                "fiscalYear": "2026",
+                "periodNo": "7"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "PRM0006",
+                "messageContains": "STERP-E-0001: User GLCLERK does not hold permission FIN.PERIOD.CLOSE for company STC"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM fin.Period WHERE CompanyCode = 'STC' AND FiscalYear = 2026 AND PeriodNo = 7",
+              "equals": "OPEN"
+            }
+          ],
+          "derivation": "AC1 words with PERMCHK.cob:154-179 (Allowed not '1' -> RC 06 PRM0006 with the procedure Reason text), usp_CheckPermission.sql:15 ('STERP-E-0001: User <u> does not hold permission <p> for company <c> site <s>.') and PERCLOSE.cob:650-665 passing the PERMCHK outcome through; ENGINEER/BOM.RELEASE has no PERMCHK caller behind a binding operation (BOM.RELEASE is checked inside bom.usp_ReleaseBom), so GLCLERK without FIN.PERIOD.CLOSE (03-core-roles-users.sql:39) on fin_softClosePeriod is used.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-012-AC2",
+          "ac": 2,
+          "title": "A blank company never reaches the permission check: the API refuses the context header",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_softClosePeriod",
+              "path": {
+                "fiscalYear": "2026",
+                "periodNo": "7"
+              },
+              "headers": {
+                "X-STERP-Company": ""
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 400,
+                "reasonCode": "API0001"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM fin.Period WHERE CompanyCode = 'STC' AND FiscalYear = 2026 AND PeriodNo = 7",
+              "equals": "OPEN"
+            }
+          ],
+          "derivation": "AC2 words with PERMCHK.cob:102-107 (blank CA-COMPANY -> RC 08 PRM0003 before any SQL); X-STERP-Company is required on every company-scoped operation (contracts 4.5, 5.10 API0001), so a blank company is refused before any kernel call and the PRM0003 branch is pinned only by the kernel component golden master.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-012-AC3",
+          "ac": 3,
+          "title": "PERMCHK allowed path for SYSADM continues the operation (success message not surfaced)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "asAt": "2026-10-19"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.customer",
+              "equals": "C0001"
+            }
+          ],
+          "derivation": "AC3 words with PERMCHK.cob:155-162 (allowed -> RC 00 '<user> holds <permission> in <company>'); no binding operation checks SYS.ADMIN through PERMCHK and every caller replaces the RC 00 message with its own, so the scenario pins the allowed SYSADM path through ARENQ's PERMCHK of AR.CUSTOMER.ENQUIRE (ARENQ.cob:241-257: no 202 ENQ0004 hold).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-012-AC4",
+          "ac": 4,
+          "title": "Binding PERMCHK callers send function CHECK only (LIST unreachable): REOPEN refused PRM0006, nothing changed",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_reopenPeriod",
+              "path": {
+                "fiscalYear": "2026",
+                "periodNo": "6"
+              },
+              "body": {
+                "reason": "A07 parity reopen attempt",
+                "reviewer": "FINCTRL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 6,
+                "reasonCode": "PRM0006",
+                "messageContains": "FIN.PERIOD.REOPEN"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM fin.Period WHERE CompanyCode = 'STC' AND FiscalYear = 2026 AND PeriodNo = 6",
+              "equals": "SOFT"
+            }
+          ],
+          "derivation": "AC4 words with PERMCHK.cob:57-60,193-202 (any function other than CHECK -> RC 08 PRM0009); every PERMCHK caller behind a binding operation moves CHECK (for example PERCLOSE.cob:650-665), so function LIST is pinned only by the kernel component golden master and the scenario pins the CHECK refusal of GLCLERK on fin_reopenPeriod (202 example PRM0006) with period 2026/06 left SOFT.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-013-AC1",
+          "ac": 1,
+          "title": "GLCLERK posting dated 2026-05-15 (period 202602 HARD) is refused RC 08 PER0003",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_validateJournalDraft",
+              "body": {
+                "journalRef": "A07-PLAT-013",
+                "journalType": "GL",
+                "description": "Demo journal 25.00 6500/7000",
+                "currency": "GBP",
+                "evidenceRef": "QA-EVID-01",
+                "documentDate": "2026-05-15",
+                "postingDate": "2026-05-15",
+                "lines": [
+                  {
+                    "account": "6500",
+                    "debit": 25.0,
+                    "credit": 0.0,
+                    "costCentre": "ADMIN",
+                    "project": "GEN",
+                    "vatCode": "",
+                    "narrative": "Demo debit"
+                  },
+                  {
+                    "account": "7000",
+                    "debit": 0.0,
+                    "credit": 25.0,
+                    "costCentre": "ADMIN",
+                    "project": "GEN",
+                    "vatCode": "",
+                    "narrative": "Demo credit"
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "PER0003",
+                "detailContains": "Period 202602 is hard closed - post the correction in the current open period or ask the financial controller to reopen it"
+              }
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 8
+              }
+            }
+          ],
+          "derivation": "AC1 words with DEMO-WORKFLOWS.md:150 (GLCLERK, 15 May 2026 -> PER0003; 25.00 6500/7000 with ADMIN/GEN), PERIODCK.cob:243-251 and the fin_validateJournalDraft description example (422 PER0003 'Period 202602 is hard closed - ...'); FY2026 period 2 is HARD in 09-fin-period-vat.sql:21.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-013-AC2",
+          "ac": 2,
+          "title": "Posting dated 2026-10-19 is allowed RC 00 in fiscal year 2026 period 7 (OPEN)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_validateJournalDraft",
+              "body": {
+                "journalRef": "A07-PLAT-013",
+                "journalType": "GL",
+                "description": "Demo journal 25.00 6500/7000",
+                "currency": "GBP",
+                "evidenceRef": "QA-EVID-01",
+                "documentDate": "2026-10-19",
+                "postingDate": "2026-10-19",
+                "lines": [
+                  {
+                    "account": "6500",
+                    "debit": 25.0,
+                    "credit": 0.0,
+                    "costCentre": "ADMIN",
+                    "project": "GEN",
+                    "vatCode": "",
+                    "narrative": "Demo debit"
+                  },
+                  {
+                    "account": "7000",
+                    "debit": 0.0,
+                    "credit": 25.0,
+                    "costCentre": "ADMIN",
+                    "project": "GEN",
+                    "vatCode": "",
+                    "narrative": "Demo credit"
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.periodStatus",
+              "equals": "OPEN"
+            },
+            {
+              "on": "r",
+              "json": "$.data.fiscalYear",
+              "equals": 2026
+            },
+            {
+              "on": "r",
+              "json": "$.data.periodNo",
+              "equals": 7
+            }
+          ],
+          "derivation": "AC2 words with PERIODCK.cob:216-221 (OPEN -> RC 00, allowed Y) and the fin_validateJournalDraft 200 example (periodStatus OPEN, fiscalYear 2026, periodNo 7); October 2026 is FY2026 period 7 OPEN in 09-fin-period-vat.sql:23.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-013-AC3",
+          "ac": 3,
+          "title": "SOFT period 2026/06 without FIN.PERIOD.SOFTPOST answers RC 06 PER0006 (HTTP 202 HOLD)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_validateJournalDraft",
+              "body": {
+                "journalRef": "A07-PLAT-013",
+                "journalType": "GL",
+                "description": "Demo journal 25.00 6500/7000",
+                "currency": "GBP",
+                "evidenceRef": "QA-EVID-01",
+                "documentDate": "2026-09-15",
+                "postingDate": "2026-09-15",
+                "lines": [
+                  {
+                    "account": "6500",
+                    "debit": 25.0,
+                    "credit": 0.0,
+                    "costCentre": "ADMIN",
+                    "project": "GEN",
+                    "vatCode": "",
+                    "narrative": "Demo debit"
+                  },
+                  {
+                    "account": "7000",
+                    "debit": 0.0,
+                    "credit": 25.0,
+                    "costCentre": "ADMIN",
+                    "project": "GEN",
+                    "vatCode": "",
+                    "narrative": "Demo credit"
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "PER0006",
+                "messageContains": "Period 202606 is soft closed - only an authorised close adjustment may be posted into it"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.periodStatus",
+              "equals": "SOFT"
+            }
+          ],
+          "derivation": "AC3 words with PERIODCK.cob:222-241 (SOFT without FIN.PERIOD.SOFTPOST -> RC 06 PER0006, override permission FIN.PERIOD.SOFTPOST) and the fin_validateJournalDraft 202 example; GLCLERK lacks FIN.PERIOD.SOFTPOST (03-core-roles-users.sql:39) and FY2026 period 6 is SOFT (09-fin-period-vat.sql:22); the override permission is not part of the journal answer and is not asserted.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-013-AC4",
+          "ac": 4,
+          "title": "A zero posting date takes business date 2026-10-07 and uses the period covering it (2026/07)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_validateJournalDraft",
+              "body": {
+                "journalRef": "A07-PLAT-013",
+                "journalType": "GL",
+                "description": "Demo journal 25.00 6500/7000",
+                "currency": "GBP",
+                "evidenceRef": "QA-EVID-01",
+                "documentDate": null,
+                "postingDate": null,
+                "lines": [
+                  {
+                    "account": "6500",
+                    "debit": 25.0,
+                    "credit": 0.0,
+                    "costCentre": "ADMIN",
+                    "project": "GEN",
+                    "vatCode": "",
+                    "narrative": "Demo debit"
+                  },
+                  {
+                    "account": "7000",
+                    "debit": 0.0,
+                    "credit": 25.0,
+                    "costCentre": "ADMIN",
+                    "project": "GEN",
+                    "vatCode": "",
+                    "narrative": "Demo credit"
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.fiscalYear",
+              "equals": 2026
+            },
+            {
+              "on": "r",
+              "json": "$.data.periodNo",
+              "equals": 7
+            },
+            {
+              "on": "r",
+              "json": "$.data.periodStatus",
+              "equals": "OPEN"
+            }
+          ],
+          "derivation": "AC4 words with PERIODCK.cob:94-96 (zero posting date -> CA-BUSINESS-DATE) and FinJournalDraftRequest (postingDate null -> business date, JournalService.vb:50-81); with X-STERP-Business-Date 2026-10-07 the covering period is FY2026 period 7 (09-fin-period-vat.sql:17-23); the facade supplies the business date before PERIODCK, so the zero-date default is pinned by its observable result.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-014-AC1",
+          "ac": 1,
+          "title": "NEXT draws the next number of the series (NextNumber 7 -> PR00000007, NextNumber 8, status ISSUED)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "sql": "UPDATE core.NumberSeries SET NextNumber = 7 WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ'"
+            },
+            {
+              "save": "r",
+              "call": "po_createRequisition",
+              "body": {
+                "purpose": "Bar stock top-up",
+                "neededBy": "2026-10-21",
+                "demandType": "MANUAL",
+                "demandRef": "",
+                "costCentre": "PURCH",
+                "project": "",
+                "budgetCode": ""
+              },
+              "idempotencyKey": "A07-PLAT-014-AC1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.reqNumber",
+              "equals": "PR00000007"
+            },
+            {
+              "sql": "SELECT NextNumber FROM core.NumberSeries WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ'",
+              "equals": 8
+            },
+            {
+              "sql": "SELECT Status FROM core.DocumentNumber WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ' AND DocumentNumber = 'PR00000007'",
+              "equals": "ISSUED"
+            }
+          ],
+          "derivation": "AC1 words with NUMGEN.cob:126-187 and usp_NextDocumentNumber.sql:11-31 (own transaction when outermost, NextNumber + 1, core.DocumentNumber ISSUED) and the po_createRequisition 200 example (PR00000007; POREQ.cob:846-864 in autocommit); series SDES is drawn only inside the full so_confirmDespatch flow, so series POREQ (prefix PR, length 8, 81-po-menu.sql:204-215) is used, and the API's new Idempotency-Key finds no replay row and draws exactly as the no-correlation path.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-014-AC2",
+          "ac": 2,
+          "title": "NEXT with a correlation id that already drew returns that number without drawing again",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE core.NumberSeries SET NextNumber = 42 WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ'"
+            },
+            {
+              "save": "first",
+              "call": "po_createRequisition",
+              "body": {
+                "purpose": "Bar stock top-up",
+                "neededBy": "2026-10-21",
+                "demandType": "MANUAL",
+                "demandRef": "",
+                "costCentre": "PURCH",
+                "project": "",
+                "budgetCode": ""
+              },
+              "idempotencyKey": "A07-PLAT-014-AC2"
+            },
+            {
+              "save": "replay",
+              "call": "po_createRequisition",
+              "body": {
+                "purpose": "Bar stock top-up",
+                "neededBy": "2026-10-21",
+                "demandType": "MANUAL",
+                "demandRef": "",
+                "costCentre": "PURCH",
+                "project": "",
+                "budgetCode": ""
+              },
+              "idempotencyKey": "A07-PLAT-014-AC2"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "first",
+              "status": 200
+            },
+            {
+              "on": "first",
+              "json": "$.data.reqNumber",
+              "equals": "PR00000042"
+            },
+            {
+              "sql": "SELECT NextNumber FROM core.NumberSeries WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ'",
+              "equals": 43
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.DocumentNumber WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ' AND CorrelationId = 'A07-PLAT-014-AC2'",
+              "equals": 1
+            },
+            {
+              "on": "replay",
+              "problem": {
+                "status": 500,
+                "reasonCode": "SQL0001",
+                "detailContains": "UQ_Requisition"
+              }
+            }
+          ],
+          "derivation": "AC2 words with NUMGEN.cob:130-140,199-240 (an already issued number for the correlation id is returned RC 04 NUM0007 without drawing); POREQ.cob:846-864 continues with the replayed PR00000042, whose INSERT then violates UQ_Requisition (80-po/01-Requisition.sql) and ends RC 12 SQL0001 (POREQ.cob:837-842), while NextNumber and the single DocumentNumber row stay as the first draw left them.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-014-AC3",
+          "ac": 3,
+          "title": "Exhausted series: STERP-E-0004 surfaces through the default driver-prefix classification; NextNumber unchanged",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "error-mapping",
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE core.NumberSeries SET NextNumber = MaxNumber + 1 WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ'"
+            },
+            {
+              "save": "r",
+              "call": "po_createRequisition",
+              "body": {
+                "purpose": "Bar stock top-up",
+                "neededBy": "2026-10-21",
+                "demandType": "MANUAL",
+                "demandRef": "",
+                "costCentre": "PURCH",
+                "project": "",
+                "budgetCode": ""
+              },
+              "idempotencyKey": "A07-PLAT-014-AC3"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 500,
+                "reasonCode": "REQ0010",
+                "detailContains": "STERP-E-0004: The number series is exhausted"
+              }
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 12
+              }
+            },
+            {
+              "sql": "SELECT NextNumber FROM core.NumberSeries WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ'",
+              "equals": 100000000
+            }
+          ],
+          "derivation": "AC3 words with usp_NextDocumentNumber.sql:20-24 (THROW 50004 after rolling back its own transaction), NUMGEN.cob:312-327 (prefixed driver text -> SQL0001 RC 12, FR-STERP-PLATFORM-010) and POREQ.cob:856-862 (NUMGEN RC > 4 -> RC 12 REQ0010 carrying the NUMGEN message); MaxNumber 99999999 from 81-po-menu.sql:208.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-014-AC4",
+          "ac": 4,
+          "title": "No binding path voids a number: a drawn requisition number stays ISSUED without a void reason",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "po_createRequisition",
+              "body": {
+                "purpose": "Bar stock top-up",
+                "neededBy": "2026-10-21",
+                "demandType": "MANUAL",
+                "demandRef": "",
+                "costCentre": "PURCH",
+                "project": "",
+                "budgetCode": ""
+              },
+              "idempotencyKey": "A07-PLAT-014-AC4"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "sql": "SELECT CONCAT(Status, '|', ISNULL(VoidReason, '')) FROM core.DocumentNumber WHERE CompanyCode = 'STC' AND SeriesCode = 'POREQ' AND CorrelationId = 'A07-PLAT-014-AC4'",
+              "equals": "ISSUED|"
+            }
+          ],
+          "derivation": "AC4 words with NUMGEN.cob:106-120 (VOID without a reason -> RC 08 NUM0004 before any SQL); no program behind a binding operation calls NUMGEN VOID (every NUMGEN caller moves NEXT), so the refusal is pinned only by the kernel component golden master and the scenario pins that a drawn number stays ISSUED.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-015",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-015-AC1",
+          "ac": 1,
+          "title": "BEGIN on a new key claims it INPROGRESS in autocommit; the claim survives the receipt unit's rollback",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE fin.Account SET Status = 'BLOCKED' WHERE CompanyCode = 'STC' AND AccountCode = '1300'"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 015 AC1",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-015-AC1"
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT CONCAT(Status, '|', Operation) FROM core.IdempotencyKey WHERE CorrelationId = 'A07-PLAT-015-AC1'",
+              "equals": "INPROGRESS|ar.Receipt.Post"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CorrelationId = 'A07-PLAT-015-AC1'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC1 words with IDEMPOT.cob:125-192 (BEGIN -> core.usp_IdempotentBegin, new key INPROGRESS, STARTED RC 00), usp_Idempotency.sql:6-18, contracts 4.8 and RCPTALOC.cob:261-311,810-822 (the claim commits before BEGN; END runs only after COMT), so the posting refused inside the unit (fin.Account 1300 blocked, usp_PostJournal.sql:37-40) rolls the receipt back while the key stays INPROGRESS (SME-061).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-015-AC2",
+          "ac": 2,
+          "title": "A key previously ended FAILED is reset by the procedure: BEGIN answers STARTED and the receipt is recorded",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT core.IdempotencyKey (CorrelationId, Operation, CompanyCode, UserCode, Status, ResultRef, ResultMessage, EndedAt) VALUES ('A07-PLAT-015-AC2', 'ar.Receipt.Post', 'STC', 'ARCLERK', 'FAILED', NULL, 'Arranged failed attempt', SYSDATETIME())"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 015 AC2",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-015-AC2"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "sql": "SELECT Status FROM core.IdempotencyKey WHERE CorrelationId = 'A07-PLAT-015-AC2'",
+              "equals": "COMPLETED"
+            }
+          ],
+          "derivation": "AC2 words with usp_Idempotency.sql:20-24 (FAILED reset to INPROGRESS, outcome NEW), IDEMPOT.cob:172-192 (NEW -> STARTED RC 00; the IDM0008 branch stays unreachable, BRF-IDEMPOT-01, G09-ADV-18) and RCPTALOC.cob:366-397,810-822 (recording continues and END marks the key COMPLETED).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-015-AC3",
+          "ac": 3,
+          "title": "A key ended COMPLETED with result SINV00000042 replays RC 04 with that reference and records nothing",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT core.IdempotencyKey (CorrelationId, Operation, CompanyCode, UserCode, Status, ResultRef, ResultMessage, EndedAt) VALUES ('A07-PLAT-015-AC3', 'ar.Receipt.Post', 'STC', 'ARCLERK', 'COMPLETED', 'SINV00000042', 'Customer receipt posted', SYSDATETIME())"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 015 AC3",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-015-AC3"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "RCP0008",
+                "messageContains": "This instruction was already completed - the original result is SINV00000042"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.receiptNo",
+              "equals": "SINV00000042"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM ar.Receipt WHERE CorrelationId = 'A07-PLAT-015-AC3'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC3 words with usp_Idempotency.sql:19 (COMPLETED -> DUPLICATE), IDEMPOT.cob:175-200 (COMPLETED RC 04 IDM0006 'This instruction was already completed - the original result is <ref>') and RCPTALOC.cob:385-391 (RC 04 -> receipt number = result reference, RC 04 RCP0008 with the IDEMPOT message, stop before any write; ar_recordReceipt 'replay' example).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-015-AC4",
+          "ac": 4,
+          "title": "A key still INPROGRESS answers RC 06 IDM0007 (HTTP 202 HOLD); RCPTALOC still records (BC-AR-05 rejected)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT core.IdempotencyKey (CorrelationId, Operation, CompanyCode, UserCode, Status, ResultRef, ResultMessage, EndedAt) VALUES ('A07-PLAT-015-AC4', 'ar.Receipt.Post', 'STC', 'ARCLERK', 'INPROGRESS', NULL, NULL, NULL)"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 015 AC4",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-015-AC4"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "IDM0007",
+                "messageContains": "recorded (CONFIRMED)"
+              }
+            }
+          ],
+          "derivation": "AC4 words with usp_Idempotency.sql:25 (INPROGRESS answered as such), IDEMPOT.cob:201-210 (RC 06 IDM0007), contracts 4.6 (RC 06 -> 202 HOLD) and RCPTALOC.cob:385-397 with STERP-AR.md section 7 step 4/8 and BC-AR-05 (RC 06 is passed through but does not stop the receipt, whose 'Receipt <no> <ccy> <gross> recorded (<state>)' text replaces the IDEMPOT message).",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-016",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-016-AC1",
+          "ac": 1,
+          "title": "AUDITLOG WRITE of a SALESREP accept inserts one core.AuditLog row: Action ACCEPT, Source SOACCEPT",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "SALESREP",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "audit"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE so.SalesOrder SET InvoiceCustomerCode = CustomerCode WHERE CompanyCode = 'STC' AND OrderNumber = 'SOS900004' AND InvoiceCustomerCode IS NULL;"
+            },
+            {
+              "save": "r",
+              "call": "so_acceptSalesOrder",
+              "path": {
+                "orderNumber": "SOS900004"
+              },
+              "body": {
+                "customer": "C0011",
+                "currency": "GBP",
+                "termsCode": "PREPAY",
+                "salesperson": "SALESREP",
+                "incotermsRule": "EXW",
+                "incotermsPlace": "Reading"
+              },
+              "idempotencyKey": "A07-PLAT-016-AC1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'so.SalesOrder' AND EntityKey = 'STC/SOS900004' AND UserCode = 'SALESREP' AND Action = 'ACCEPT' AND Source = 'SOACCEPT'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC1 words with AUDITLOG.cob:54-201 (action upper-cased, blank source -> COBOL, core.usp_WriteAudit inserts one row and returns its AuditId) on the binding surface SOACCEPT ACCEPT: 7500-AUDIT-THE-CHANGE writes entity so.SalesOrder, key '<co>/<order>', action = the function and source 'SOACCEPT' (SOACCEPT.cob:1250-1296, source at :1292; every production AUDITLOG caller moves a non-blank AU-SOURCE, so the blank-source default has no binding route); SOS900004 (93-so-demo.sql:107) has no InvoiceCustomerCode on fresh, which SOACCEPT refuses as a BLOCKER (SOACCEPT.cob:228,313,443-455), so the invoiced party is arranged as FR-STERP-SO-017-AC2 does. Legacy run (SalesOrderService.Accept as SALESREP, business date 2026-10-19, restored freshc + arrangement): RC 06 SOA0008 (credit hold, -> 202) and one core.AuditLog row SALESREP / so.SalesOrder / STC/SOS900004 / ACCEPT / Source SOACCEPT. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-027: invoiced party arranged; Source is SOACCEPT on this route (observed legacy run)]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-016-AC2",
+          "ac": 2,
+          "title": "A refused request writes no audit row (blank-user refusal AUD0001 unreachable)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "WHSE",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "audit",
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "so_acceptSalesOrder",
+              "path": {
+                "orderNumber": "SOS900004"
+              },
+              "body": {
+                "customer": "C0011",
+                "currency": "GBP",
+                "termsCode": "PREPAY",
+                "salesperson": "SALESREP",
+                "incotermsRule": "EXW",
+                "incotermsPlace": "Reading"
+              },
+              "idempotencyKey": "A07-PLAT-016-AC2"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'so.SalesOrder' AND EntityKey = 'STC/SOS900004' AND UserCode = 'WHSE'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC2 words with AUDITLOG.cob validation (no user -> RC 08 AUD0001 without SQL); every binding operation supplies the resolved STERP user, so AUD0001 is pinned only by the kernel component golden master and the scenario pins that a refused request (screen gate SO.ORDER.ENTER, contracts 5.4; WHSE grants 03-core-roles-users.sql:49) inserts no audit row.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-016-AC3",
+          "ac": 3,
+          "title": "A sensitive flag other than Y is stored as IsSensitive 0",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "SALESREP",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "audit"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE so.SalesOrder SET InvoiceCustomerCode = CustomerCode WHERE CompanyCode = 'STC' AND OrderNumber = 'SOS900004' AND InvoiceCustomerCode IS NULL;"
+            },
+            {
+              "save": "r",
+              "call": "so_acceptSalesOrder",
+              "path": {
+                "orderNumber": "SOS900004"
+              },
+              "body": {
+                "customer": "C0011",
+                "currency": "GBP",
+                "termsCode": "PREPAY",
+                "salesperson": "SALESREP",
+                "incotermsRule": "EXW",
+                "incotermsPlace": "Reading"
+              },
+              "idempotencyKey": "A07-PLAT-016-AC3"
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT TOP (1) CAST(IsSensitive AS int) FROM core.AuditLog WHERE EntityType = 'so.SalesOrder' AND EntityKey = 'STC/SOS900004' AND UserCode = 'SALESREP' AND Action = 'ACCEPT' ORDER BY AuditId DESC",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC3 words with AUDITLOG.cob:70-75,129-133 (a flag other than 'Y' is stored as 'N' and bound as '0'); on the binding surface SOACCEPT ACCEPT the caller moves 'N' to AU-SENSITIVE (SOACCEPT.cob:1293) and no binding caller sends 'x', so the stored IsSensitive is 0 (core.AuditLog.IsSensitive, 07-AuditLog.sql); SOS900004 has no InvoiceCustomerCode on fresh and SOACCEPT refuses it (SOACCEPT.cob:443-455), so the invoiced party is arranged as FR-STERP-SO-017-AC2 does. Legacy run (SalesOrderService.Accept as SALESREP, business date 2026-10-19, restored freshc + arrangement): the ACCEPT audit row has IsSensitive 0. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-027: invoiced party arranged so SOACCEPT accepts and audits (observed legacy run)]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-017",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-017-AC1",
+          "ac": 1,
+          "title": "RAISE with severity ERROR succeeds and commits the exception although the caller refuses (KIT0010)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "WHSE",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 200.0,
+                "location": "",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-PLAT-017-AC1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "reasonCode": "KIT0010"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE CompanyCode = 'STC' AND Module = 'KIT' AND Category = 'KIT MATERIAL SHORTAGE' AND DocumentType = 'EXECUTIONKIT' AND DocumentRef = 'KIT0001002' AND Status = 'OPEN' AND Severity = 'ERROR' AND RaisedBy = 'WHSE'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC1 words with EXCPRAIS.cob:68-280 (after a successful raise ERROR mirrors RC 00 with the exception id, SME-059, SME-1258) and KITISSUE.cob:396-429 (shortage -> RC 8 KIT0010 and RAISE severity ERROR, category 'KIT MATERIAL SHORTAGE', document EXECUTIONKIT/KIT0001002, committed although the issue is refused); the RC 00 is internal, so the committed OPEN row stands for it (KIT0001002 line 1, 95-kit-demo.sql). KITISSUE validates traceability and the permitted quantity before free stock (KITISSUE.cob:238-253,304-365): the authored body (BOLT-M5X16-SS, no lot, 99999) stops at KIT0012 and, with a lot, at the overissue refusal KIT0008, so the issue takes the line item ADHESIVE-EP420-250ML with its accepted lot L26001-0250ML and 200 EA (within the 250 required, above the 85 eligible); the legacy route observed 422 KIT0010 and one OPEN ERROR KIT MATERIAL SHORTAGE row for EXECUTIONKIT/KIT0001002 raised by WHSE with priority 2 (amendment evidence p4/runs/rg028-platform017-AC1-C-legacy-route.txt; authored body rg028-platform017-AC1-authored-legacy-route.txt, lot only rg028-platform017-AC1-lotOnly-legacy-route.txt). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-028: reach the KIT0010 shortage with a valid lot and a quantity within the requirement]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-017-AC2",
+          "ac": 2,
+          "title": "A second RAISE for the same open company/module/category/document updates the existing row",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "WHSE",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "first",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 200.0,
+                "location": "",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-PLAT-017-AC2-1"
+            },
+            {
+              "save": "second",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 200.0,
+                "location": "",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-PLAT-017-AC2-2"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "second",
+              "problem": {
+                "status": 422,
+                "reasonCode": "KIT0010"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE CompanyCode = 'STC' AND Module = 'KIT' AND Category = 'KIT MATERIAL SHORTAGE' AND DocumentType = 'EXECUTIONKIT' AND DocumentRef = 'KIT0001002' AND Status = 'OPEN'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC2 words with usp_RaiseException.sql:22-32 (one open item per company, module, category, document type and reference: a second raise updates the open row and returns its id) reached twice through the KITISSUE shortage path (KITISSUE.cob:396-429). KITISSUE validates traceability and the permitted quantity before free stock (KITISSUE.cob:238-253,304-365): the authored body (BOLT-M5X16-SS, no lot, 99999) stops at KIT0012 and, with a lot, at the overissue refusal KIT0008, so the issue takes the line item ADHESIVE-EP420-250ML with its accepted lot L26001-0250ML and 200 EA (within the 250 required, above the 85 eligible); the legacy route observed 422 KIT0010 twice and a single OPEN row (amendment evidence p4/runs/rg028-platform017-AC2-C-legacy-route.txt). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-028: reach the KIT0010 shortage with a valid lot and a quantity within the requirement]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-017-AC3",
+          "ac": 3,
+          "title": "Stored exception priority follows the RAISE rule (out-of-range replacement unreachable; in-range 2 kept)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "WHSE",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "save": "r",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 200.0,
+                "location": "",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-PLAT-017-AC3"
+            }
+          ],
+          "assertions": [
+            {
+              "sql": "SELECT TOP (1) Priority FROM core.ExceptionItem WHERE CompanyCode = 'STC' AND Module = 'KIT' AND Category = 'KIT MATERIAL SHORTAGE' AND DocumentType = 'EXECUTIONKIT' AND DocumentRef = 'KIT0001002' AND Status = 'OPEN'",
+              "equals": 2
+            }
+          ],
+          "derivation": "AC3 words with EXCPRAIS.cob:85-88 (priority outside 1..9 replaced by 5); the callers that pass 0 or more than 9 (ARDISPUT sweep +20, ARADJUST +30, DDMAND +40, ARINSOLV +90 and the AP APSVC wrapper) have no binding operation, so the replacement is pinned only by the kernel component golden master and the scenario pins that the in-range priority of KITISSUE.cob:427 (2) is stored unchanged. KITISSUE validates traceability and the permitted quantity before free stock (KITISSUE.cob:238-253,304-365): the authored body (BOLT-M5X16-SS, no lot, 99999) stops at KIT0012 and, with a lot, at the overissue refusal KIT0008, so the issue takes the line item ADHESIVE-EP420-250ML with its accepted lot L26001-0250ML and 200 EA (within the 250 required, above the 85 eligible); the legacy route observed the stored priority 2 (amendment evidence p4/runs/rg028-platform017-AC3-C-legacy-route.txt). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-028: reach the KIT0010 shortage with a valid lot and a quantity within the requirement]",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-018",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-018-AC1",
+          "ac": 1,
+          "title": "The company row from 2026-07-01 wins over the '*' row as at 2026-10-19 (FIN.CLOSE.MATERIALITY 2500.00)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "sql": "INSERT core.Parameter (ParamCode, CompanyCode, EffectiveFrom, Value, DataType, UnitOfValue, OwnerRole, DecisionRef, Description, CreatedBy) VALUES ('FIN.CLOSE.MATERIALITY', 'STC', '2026-07-01', '2500.00', 'MONEY', 'GBP', 'FINCTRL', 'D-15', 'A07 parity company row', 'A07')"
+            },
+            {
+              "save": "r",
+              "call": "fin_getPeriodCloseStatus",
+              "path": {
+                "fiscalYear": "2026",
+                "periodNo": "7"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.materiality",
+              "equals": 2500.0
+            }
+          ],
+          "derivation": "AC1 words with PARMGET.cob:74-331 (the caller's company row preferred to '*', latest EffectiveFrom on or before the as-of date = business date) and PERCLOSE.cob:172-183 (GETNUM FIN.CLOSE.MATERIALITY into the close status answer); the seeded '*' row (1000.00 from 2026-04-01, 11-fin-eventmap.sql:45) stands for the AC's AP.LATE.RATE '*' row and an STC row from 2026-07-01 is arranged.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-018-AC2",
+          "ac": 2,
+          "title": "An unknown code with use-default Y answers the caller's default (AR.DISCOUNT.GRACE.DAYS -> 2)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "sql": "DELETE core.Parameter WHERE ParamCode = 'AR.DISCOUNT.GRACE.DAYS'"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 018 AC2",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-018-AC2"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.discGraceDays",
+              "equals": 2
+            }
+          ],
+          "derivation": "AC2 words with PARMGET.cob (not found with use-default Y -> the supplied default, scope DEFAULT, RC 04 PRM0004) and RCPTALOC.cob:189-198 (GETNUM AR.DISCOUNT.GRACE.DAYS, use-default Y, default '2', value used whatever the return code); with the parameter removed only the default can supply 2 (the AC's default 30 belongs to ARINSOLV, which has no binding operation).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-018-AC3",
+          "ac": 3,
+          "title": "GETNUM of a TEXT value 'ABC' is refused PRM0005 and yields no number (grace days 0)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "ARCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "steps": [
+            {
+              "sql": "UPDATE core.Parameter SET Value = 'ABC' WHERE ParamCode = 'AR.DISCOUNT.GRACE.DAYS'"
+            },
+            {
+              "save": "r",
+              "call": "ar_recordReceipt",
+              "body": {
+                "customer": "C0001",
+                "method": "BACS",
+                "bankAccount": "GBP1",
+                "receiptDate": "2026-10-19",
+                "currency": "GBP",
+                "gross": 100.0,
+                "bankRef": "A07 018 AC3",
+                "externalRef": ""
+              },
+              "idempotencyKey": "A07-PLAT-018-AC3"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.discGraceDays",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC3 words with PARMGET.cob (GETNUM of a non-numeric value -> RC 08 PRM0005, numeric value 0) and RCPTALOC.cob:189-198 (PM-VALUE-NUM moved without testing the return code), so the receipt answer carries 0 grace days; the seeded row is 04-core-parameters.sql:158.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-019",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-019-AC1",
+          "ac": 1,
+          "title": "Month-end clamping on a binding period start: as at 2028-02-29 the 12-month period starts 2027-02-28",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "asAt": "2028-02-29"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.fromDate",
+              "equals": "2027-02-28"
+            }
+          ],
+          "derivation": "AC1 words (ADDMONTH clamps to the target month's last day, DATECALC.cob) with ARENQ.cob:151-187 (period start = ADDMONTH -12 of the as-at date when none is given) and the ar_getCustomerMetrics description (fromDate = asAt - 12 months supplied by DebtorsService.Metrics); the binding facade computes the start itself, so DATECALC ADDMONTH (2027-01-31 + 1 -> 2027-02-28) is pinned only by the kernel component golden master and the same month-end clamp is pinned on the binding period start.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-019-AC2",
+          "ac": 2,
+          "title": "ADDBUS from Thursday 2026-12-24 skips the ENG 25 and 28 December holidays and the weekend",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "",
+                "promiseAmt": 500.0,
+                "promiseDate": "2026-12-24",
+                "narrative": "A07 parity: Christmas promise"
+              },
+              "idempotencyKey": "A07-PLAT-019-AC2"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.nextActionDt",
+              "equals": "2026-12-29"
+            }
+          ],
+          "derivation": "AC2 words with the ENG holidays 2026-12-25 and 2026-12-28 (00-core-currency-calendar.sql:30, CALBUILT.cpy:32-34) and DATECALC ADDBUS (start never counted; Saturdays, Sundays and calendar holidays skipped) reached through the DATECALC-backed binding surface ar_recordPromiseToPay (ARDISPUT PROMISE follow-up one ENG business day after the promise date, ARDISPUT.cob:602-706); ADDBUS 1 from 2026-12-24 lands on 2026-12-29 (the AC's ADDBUS 2 lands on 2026-12-30).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-019-AC3",
+          "ac": 3,
+          "title": "PARSE has no production caller; the DATECALC surface moves a Friday promise to Monday",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "",
+                "promiseAmt": 500.0,
+                "promiseDate": "2026-10-23",
+                "narrative": "A07 parity: Friday promise"
+              },
+              "idempotencyKey": "A07-PLAT-019-AC3"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.nextActionDt",
+              "equals": "2026-10-26"
+            }
+          ],
+          "derivation": "AC3 words with DATECALC PARSE (6 digits always DDMMYY with pivot 50, RC 04 DAT0007, SME-053, SME-1254); no production program calls DATECALC PARSE, so '261004' -> 2004-10-26 is pinned only by the kernel component golden master and this scenario pins the DATECALC-backed binding surface ar_recordPromiseToPay (ARDISPUT PROMISE follow-up one ENG business day after the promise date, ARDISPUT.cob:602-706) (Friday 2026-10-23 -> Monday 2026-10-26).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-019-AC4",
+          "ac": 4,
+          "title": "Unknown calendar codes are unreachable; a Monday counts as a business day on the DATECALC surface",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "",
+                "promiseAmt": 500.0,
+                "promiseDate": "2026-10-25",
+                "narrative": "A07 parity: Sunday promise"
+              },
+              "idempotencyKey": "A07-PLAT-019-AC4"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.nextActionDt",
+              "equals": "2026-10-26"
+            }
+          ],
+          "derivation": "AC4 words with DATECALC (calendar code never validated, an unknown code is a weekends-only calendar, SME-1257; ISBUSDAY of a Monday -> 1); ISBUSDAY is reached only inside the AP service wrapper and every binding DATECALC caller names ENG or BACS, so calendar XYZ is pinned only by the kernel component golden master and this scenario pins the DATECALC-backed binding surface ar_recordPromiseToPay (ARDISPUT PROMISE follow-up one ENG business day after the promise date, ARDISPUT.cob:602-706) (Sunday 2026-10-25 -> Monday 2026-10-26).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-019-AC5",
+          "ac": 5,
+          "title": "Holiday-load failure fallback cannot be injected; 2027 Christmas answer common to database and built-in table",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "",
+                "promiseAmt": 500.0,
+                "promiseDate": "2027-12-24",
+                "narrative": "A07 parity: Christmas 2027 promise"
+              },
+              "idempotencyKey": "A07-PLAT-019-AC5"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.nextActionDt",
+              "equals": "2027-12-29"
+            }
+          ],
+          "derivation": "AC5 words with the DATECALC built-in CALBUILT 2026-2028 table used for one request after a holiday load failure (BC-PLATFORM-06, SME-029) and the ENG 2027-12-27/2027-12-28 substitute holidays held in both sources (CALBUILT.cpy, 00-core-currency-calendar.sql:33); a SQL failure of the holiday read cannot be injected without DDL or permission changes, so the fallback is pinned only by the kernel component golden master and this scenario pins the DATECALC-backed binding surface ar_recordPromiseToPay (ARDISPUT PROMISE follow-up one ENG business day after the promise date, ARDISPUT.cob:602-706) (Friday 2027-12-24 -> Wednesday 2027-12-29).",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-020",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-020-AC1",
+          "ac": 1,
+          "title": "DUEDATE results are not returned by any binding operation; DOM31 terms resolve through GETTERMS",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "po_checkPaymentTerms",
+              "path": {
+                "supplierCode": "S0006"
+              },
+              "body": {
+                "termsCode": "DOM31",
+                "valueGbp": 500.0,
+                "orderNumber": "PO00000012"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.termsCode",
+              "equals": "DOM31"
+            }
+          ],
+          "derivation": "AC1 words with TERMCALC DUEDATE (DAYOFNEXTMONTH day clamped to the month, TRM0005); the due date is computed only by PAYTERMC APPLY/DUEDATE, whose result no binding operation returns (po_createPurchaseOrder keeps only the terms snapshot), and inside batch invoicing, so 2027-01-15 -> 2027-02-28 is pinned only by the kernel component golden master; this scenario pins TERMCALC GETTERMS through po_checkPaymentTerms (PAYTERMC.cob:150-209) for DOM31 (07-core-numbering-terms.sql:42).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-020-AC2",
+          "ac": 2,
+          "title": "Unknown terms code ZZZ is classified TRM0002 (GETTERMS path: RC 16 PTC0002, HTTP 404)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "po_checkPaymentTerms",
+              "path": {
+                "supplierCode": "S0006"
+              },
+              "body": {
+                "termsCode": "ZZZ",
+                "valueGbp": 500.0,
+                "orderNumber": "PO00000012"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 404,
+                "reasonCode": "PTC0002"
+              }
+            }
+          ],
+          "derivation": "AC2 words with TERMCALC (unknown code -> TRM0002: statutory default with RC 04 on DUEDATE, RC 16 on GETTERMS) and PAYTERMC.cob:150-209 (GETTERMS failure -> RC 16 PTC0002, mapped to 404 by contracts 4.6); only GETTERMS is reachable, so the statutory 30-day DUEDATE answer with RC 04 is pinned only by the kernel component golden master.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-020-AC3",
+          "ac": 3,
+          "title": "Bacs date adjustment is not returned by any binding operation; 30-day terms check stays within policy",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "po_checkPaymentTerms",
+              "path": {
+                "supplierCode": "S0006"
+              },
+              "body": {
+                "termsCode": "N30",
+                "valueGbp": 500.0,
+                "orderNumber": "PO00000012"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.outcome",
+              "equals": "WITHIN"
+            }
+          ],
+          "derivation": "AC3 words with TERMCALC DUEDATE Bacs adjustment through DATECALC ADJUST (raw 2026-10-24 kept, 2026-10-26 returned, RC 04 TRM0006); no binding operation returns a due date, so the adjustment is pinned only by the kernel component golden master; this scenario pins TERMCALC GETTERMS through po_checkPaymentTerms (PAYTERMC.cob:150-209) for N30 against the 30-day policy (po_checkPaymentTerms 200 example, outcome WITHIN).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-020-AC4",
+          "ac": 4,
+          "title": "Long-term flag of DUEDATE is not returned; EOM60 terms are checked through GETTERMS",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "BUYER",
+            "company": "STC",
+            "site": "BHM",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "po_checkPaymentTerms",
+              "path": {
+                "supplierCode": "S0006"
+              },
+              "body": {
+                "termsCode": "EOM60",
+                "valueGbp": 500.0,
+                "orderNumber": "PO00000012"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "bodyContains": "EOM60"
+            }
+          ],
+          "derivation": "AC4 words with TERMCALC DUEDATE (term from invoice to final due date longer than the 60-day maximum sets the flag, RC 04 TRM0007); no binding operation returns the flag, so it is pinned only by the kernel component golden master; this scenario pins TERMCALC GETTERMS through po_checkPaymentTerms (PAYTERMC.cob:150-209) for EOM60 (07-core-numbering-terms.sql:41, effective 75 days), whose answer carries the terms code in every outcome (PAYTERMC rule R4).",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-021",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-021-AC1",
+          "ac": 1,
+          "title": "TOGBP is not reachable through a binding operation; the FXCONV-backed revaluation run is accepted",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitRevalrunRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW",
+                "RATE": "SPOT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "REVALRUN"
+            }
+          ],
+          "derivation": "AC1 words with FXCONV.cob:77-483 (TOGBP = foreign / rate held to 12 decimals, rounded once half away through RNDALLOC, residual reported); no binding operation converts a supplied amount (TOGBP is called only by the AP service wrapper and ARINSOLV, neither exposed), so 115.00 at 1.15000000 -> 100.00 is pinned only by the kernel component golden master; this scenario pins the only binding FXCONV caller, the REVALRUN job (FXREVAL GETRATE, fin_submitRevalrunRun example CO=STC ASAT=20261031 MODE=PREVIEW RATE=SPOT), whose submission is accepted 202 with job name REVALRUN.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-021-AC2",
+          "ac": 2,
+          "title": "GBPPERFCY inversion is not reachable; the FXCONV-backed revaluation run is accepted",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitRevalrunRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW",
+                "RATE": "SPOT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "REVALRUN"
+            }
+          ],
+          "derivation": "AC2 words with FXCONV.cob (GBPPERFCY with allow-invert Y keeps the entered rate, inverts and truncates to 8 decimals, RC 04 FX0004: 0.87 -> 1.14942528); no binding operation supplies a quotation basis, so the inversion is pinned only by the kernel component golden master; this scenario pins the only binding FXCONV caller, the REVALRUN job (FXREVAL GETRATE, fin_submitRevalrunRun example CO=STC ASAT=20261031 MODE=PREVIEW RATE=SPOT), whose submission is accepted 202 with job name REVALRUN.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-021-AC3",
+          "ac": 3,
+          "title": "GETRATE with no EUR rate on or before 2026-01-01 cannot be observed; revaluation as at 20260101 is accepted",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitRevalrunRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20260101",
+                "MODE": "PREVIEW",
+                "RATE": "SPOT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "REVALRUN"
+            }
+          ],
+          "derivation": "AC3 words with FXCONV.cob (latest core.FxRate of currency and type on or before the date; none -> RC 16 FX0001); the REVALRUN outcome per currency is not exposed in a form that isolates the FXCONV answer, so FX0001 is pinned only by the kernel component golden master; this scenario submits the only binding FXCONV caller, the REVALRUN job (FXREVAL GETRATE, fin_submitRevalrunRun example CO=STC ASAT=20261031 MODE=PREVIEW RATE=SPOT), whose submission is accepted 202 with job name REVALRUN as at 20260101.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-021-AC4",
+          "ac": 4,
+          "title": "Places 0 defaulting to 2 cannot be requested through a binding operation; revaluation run is accepted",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitRevalrunRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW",
+                "RATE": "SPOT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "REVALRUN"
+            }
+          ],
+          "derivation": "AC4 words with FXCONV.cob (places 0 replaced by 2, so 0 places cannot be requested, BRF-FXCONV-03); no binding operation lets the caller choose the places, so the default is pinned only by the kernel component golden master; this scenario pins the only binding FXCONV caller, the REVALRUN job (FXREVAL GETRATE, fin_submitRevalrunRun example CO=STC ASAT=20261031 MODE=PREVIEW RATE=SPOT), whose submission is accepted 202 with job name REVALRUN.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-022",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-022-AC1",
+          "ac": 1,
+          "title": "Exact half rounds away from zero: 1 x 1.005 extends to 1.01 at 2 places",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "SALESREP",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "so_calculateDocumentTotals",
+              "body": {
+                "docRef": "SOS900008",
+                "customer": "C0090",
+                "currency": "GBP",
+                "priceDate": "2026-10-19",
+                "lines": [
+                  {
+                    "lineNum": 1,
+                    "itemCode": "FG-FRAME-GRAVEL-M",
+                    "acceptedQty": 1.0,
+                    "uomCode": "EA",
+                    "conversionFactor": 1.0,
+                    "unitPrice": 1.005,
+                    "pricePerQty": 1.0,
+                    "discountPct1": 0.0,
+                    "discountPct2": 0.0,
+                    "vatCode": "S",
+                    "vatRatePct": 20.0,
+                    "costSnapshotGbp": 0.5
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.totGross",
+              "equals": 1.01
+            }
+          ],
+          "derivation": "AC1 words with RNDALLOC.cob:90-395 (ROUND-AWAY: exact halves away from zero; EXTEND = value x value2 held to 12 decimals then rounded once) reached through so_calculateDocumentTotals (SODISC DOCUMENT, SODISC.cob:537-566: UNITPRC price / price-per at 6 places, EXTEND quantity x unit price rounded once at the 2 document places); 1.005 -> 1.01, while the negative half (-1.005 -> -1.01) needs a negative quantity or price that SODISC refuses (DSC0004) or the binding request does not carry.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-022-AC2",
+          "ac": 2,
+          "title": "ALLOC of a document amount is not reachable (no document allowance input); totals reconcile",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "SALESREP",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "so_calculateDocumentTotals",
+              "body": {
+                "docRef": "SOS900008",
+                "customer": "C0090",
+                "currency": "GBP",
+                "priceDate": "2026-10-19",
+                "lines": [
+                  {
+                    "lineNum": 1,
+                    "itemCode": "FG-FRAME-GRAVEL-M",
+                    "acceptedQty": 1.0,
+                    "uomCode": "EA",
+                    "conversionFactor": 1.0,
+                    "unitPrice": 1.005,
+                    "pricePerQty": 1.0,
+                    "discountPct1": 0.0,
+                    "discountPct2": 0.0,
+                    "vatCode": "S",
+                    "vatRatePct": 20.0,
+                    "costSnapshotGbp": 0.5
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.totAllowance",
+              "equals": 0
+            },
+            {
+              "on": "r",
+              "json": "$.data.reconciled",
+              "equals": "Y"
+            }
+          ],
+          "derivation": "AC2 words with RNDALLOC.cob ALLOC (whole minor units, spare units to the largest 9-decimal remainders, earlier line wins ties: 0.10 EQUAL over 3 -> 0.04, 0.03, 0.03); SODISC calls ALLOC only for a document allowance or charge (SODISC.cob:690-712), which the binding request cannot carry (SoDocumentTotalsRequest), so ALLOC is pinned only by the kernel component golden master and this scenario pins the reconciled totals of so_calculateDocumentTotals (SODISC DOCUMENT, SODISC.cob:537-566: UNITPRC price / price-per at 6 places, EXTEND quantity x unit price rounded once at the 2 document places).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-022-AC3",
+          "ac": 3,
+          "title": "ALLOC mode validation is not reachable; the SODISC-backed totals stay reconciled",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "SALESREP",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "so_calculateDocumentTotals",
+              "body": {
+                "docRef": "SOS900008",
+                "customer": "C0090",
+                "currency": "GBP",
+                "priceDate": "2026-10-19",
+                "lines": [
+                  {
+                    "lineNum": 1,
+                    "itemCode": "FG-FRAME-GRAVEL-M",
+                    "acceptedQty": 1.0,
+                    "uomCode": "EA",
+                    "conversionFactor": 1.0,
+                    "unitPrice": 1.005,
+                    "pricePerQty": 1.0,
+                    "discountPct1": 0.0,
+                    "discountPct2": 0.0,
+                    "vatCode": "S",
+                    "vatRatePct": 20.0,
+                    "costSnapshotGbp": 0.5
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.reconciled",
+              "equals": "Y"
+            }
+          ],
+          "derivation": "AC3 words with RNDALLOC.cob ALLOC (mode exactly EQUAL or WEIGHT, not case-folded: 'equal' -> RC 08 RND0003); the only binding ALLOC caller fixes its own mode and is not reached without a document allowance, so RND0003 is pinned only by the kernel component golden master and this scenario pins so_calculateDocumentTotals (SODISC DOCUMENT, SODISC.cob:537-566: UNITPRC price / price-per at 6 places, EXTEND quantity x unit price rounded once at the 2 document places).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-022-AC4",
+          "ac": 4,
+          "title": "A zero price-per divisor never reaches UNITPRC: the facade maps 0 to 1 and the line extends normally",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "SALESREP",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "so_calculateDocumentTotals",
+              "body": {
+                "docRef": "SOS900008",
+                "customer": "C0090",
+                "currency": "GBP",
+                "priceDate": "2026-10-19",
+                "lines": [
+                  {
+                    "lineNum": 1,
+                    "itemCode": "FG-FRAME-GRAVEL-M",
+                    "acceptedQty": 1.0,
+                    "uomCode": "EA",
+                    "conversionFactor": 1.0,
+                    "unitPrice": 1.005,
+                    "pricePerQty": 0.0,
+                    "discountPct1": 0.0,
+                    "discountPct2": 0.0,
+                    "vatCode": "S",
+                    "vatRatePct": 20.0,
+                    "costSnapshotGbp": 0.5
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.totGross",
+              "equals": 1.01
+            }
+          ],
+          "derivation": "AC4 words with RNDALLOC.cob UNITPRC (zero divisor -> RC 08 RND0006); SalesOrderService.AddDiscountLine maps price-per 0 to 1 (so_calculateDocumentTotals description) and SODISC.cob:539-545 refuses a non-positive price-per as DSC0005 before RNDALLOC, so RND0006 is pinned only by the kernel component golden master and this scenario pins the binding behaviour of a zero price-per.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-023",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-023-AC1",
+          "ac": 1,
+          "title": "DOCREF keeps only A-Z and 0-9 of the upper-cased reference (STRIP mode unreachable)",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "APCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ap_checkDuplicateInvoice",
+              "body": {
+                "supplierCode": "S0001",
+                "documentType": "INVOICE",
+                "supplierDocRef": "aas-118220",
+                "statedGross": 28800.0,
+                "documentDate": "2026-07-04"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "reasonCode": "APR0010"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.refNormalised",
+              "equals": "AAS118220"
+            }
+          ],
+          "derivation": "AC1 words with STRUTIL.cob:76-402 (DOCREF keeps A-Z and 0-9 of the upper-cased text; under STRIP the leading zeros of the trailing digit run go, RC 04 STR0006: 'SI-000123' -> SI123); the only binding DOCREF caller does not use STRIP, so the STRIP result is pinned only by the kernel component golden master and this scenario pins the DOCREF normalisation of 'aas-118220' through ap_checkDuplicateInvoice (APINVREG DUPCHK normalising the reference with STRUTIL DOCREF: upper-case, A-Z and 0-9 kept, leading zeros kept) against PI-26-0001 'AAS/118220' of S0001 (90-ap-demo.sql:32, DEMO-WORKFLOWS.md:98).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-023-AC2",
+          "ac": 2,
+          "title": "MONEY editing has no production caller; the STRUTIL-backed duplicate check is pinned instead",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "APCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ap_checkDuplicateInvoice",
+              "body": {
+                "supplierCode": "S0001",
+                "documentType": "INVOICE",
+                "supplierDocRef": "AAS/118220",
+                "statedGross": 28800.0,
+                "documentDate": "2026-07-04"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "reasonCode": "APR0010"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.refNormalised",
+              "equals": "AAS118220"
+            }
+          ],
+          "derivation": "AC2 words with STRUTIL.cob MONEY (two decimals by truncation with comma separators, single byte X'A3' for GBP with symbol Y: 1234.567 -> X'A3' 1,234.56); no production program calls STRUTIL MONEY, so it is pinned only by the kernel component golden master and this scenario pins the canonical duplicate refusal through ap_checkDuplicateInvoice (APINVREG DUPCHK normalising the reference with STRUTIL DOCREF: upper-case, A-Z and 0-9 kept, leading zeros kept) against PI-26-0001 'AAS/118220' of S0001 (90-ap-demo.sql:32, DEMO-WORKFLOWS.md:98).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-023-AC3",
+          "ac": 3,
+          "title": "CODE validation has no binding caller; DOCREF drops the embedded space of 'aas 118220'",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "APCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ap_checkDuplicateInvoice",
+              "body": {
+                "supplierCode": "S0001",
+                "documentType": "INVOICE",
+                "supplierDocRef": "aas 118220",
+                "statedGross": 28800.0,
+                "documentDate": "2026-07-04"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 422,
+                "reasonCode": "APR0010"
+              }
+            },
+            {
+              "on": "r",
+              "json": "$.data.refNormalised",
+              "equals": "AAS118220"
+            }
+          ],
+          "derivation": "AC3 words with STRUTIL.cob CODE (upper-cased code of A-Z 0-9 - . / _ only; 'ab c' -> RC 08 STR0003 at position 3); no program behind a binding operation calls STRUTIL CODE, so the refusal is pinned only by the kernel component golden master and this scenario pins how DOCREF treats an embedded space and lower case through ap_checkDuplicateInvoice (APINVREG DUPCHK normalising the reference with STRUTIL DOCREF: upper-case, A-Z and 0-9 kept, leading zeros kept) against PI-26-0001 'AAS/118220' of S0001 (90-ap-demo.sql:32, DEMO-WORKFLOWS.md:98).",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-024",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-024-AC1",
+          "ac": 1,
+          "title": "ROUND-AWAY has no binding caller; the contracts 7.1 half-away rule rounds 1 x 0.125 to 0.13",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "SALESREP",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "so_calculateDocumentTotals",
+              "body": {
+                "docRef": "SOS900008",
+                "customer": "C0090",
+                "currency": "GBP",
+                "priceDate": "2026-10-19",
+                "lines": [
+                  {
+                    "lineNum": 1,
+                    "itemCode": "FG-FRAME-GRAVEL-M",
+                    "acceptedQty": 1.0,
+                    "uomCode": "EA",
+                    "conversionFactor": 1.0,
+                    "unitPrice": 0.125,
+                    "pricePerQty": 1.0,
+                    "discountPct1": 0.0,
+                    "discountPct2": 0.0,
+                    "vatCode": "S",
+                    "vatRatePct": 20.0,
+                    "costSnapshotGbp": 0.5
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.totGross",
+              "equals": 0.13
+            }
+          ],
+          "derivation": "AC1 words with STFUNCS.cob:41-101 (ROUND-AWAY exact halves away from zero: 2.5 -> 3, -2.5 -> -3) and contracts 7.1 (ROUNDED -> MidpointRounding.AwayFromZero); the STFUNCS user-defined functions have no production caller (no program outside STFUNCS.cob and the test drivers invokes ROUND-AWAY, SIGN-OF, DAYS-IN-MONTH, END-OF-MONTH or WEEKDAY-OF), so the criterion is pinned only by the kernel component golden master, and this scenario pins the same rule on so_calculateDocumentTotals (RNDALLOC EXTEND at 2 places, SODISC.cob:546-566).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-024-AC2",
+          "ac": 2,
+          "title": "ROUND-AWAY place clamping has no binding caller; 1.23456 is rounded once at the 2 document places",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "SALESREP",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "so_calculateDocumentTotals",
+              "body": {
+                "docRef": "SOS900008",
+                "customer": "C0090",
+                "currency": "GBP",
+                "priceDate": "2026-10-19",
+                "lines": [
+                  {
+                    "lineNum": 1,
+                    "itemCode": "FG-FRAME-GRAVEL-M",
+                    "acceptedQty": 1.0,
+                    "uomCode": "EA",
+                    "conversionFactor": 1.0,
+                    "unitPrice": 1.23456,
+                    "pricePerQty": 1.0,
+                    "discountPct1": 0.0,
+                    "discountPct2": 0.0,
+                    "vatCode": "S",
+                    "vatRatePct": 20.0,
+                    "costSnapshotGbp": 0.5
+                  }
+                ]
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.totGross",
+              "equals": 1.23
+            }
+          ],
+          "derivation": "AC2 words with STFUNCS.cob:41-101 and STFNARGS.cpy:1-36 (places clamped to 0..8; values held as S9(18)V9(12)); the STFUNCS user-defined functions have no production caller (no program outside STFUNCS.cob and the test drivers invokes ROUND-AWAY, SIGN-OF, DAYS-IN-MONTH, END-OF-MONTH or WEEKDAY-OF), so the criterion is pinned only by the kernel component golden master, and this scenario pins the single rounding of the AC's value 1.23456 at the document places on so_calculateDocumentTotals.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-024-AC3",
+          "ac": 3,
+          "title": "DAYS-IN-MONTH has no binding caller; 29 February 2028 is accepted as a valid as-at date",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_getCustomerMetrics",
+              "path": {
+                "customerCode": "C0001"
+              },
+              "query": {
+                "asAt": "2028-02-29"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.asAt",
+              "equals": 20280229
+            }
+          ],
+          "derivation": "AC3 words with STFUNCS.cob:160-269 (DAYS-IN-MONTH(2028, 2) = 29, 0 outside 1601..9999); the STFUNCS user-defined functions have no production caller (no program outside STFUNCS.cob and the test drivers invokes ROUND-AWAY, SIGN-OF, DAYS-IN-MONTH, END-OF-MONTH or WEEKDAY-OF), so the criterion is pinned only by the kernel component golden master, and this scenario pins that the leap day 2028-02-29 is a valid date on the binding surface ar_getCustomerMetrics. Legacy run (DebtorsService.Metrics C0001 as at 2028-02-29, restored freshc): ARENQ METRICS RC 04 ENQ0030 (-> 200, as the binding 200 example) with EQ-AS-AT 20280229; the binding response schema ArArenqCommarea.asAt is integer (EQ-AS-AT PIC 9(8), STERP-AR.openapi.yaml), so data.asAt is 20280229 (the ISO value in the 200 example is illustrative). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-029: data.asAt is the integer 20280229 of the binding schema (observed legacy run)]",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-024-AC4",
+          "ac": 4,
+          "title": "END-OF-MONTH has no binding caller; period 2026/11 ends on 2027-02-28",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_getPeriodCloseStatus",
+              "path": {
+                "fiscalYear": "2026",
+                "periodNo": "11"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.endDate",
+              "equals": "2027-02-28"
+            }
+          ],
+          "derivation": "AC4 words with STFUNCS.cob:160-269 (END-OF-MONTH replaces the day with the month's last day without validating it: 20260200 -> 20260228); the STFUNCS user-defined functions have no production caller (no program outside STFUNCS.cob and the test drivers invokes ROUND-AWAY, SIGN-OF, DAYS-IN-MONTH, END-OF-MONTH or WEEKDAY-OF), so the criterion is pinned only by the kernel component golden master, and this scenario pins a February month end on the binding period answer (FY2026 period 11 EndDate = EOMONTH of 2027-02-01, 09-fin-period-vat.sql:17-18).",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-024-AC5",
+          "ac": 5,
+          "title": "WEEKDAY-OF has no binding caller; a Friday promise follows up on Monday 2026-10-19",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "CREDMGR",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-16"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "ar_recordPromiseToPay",
+              "body": {
+                "customer": "C0009",
+                "caseRef": "",
+                "promiseAmt": 500.0,
+                "promiseDate": "2026-10-16",
+                "narrative": "A07 parity: weekday check"
+              },
+              "idempotencyKey": "A07-PLAT-024-AC5"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.data.nextActionDt",
+              "equals": "2026-10-19"
+            }
+          ],
+          "derivation": "AC5 words with STFUNCS.cob:160-269 (WEEKDAY-OF(20261019) = 1, Monday); the STFUNCS user-defined functions have no production caller (no program outside STFUNCS.cob and the test drivers invokes ROUND-AWAY, SIGN-OF, DAYS-IN-MONTH, END-OF-MONTH or WEEKDAY-OF), so the criterion is pinned only by the kernel component golden master, and this scenario pins that 2026-10-19 is the Monday business day after Friday 2026-10-16 on ar_recordPromiseToPay (ARDISPUT PROMISE follow-up, ARDISPUT.cob:602-706). ARDISPUT refuses a promise dated before the business date (ARDISPUT.cob:609-618, RC 08 DSP0020) and sets the follow-up to DATECALC ADDBUS(promise date, 1, ENG) (ARDISPUT.cob:661-679), so the business date is the Friday 2026-10-16 of the promise. Legacy runs (DebtorsService.RecordPromise as CREDMGR, restored freshc): business date 2026-10-19 -> RC 08 DSP0020; business date 2026-10-16 -> RC 00 with DS-NEXT-ACTION-DT 20261019. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-030: business date set to the promise date 2026-10-16 (observed legacy run)]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-025",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-025-AC1",
+          "ac": 1,
+          "title": "CMDLINE parsing of 'CO=STC YEAR=2026 MODE=preview' is internal; the TBRPT submission with those keys is accepted",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitTbrptRun",
+              "body": {
+                "CO": "STC",
+                "YEAR": "2026",
+                "MODE": "preview"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "TBRPT"
+            },
+            {
+              "sql": "SELECT CASE WHEN EXISTS (SELECT 1 FROM core.JobRun WHERE JobName = 'TBRPT' AND SubmittedBy = 'GLCLERK') THEN 1 ELSE 0 END",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC1 words with CMDARGS.cob:54-284 (first token without '=' ignored, keys upper-cased, MODE value upper-cased, '3 argument(s) read') and contracts 8.2/8.3 (the submission path builds the KEY=VALUE command line and registers the run, FinTbrptParameters keys CO, YEAR, MODE); CMDARGS output (pairs, named fields, message) stays inside the batch program and no binding operation returns it, so the criterion is pinned only by the kernel component golden master.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-025-AC2",
+          "ac": 2,
+          "title": "Repeated keys cannot be sent through a JSON parameter object; the standard TBRPT submission is accepted",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitTbrptRun",
+              "body": {
+                "CO": "STC",
+                "FY": "2026",
+                "FROM": "7",
+                "TO": "7",
+                "ZERO": "N"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "TBRPT"
+            }
+          ],
+          "derivation": "AC2 words with CMDARGS.cob (named field CO: last occurrence wins; GET CO returns the first stored occurrence, BRF-CMDARGS-03, SME-1253); a JSON parameter object cannot repeat a key and the catalogue launcher sends each ParamSpec key once (ReportService.BuildArguments), so 'X CO=A CO=B' is unreachable and CMDARGS output (pairs, named fields, message) stays inside the batch program and no binding operation returns it, so the criterion is pinned only by the kernel component golden master; this scenario pins the fin_submitTbrptRun example.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-025-AC3",
+          "ac": 3,
+          "title": "A token without '=' cannot be sent; TBRPT submission with KEY=VALUE pairs only is accepted",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitTbrptRun",
+              "body": {
+                "CO": "STC",
+                "FY": "2026",
+                "FROM": "7",
+                "TO": "7"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "TBRPT"
+            }
+          ],
+          "derivation": "AC3 words with CMDARGS.cob (a later token without '=' -> RC 08 CMD0001 with the count message overwriting the text, BRF-CMDARGS-01, SME-051); every binding submission builds KEY=VALUE tokens (contracts 8.2), so 'X BAD CO=STC' is unreachable and CMDARGS output (pairs, named fields, message) stays inside the batch program and no binding operation returns it, so the criterion is pinned only by the kernel component golden master.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-025-AC4",
+          "ac": 4,
+          "title": "21 parameter pairs: the submission accepts them; the 20-pair limit (CMD0004) is internal to the program",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "actor": "GLCLERK",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-19"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitTbrptRun",
+              "body": {
+                "CO": "STC",
+                "FY": "2026",
+                "FROM": "7",
+                "TO": "7",
+                "ZERO": "N",
+                "X01": "V01",
+                "X02": "V02",
+                "X03": "V03",
+                "X04": "V04",
+                "X05": "V05",
+                "X06": "V06",
+                "X07": "V07",
+                "X08": "V08",
+                "X09": "V09",
+                "X10": "V10",
+                "X11": "V11",
+                "X12": "V12",
+                "X13": "V13",
+                "X14": "V14",
+                "X15": "V15",
+                "X16": "V16"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 202
+            },
+            {
+              "on": "r",
+              "json": "$.jobName",
+              "equals": "TBRPT"
+            }
+          ],
+          "derivation": "AC4 words with CMDARGS.cob (first 20 pairs stored, further pairs counted, RC 04 CMD0004 '<n> argument(s) ignored - only 20 are held') and FinTbrptParameters (additional string properties allowed); 21 pairs (5 TBRPT keys and 16 extra) reach the program command line, but CMDARGS output (pairs, named fields, message) stays inside the batch program and no binding operation returns it, so the criterion is pinned only by the kernel component golden master.",
+          "confidence": "unknown"
+        }
+      ]
+    }
+  ]
+}

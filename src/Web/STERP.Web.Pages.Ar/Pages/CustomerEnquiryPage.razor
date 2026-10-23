@@ -1,0 +1,235 @@
+@inherits StPage
+@* frmCustomerEnquiry (page:ar/customer-enquiry, FR-STERP-AR-015; frmCustomerEnquiry.vb:12-163, .Designer.vb:1-83):
+   ar_getCustomerEnquiry supplies the balance, the aged profile, the turnover figures and the open items; ar_getCustomerMetrics
+   (ARENQ) refines the trading figures when it answers RC <= 04 and shows no dialog otherwise. Enquiry only - nothing posts. *@
+<div class="st-page" style="overflow:auto">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Find (F5)" Glyph="REFRESH" OnClick="FindAsync" />
+        <StToolButton Text="Statement" Glyph="PRINT" OnClick="StatementAsync" />
+        <StToolButton Text="Credit check" Glyph="ENGINE" OnClick="CreditCheckAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <div class="st-filters">
+        <StTextField Caption="&Customer account:" Inline="true" Width="110" MaxLength="20" Field="Customer" @bind-Value="_customer" Id="@Uid("customer")" />
+        <span style="width:380px; flex:0 0 380px; overflow:hidden; white-space:pre">@_customerName</span>
+        <StTextField Caption="&As at (dd/MM/yyyy):" Inline="true" Width="90" MaxLength="10" Field="AsAt" @bind-Value="_asAt" Id="@Uid("asat")" />
+    </div>
+    <fieldset class="st-group" style="flex:0 0 auto">
+        <legend>Account position - all figures sterling</legend>
+        <div style="display:grid; grid-template-columns:128px 78px 128px 78px 128px 78px 128px 78px; column-gap:8px; row-gap:4px; padding:2px 4px">
+            @for (var i = 0; i < MetricSpec.Length; i++)
+            {
+                var row = i % 4 + 1;
+                var col = i / 4 * 2 + 1;
+                var key = MetricSpec[i].Key;
+                <span style="@($"grid-row:{row};grid-column:{col}")">@MetricSpec[i].Caption</span>
+                <span style="@($"grid-row:{row};grid-column:{col + 1};text-align:right")" id="@Uid("m-" + key.ToLowerInvariant())">@_metric[key]</span>
+            }
+        </div>
+    </fieldset>
+    <div style="padding:2px 4px">Aged profile (£ sterling) - every bucket is shown even when it is empty:</div>
+    <StGrid Id="@Uid("aged")" Data="_aged" Selected="_agedSelected" SelectedChanged="i => _agedSelected = i" Label="Aged profile" Style="flex:0 0 104px" />
+    <div style="padding:2px 4px">@_itemsCaption</div>
+    <StGrid Id="@Uid("items")" Data="_items" Selected="_itemsSelected" SelectedChanged="i => _itemsSelected = i" Label="Open items" />
+</div>
+
+@code {
+    private const string ItemsCaption = "Open items, oldest due date first:";
+
+    /// <summary>Every figure on the panel keeps a caption of its own, in reading order (COM-024, .Designer.vb:21-29).</summary>
+    private static readonly (string Key, string Caption)[] MetricSpec =
+    [
+        ("STATUS", "Account status:"), ("BALANCE", "Balance (£):"), ("OVERDUE", "Overdue (£):"), ("DISPUTED", "Disputed (£):"),
+        ("LIMIT", "Credit limit (£):"), ("EXPOSURE", "Exposure (£):"), ("AVAILABLE", "Credit available (£):"), ("UTILISED", "Credit utilised (%):"),
+        ("TURNOVER", "Turnover 12 months (£):"), ("DSO", "Days sales outstanding:"), ("AVGDAYS", "Average days to pay:"), ("RECEIPTS", "Receipts 12 months (£):"),
+        ("ITEMS", "Open items (count):"), ("OLDEST", "Oldest due date:"), ("WORST", "Worst days overdue:"), ("UNAPPLIED", "Unapplied cash (£):"),
+    ];
+
+    private static readonly string[] AgedColumns = ["BucketNo", "BucketName", "ItemCount", "AmountGBP", "DisputedGBP"];
+
+    private static readonly string[] ItemColumns =
+    [
+        "OpenItemId", "ItemType", "DocumentNumber", "DocumentDate", "DueDate", "CurrencyCode", "OriginalAmount", "ResidualAmount",
+        "ResidualAmountGBP", "SettlementStatus", "BalanceSide", "DaysOverdue", "BucketNo", "BucketName", "IsDisputed", "DisputedAmountGBP",
+        "CollectionStatus", "LastReminderStep", "LastReminderDate",
+    ];
+
+    private static readonly string[] StatementColumns =
+    [
+        "LineKind", "OpenItemId", "ItemType", "DocumentNumber", "DocumentDate", "DueDate", "CurrencyCode", "OriginalAmount", "AmountGBP",
+        "DebitGBP", "CreditGBP", "DaysOverdue", "BucketNo", "BucketName", "IsDisputed", "DisputedAmountGBP", "RunningBalanceGBP",
+    ];
+
+    private readonly Dictionary<string, string> _metric = MetricSpec.ToDictionary(m => m.Key, _ => "-");
+    private string _customer = "";
+    private string _asAt = "";
+    private string _customerName = "(press F2 for the account list)";
+    private string _itemsCaption = ItemsCaption;
+    private GridData _aged = GridData.Empty;
+    private GridData _items = GridData.Empty;
+    private int _agedSelected = -1;
+    private int _itemsSelected = -1;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        ArWindow.Size(Window, Browser, 888, 586);
+    }
+
+    /// <summary>frmCustomerEnquiry.OnLoad: as-at = business date, the menu argument pre-fills the account and loads.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _asAt = ArFmt.Date(Session.BusinessDate);
+        if (FormArgument != "") _customer = FormArgument;
+        SetStatus("Key an account and press F5, or press F2 for the account list.");
+        if (_customer != "") await LoadDataAsync();
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadDataAsync();
+
+    /// <summary>F2: the account list (frmLookup.Pick over DebtorsService.CustomerPickSql = named lookup AR.CUSTOMER).</summary>
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        var code = await Dialogs.LookupAsync("named", "AR.CUSTOMER", "Customer account");
+        if (code == "") return;
+        _customer = code;
+        await LoadDataAsync();
+    }
+
+    private DateOnly AsAt() => ArFmt.ParseDate(_asAt) ?? Session.BusinessDate;
+
+    private async Task LoadDataAsync()
+    {
+        ClearResults();
+        var customer = _customer.Trim().ToUpperInvariant();
+        if (customer == "")
+        {
+            SetStatus("Key an account first, or press F2 for the account list.", CueWarning);
+            return;
+        }
+        _customer = customer;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync($"/api/ar/v1/customers/{Query.Path(customer)}/enquiry");
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            ShowBalance(r.Json?["balance"]);
+            _aged = ArFmt.Grid(r.Json?["agedProfile"], AgedColumns);
+            _agedSelected = _aged.Count > 0 ? 0 : -1;
+            _items = ArFmt.Grid(r.Json?["openItems"], ItemColumns);
+            _itemsSelected = _items.Count > 0 ? 0 : -1;
+            ShowTurnover(r.Json?["turnover"]);
+            await ShowMetricsAsync(customer);
+            SetStatus(_items.Count + " open item(s) at " + ArFmt.Date(AsAt()) + ".  F2 account list, F5 refresh, F3 close.", "");
+        });
+    }
+
+    private void ClearResults()
+    {
+        _customerName = "";
+        foreach (var key in _metric.Keys.ToList()) _metric[key] = "";
+        _aged = GridData.Empty;
+        _items = GridData.Empty;
+        _agedSelected = _itemsSelected = -1;
+        _itemsCaption = ItemsCaption;
+    }
+
+    /// <summary>Result set 1 - ar.vw_CustomerBalance, the credit control position.</summary>
+    private void ShowBalance(JsonNode? r)
+    {
+        if (r is not JsonObject) return;
+        var currency = ArFmt.Col(r, "CurrencyCode") is { } c ? ArFmt.Str(c) : "GBP";
+        _customerName = ArFmt.Str(ArFmt.Col(r, "LegalName")) + "  (" + currency + ")";
+        _metric["STATUS"] = ArFmt.Str(ArFmt.Col(r, "CreditState")) + (ArFmt.Bool(ArFmt.Col(r, "HoldFlag")) ? " / ON HOLD" : "");
+        _metric["BALANCE"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "BalanceGBP")));
+        _metric["OVERDUE"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "OverdueGBP")));
+        _metric["DISPUTED"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "DisputedGBP")));
+        _metric["LIMIT"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "CreditLimitGBP")));
+        _metric["EXPOSURE"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "ExposureGBP")));
+        _metric["AVAILABLE"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "CreditAvailableGBP")));
+        _metric["UTILISED"] = ArFmt.Dec(ArFmt.Col(r, "UtilisationPct")).ToString("0.00", UkFormat.Culture);
+        _metric["UNAPPLIED"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "UnappliedCashGBP")));
+        _metric["WORST"] = ArFmt.Int(ArFmt.Col(r, "MaxDaysOverdue")).ToString(UkFormat.Culture);
+        var oldest = ArFmt.Col(r, "OldestDueDate");
+        _metric["OLDEST"] = oldest is null ? "-" : ArFmt.Date(oldest);
+    }
+
+    /// <summary>Result set 3 - turnover, DSO and receipt effectiveness; an undefined DSO is "undefined", never zero (AR-022).</summary>
+    private void ShowTurnover(JsonNode? r)
+    {
+        if (r is not JsonObject) return;
+        _metric["TURNOVER"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "NetTurnoverGBP")));
+        _metric["RECEIPTS"] = ArFmt.Money(ArFmt.Dec(ArFmt.Col(r, "ReceivedGBP")));
+        var dso = ArFmt.Col(r, "DsoDays");
+        _metric["DSO"] = dso is null ? "undefined" : ArFmt.Dec(dso).ToString("0.0", UkFormat.Culture);
+        var avg = ArFmt.Col(r, "AverageDaysToPay");
+        _metric["AVGDAYS"] = avg is null ? "-" : ArFmt.Dec(avg).ToString("0.0", UkFormat.Culture);
+        _metric["ITEMS"] = _items.Count.ToString(UkFormat.Culture);
+    }
+
+    /// <summary>ARENQ refines the figures with the engine's own ageing and DSO basis; anything but RC 00/04 leaves the panel as it is.</summary>
+    private async Task ShowMetricsAsync(string customer)
+    {
+        var r = await Api.GetAsync($"/api/ar/v1/customers/{Query.Path(customer)}/metrics" + Query.Build(("asAt", ArFmt.Iso(AsAt()))));
+        if (!r.IsSuccess)
+        {
+            if (r.Problem?.ReturnCode is null) throw new ApiFailure(r);
+            return;
+        }
+        if (r.Outcome is not { ReturnCode: <= 4 }) return;
+        var ca = r.Data;
+        _metric["WORST"] = ArFmt.Int(ArFmt.Col(ca, "worstDays")).ToString(UkFormat.Culture);
+        _metric["ITEMS"] = ArFmt.Int(ArFmt.Col(ca, "openItems")).ToString(UkFormat.Culture);
+        _metric["OLDEST"] = ArFmt.AreaDate(ca, "oldestDue");
+        _metric["TURNOVER"] = ArFmt.AreaMoney(ca, "turnoverInv");
+        _metric["RECEIPTS"] = ArFmt.AreaMoney(ca, "receiptsValue");
+        _metric["AVGDAYS"] = ArFmt.Int(ArFmt.Col(ca, "avgDaysPaid")).ToString(UkFormat.Culture);
+        _metric["DSO"] = ArFmt.AreaText(ca, "dsoDefined") == "Y" ? ArFmt.Dec(ArFmt.Col(ca, "dso")).ToString("0.0", UkFormat.Culture) : "undefined";
+    }
+
+    /// <summary>The engine's view of exposure and the release decision for this account (CREDCHK CHECK, order value 0).</summary>
+    private async Task CreditCheckAsync()
+    {
+        if (_customer.Trim() == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ar/v1/customers/{Query.Path(_customer.Trim())}/credit-check",
+                new JsonObject
+                {
+                    ["orderValue"] = 0m,
+                    ["currency"] = Session.Selected?.BaseCurrency ?? "",
+                    ["checkPoint"] = "ORDER",
+                    ["documentRef"] = "",
+                }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            var ca = r.Data;
+            var decision = ArFmt.AreaText(ca, "decision");
+            SetStatus("Decision " + decision + " | exposure " + ArFmt.AreaMoney(ca, "exposure") + " of limit " + ArFmt.AreaMoney(ca, "limit") +
+                      " | headroom " + ArFmt.AreaMoney(ca, "headroom") + " | " + ArFmt.AreaText(ca, "decisionText"),
+                      decision == "RELEASE" ? CueOk : CueHold);
+        });
+    }
+
+    /// <summary>Replaces the open item list with the statement lines at the chosen date (style OPENITEM).</summary>
+    private async Task StatementAsync()
+    {
+        if (_customer.Trim() == "") return;
+        await GuardAsync(async () =>
+        {
+            var asAt = AsAt();
+            var r = await Api.GetAsync($"/api/ar/v1/customers/{Query.Path(_customer.Trim())}/statement-lines" +
+                                       Query.Build(("asAt", ArFmt.Iso(asAt)), ("style", "OPENITEM")));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            _items = ArFmt.Grid(r.Json?["lines"], StatementColumns);
+            _itemsSelected = _items.Count > 0 ? 0 : -1;
+            _itemsCaption = "Open item statement at " + ArFmt.Date(asAt) + " - press F5 for the open items:";
+            SetStatus(_items.Count + " statement line(s) at " + ArFmt.Date(asAt) + ".", "");
+        });
+    }
+
+    private Task FindAsync()
+    {
+        _itemsCaption = ItemsCaption;
+        return LoadDataAsync();
+    }
+}

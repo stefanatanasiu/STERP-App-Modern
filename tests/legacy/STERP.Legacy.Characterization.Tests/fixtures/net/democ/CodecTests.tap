@@ -1,0 +1,6 @@
+ok - codec: COMP-3 packed decimal with C/D sign nibble  # REQ: COM-011
+ok - codec: COMP-5 is a native 4 byte integer  # REQ: COM-011
+ok - codec: PIC X is space padded and trimmed  # REQ: COM-011
+ok - codec: SIGN LEADING SEPARATE keeps the sign in its own byte  # REQ: COM-011
+ok - codec: signed zoned decimal uses the GnuCOBOL p..y over-punch  # REQ: COM-011
+ok - codec: unsigned zoned decimal round trip  # REQ: COM-011

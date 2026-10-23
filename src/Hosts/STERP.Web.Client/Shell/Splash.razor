@@ -1,0 +1,14 @@
+@inherits ShellComponentBase
+@* frmSplash (frmSplash.Designer.vb) with the start-up steps of FR-STERP-WEB-010. *@
+<div class="st-splash st-raised" role="main">
+    <div class="st-frame"></div>
+    <h1>@Shell.Options.ProductName</h1>
+    <div class="st-sub">Finance, sales, purchasing, stock and manufacturing</div>
+    <div class="st-line">Version @Version</div>
+    <div class="st-line">(c) 1994-2026 Stellar Business Systems Limited.  All rights reserved.</div>
+    <div class="st-step st-sunken-outer" role="status" aria-live="polite">@(Shell.Steps.Count == 0 ? "Starting..." : string.Join("\n", Shell.Steps))</div>
+</div>
+
+@code {
+    private string Version => Shell.Options.Version.Length > 0 ? Shell.Options.Version : "1.0.0";
+}

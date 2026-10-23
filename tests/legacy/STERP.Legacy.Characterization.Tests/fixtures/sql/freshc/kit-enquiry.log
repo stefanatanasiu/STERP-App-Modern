@@ -1,0 +1,17 @@
+# kit-enquiry
+ok 1 - a kit whose every line is covered is reported ready at 100 per cent -- REQ: KIT-006, KIT-022
+ok 2 - one short line out of three is enough to make the whole kit not ready -- REQ: KIT-006, KIT-022
+ok 3 - the readiness percentage is advisory and reports two lines of three as 66.7 -- REQ: KIT-022
+ok 4 - covering the last short line is what makes the kit ready, nothing else -- REQ: KIT-006
+ok 5 - a cancelled line leaves the requirement and does not count against readiness -- REQ: KIT-005, KIT-006
+ok 6 - a kit with no material lines is not reported ready -- REQ: KIT-006, KIT-022
+ok 7 - issued, returned and scrapped quantities are reported beside readiness -- REQ: KIT-013, KIT-014, KIT-022
+ok 8 - the readiness enquiry answers for one company, site and status only -- REQ: KIT-022, COM-001
+ok 9 - the higher priority kit is covered in full with four of the six free pins -- REQ: KIT-007  AC: AC-078
+ok 10 - the second kit gets the remaining two pins and is short two -- REQ: KIT-007  AC: AC-078
+ok 11 - the six free pins are promised once across both kits, never twice -- REQ: KIT-007  AC: AC-078
+ok 12 - the later kit is answered against the stock the earlier kit has already claimed -- REQ: KIT-007
+ok 13 - an unreleased draft kit makes no claim on stock in a trial -- REQ: KIT-006, KIT-024
+ok 14 - the trial changed no stock, no reservation and no requirement -- REQ: KIT-006  AC: AC-078
+ok 15 - changing the stated priority changes which kit is covered -- REQ: KIT-007  AC: AC-078
+ok 16 - with nothing free the requirement is reported short in full, not covered -- REQ: KIT-006, KIT-007

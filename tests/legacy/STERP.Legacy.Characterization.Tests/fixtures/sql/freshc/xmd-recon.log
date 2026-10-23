@@ -1,0 +1,21 @@
+# xmd-recon
+ok 1 - the control balance view reproduces the RECONCTL general ledger balance for all 7 control families at cutoff 20261031 -- REQ: XMD-005, FIN-021
+ok 2 - each family holds the same distinct control accounts as RECONCTL counts -- REQ: XMD-005, XMD-012
+ok 3 - the reported balance follows the RECONCTL control sign convention -- REQ: XMD-005, XMD-012
+ok 4 - an unposted journal is not part of the control balance -- REQ: XMD-005, FIN-021
+ok 5 - posting the journal moves the control balance by exactly its sterling debit -- REQ: XMD-005, XMD-012
+ok 6 - a journal posted after the cutoff is outside it and inside the later one -- REQ: XMD-005, XMD-012
+ok 7 - a posting to an account with no control type never reaches the control balance -- REQ: XMD-005
+ok 8 - another company's control posting stays out of this company's balance -- REQ: XMD-005, COM-001
+ok 9 - exceptions age into the EXCPAGE buckets 0-7, 8-30, 31-60 and 61 plus -- REQ: XMD-006, RPT-016
+ok 10 - every exception is counted once, in one bucket, for its own value -- REQ: XMD-006, XMD-012
+ok 11 - reassigning an exception does not reset its age -- REQ: XMD-006
+ok 12 - an exception with no owner is reported as unowned, not omitted -- REQ: XMD-006, XMD-009
+ok 13 - an unknown reference is reported as a broken chain, not as an empty success -- REQ: XMD-012
+ok 14 - the chain trace numbers its steps from one, without gaps, operations first -- REQ: XMD-001, XMD-003
+ok 15 - a reversal or credit is listed as its own step, never folded into another -- REQ: XMD-004
+ok 16 - a document type that starts no chain is refused with a stated reason -- REQ: XMD-001, COM-020
+ok 17 - the sales ledger balance is the outstanding amount, below the documents as raised by the 4.50 of discounts and write offs allowed -- REQ: AR-021, XMD-002
+ok 18 - the debtors control account holds the outstanding sales ledger at cutoff 20261031 -- REQ: AR-026, XMD-005
+ok 19 - RECONCTL and CSTINVAL value stock from the same costing pool, 1060051.85, and it is not negative -- REQ: CST-022, XMD-005
+ok 20 - the valuation reconciliation reads every INVENTORY control account by posting date, 1060051.85 -- REQ: CST-022, XMD-012

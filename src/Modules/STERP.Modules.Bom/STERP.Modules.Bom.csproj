@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Modules.Bom</RootNamespace>
+    <Description>STERP-BOM slice (wave W8): Bills of Material: BOM editor, explosion, where-used, costing, bulk change.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Platform\STERP.Platform.Hosting\STERP.Platform.Hosting.csproj" />
+
+  </ItemGroup>
+</Project>

@@ -1,0 +1,49 @@
+@using Sterp.Web.Framework.Format
+@* A captioned text box (UiStyle.Caption + UiStyle.Edit). The visible label keeps the legacy caption and access key; the
+   accessible name is the caption without "&" and ":" so assistive technology and automation find it (contracts 9.6). *@
+<span class="@(Inline ? "st-filter" : "st-field")" data-sterp-field="@Field">
+    <label for="@Id" style="@(LabelWidth > 0 ? $"width:{LabelWidth}px;display:inline-block" : null)"><StMnemonic Text="@Caption" /></label>
+    <input id="@Id" class="st-input @(Right ? "st-right" : null)" aria-label="@UkFormat.LabelText(Caption)" value="@Value" readonly="@ReadOnly" disabled="@Disabled"
+           maxlength="@(MaxLength > 0 ? MaxLength : null)" style="width:@(Width)px" autocomplete="off" spellcheck="false" @oninput="OnInput" @onfocus="OnFocus" />
+    @ChildContent
+</span>
+
+@code {
+    [Parameter, EditorRequired] public string Caption { get; set; } = "";
+
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    [Parameter] public string Id { get; set; } = "f-" + Guid.NewGuid().ToString("N")[..8];
+
+    /// <summary>Logical field name reported with key presses (F2 lookup of the focused field).</summary>
+    [Parameter] public string? Field { get; set; }
+
+    [Parameter] public int Width { get; set; } = 120;
+
+    [Parameter] public int LabelWidth { get; set; }
+
+    [Parameter] public int MaxLength { get; set; }
+
+    [Parameter] public bool ReadOnly { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
+
+    [Parameter] public bool Right { get; set; }
+
+    /// <summary>Filter-row layout (caption and box side by side, wrapping with the row).</summary>
+    [Parameter] public bool Inline { get; set; }
+
+    [Parameter] public EventCallback OnFocused { get; set; }
+
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString() ?? "";
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private Task OnFocus() => OnFocused.InvokeAsync();
+}

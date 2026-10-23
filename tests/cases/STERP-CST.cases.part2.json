@@ -1,0 +1,33 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-CST",
+  "authored_by": "Agent 07 attempt a07-20261020T154730Z-b88d28f6 - shared-in-place concurrency obligation (contracts 4.9, 6.7)",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-CST-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-CST-012-EDGE-COEXIST-STATUS-GATE",
+          "ac": null,
+          "title": "A cost set moved to REVIEW by a legacy writer is refused by the target review with CST0403",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {"login": "SYSADM", "company": "STC", "site": "RDG"},
+          "covers": ["concurrency", "coexistence"],
+          "steps": [
+            {"save": "legacy", "sql": "UPDATE cst.CostSet SET Status = 'REVIEW', ReviewedBy = 'COSTACC', ModifiedBy = 'COSTACC', ModifiedAt = SYSDATETIME() WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'; SELECT Status FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'"},
+            {"save": "r", "call": "cst_reviewCostSet", "path": {"costSet": "FY2027DRAFT"}, "body": {}}
+          ],
+          "assertions": [
+            {"on": "legacy", "json": "$[0].Status", "equals": "REVIEW"},
+            {"on": "r", "problem": {"status": 422, "reasonCode": "CST0403", "detailContains": "Cost set is REVIEW - it must be DRAFT for this action"}},
+            {"sql": "SELECT ReviewedBy FROM cst.CostSet WHERE CompanyCode = 'STC' AND CostSetCode = 'FY2027DRAFT'", "equals": "COSTACC"}
+          ],
+          "derivation": "The legacy writer step reproduces the STDCOST 2000 REVIEW statement (UPDATE cst.CostSet SET Status = 'REVIEW', ReviewedBy, ModifiedBy, ModifiedAt; STDCOST.cob:286-406) on the freshc row FY2027DRAFT (DRAFT in the seed); the binding cst_reviewCostSet description requires status DRAFT else 422 CST0403 'Cost set is <status> - it must be DRAFT for this action', so the target applies the legacy status gate to rows changed by the legacy writer (contracts 4.9, 6.7).",
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ]
+}

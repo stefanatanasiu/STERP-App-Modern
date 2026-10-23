@@ -1,0 +1,30 @@
+@inherits StListPage
+@* Example list page (not registered): the ListForm pattern - filters, page actions between Refresh (F5) and Close (F3), a
+   grid with the legacy captions and UK formats, '<n> record(s)'. Replace the operation and columns with the slice's own. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Item:" Inline="true" Width="140" Field="ItemCode" @bind-Value="_item" Id="@Uid("item")" />
+    </Filters>
+    <Tools>
+        <StToolButton Text="Details" Glyph="FIND" OnClick="DetailsAsync" />
+    </Tools>
+</StListLayout>
+
+@code {
+    private string _item = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Example Enquiry");
+    }
+
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/example/v1/items" + Query.Build(("search", _item.Trim())));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json, new GridColumn("itemCode"), new GridColumn("qtyOnHand", kind: "QTY")));
+    });
+
+    private Task DetailsAsync() => InfoAsync("Item " + SelectedText("itemCode"), "Details");
+}

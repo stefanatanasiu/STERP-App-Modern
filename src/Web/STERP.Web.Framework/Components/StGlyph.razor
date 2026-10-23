@@ -1,0 +1,61 @@
+@* 16x16 toolbar glyphs: inline SVG equivalents of UiStyle.Glyph (UiStyle.vb:181-240); decorative, the caption is the name. *@
+<svg class="st-glyph" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+    @switch (Kind?.ToUpperInvariant())
+    {
+        case "NEW":
+            <rect x="3.5" y="1.5" width="9" height="13" fill="#fff" stroke="#404040" />
+            <path d="M5 4.5h5M5 7.5h5M5 10.5h3" stroke="#808080" />
+            break;
+        case "SAVE":
+            <rect x="1" y="1" width="14" height="14" fill="#000080" />
+            <rect x="4" y="2" width="8" height="5" fill="#fff" />
+            <rect x="3" y="9" width="10" height="5" fill="#dcdcdc" />
+            break;
+        case "RETIRE":
+            <path d="M3 3L12 12M12 3L3 12" stroke="#800000" stroke-width="2" />
+            break;
+        case "REFRESH":
+            <path d="M12.5 5.5A5.5 5.5 0 1 0 13 9" fill="none" stroke="#006000" stroke-width="2" />
+            <polygon points="11,0 15,5 9,5" fill="#006000" />
+            break;
+        case "FIND":
+            <circle cx="6" cy="6" r="4" fill="none" stroke="#000080" stroke-width="2" />
+            <path d="M9 9L14 14" stroke="#000080" stroke-width="2" />
+            break;
+        case "PRINT":
+            <rect x="4.5" y="1.5" width="7" height="4" fill="#fff" stroke="#404040" />
+            <rect x="1" y="5" width="14" height="6" fill="#696969" />
+            <rect x="4.5" y="9.5" width="7" height="5" fill="#fff" stroke="#404040" />
+            break;
+        case "POST":
+            <polyline points="2,8 6,13 14,2" fill="none" stroke="#007000" stroke-width="3" />
+            break;
+        case "REJECT":
+            <path d="M3 3L13 13M13 3L3 13" stroke="#800000" stroke-width="3" />
+            break;
+        case "RUN":
+            <polygon points="3,1 14,8 3,15" fill="#006000" />
+            break;
+        case "CLOSE":
+            <rect x="2.5" y="2.5" width="11" height="11" fill="#dcdcdc" stroke="#404040" />
+            <path d="M5 5L11 11M11 5L5 11" stroke="#000" stroke-width="2" />
+            break;
+        case "ENGINE":
+            <rect x="1.5" y="3.5" width="13" height="9" fill="#dcdcdc" stroke="#404040" />
+            <rect x="3" y="5" width="3" height="3" fill="#00ff00" />
+            <rect x="7" y="5" width="3" height="3" fill="#ffd700" />
+            <path d="M3 10.5h9" stroke="#808080" />
+            break;
+        case "EDIT":
+            <path d="M3 13L4 9L11 2L14 5L7 12Z" fill="#ffd700" stroke="#404040" />
+            <path d="M3 13L4 9L7 12Z" fill="#fff" stroke="#404040" />
+            break;
+        default:
+            <rect x="2.5" y="2.5" width="11" height="11" fill="#dcdcdc" stroke="#404040" />
+            break;
+    }
+</svg>
+
+@code {
+    [Parameter] public string? Kind { get; set; }
+}

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Ar</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Ar</AssemblyName>
+    <Description>STERP-AR GUI pages (STERP-AR.md section 7.3): customer enquiry, receipt entry and allocation, credit control worklist and credit overrides.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

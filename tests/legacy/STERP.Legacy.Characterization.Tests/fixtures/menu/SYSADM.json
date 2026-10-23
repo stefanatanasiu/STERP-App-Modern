@@ -1,0 +1,1832 @@
+[
+  {
+    "MenuCode": "FILE",
+    "ParentMenuCode": null,
+    "Caption": "\u0026File",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYSTEM",
+    "ParentMenuCode": null,
+    "Caption": "\u0026System",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN",
+    "ParentMenuCode": null,
+    "Caption": "Fi\u0026nance",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Debtors",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Creditors",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO",
+    "ParentMenuCode": null,
+    "Caption": "Sa\u0026les",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Bills of Material",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 70,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Purchasing",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 70,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Kits",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 75,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM",
+    "ParentMenuCode": null,
+    "Caption": "Stoc\u0026k Control",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 80,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Costing",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Reports",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 120,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WINDOW",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Window",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 130,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "HELP",
+    "ParentMenuCode": null,
+    "Caption": "\u0026Help",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 140,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.SUPPLIER.VERIFY",
+    "ParentMenuCode": "AP",
+    "Caption": "\u0026Supplier and Bank Verification...",
+    "FormClass": "frmSupplierVerify",
+    "FormArgument": null,
+    "PermissionCode": "AP.SUPPLIER.VIEW",
+    "SortOrder": 10,
+    "Shortcut": "F5"
+  },
+  {
+    "MenuCode": "AP.SUPPLIER.BANKAPP",
+    "ParentMenuCode": "AP",
+    "Caption": "Approve Supplier Bank Changes...",
+    "FormClass": "frmSupplierVerify",
+    "FormArgument": null,
+    "PermissionCode": "AP.BANK.APPROVE",
+    "SortOrder": 15,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.INVOICE.REG",
+    "ParentMenuCode": "AP",
+    "Caption": "\u0026Invoice Register and Matching...",
+    "FormClass": "frmInvoiceRegister",
+    "FormArgument": null,
+    "PermissionCode": "AP.INVOICE.ENTER",
+    "SortOrder": 20,
+    "Shortcut": "F6"
+  },
+  {
+    "MenuCode": "AP.PAYMENT.RUN",
+    "ParentMenuCode": "AP",
+    "Caption": "\u0026Payment Proposal and Run...",
+    "FormClass": "frmPaymentRun",
+    "FormArgument": null,
+    "PermissionCode": "AP.PAYMENT.PROPOSE",
+    "SortOrder": 30,
+    "Shortcut": "F7"
+  },
+  {
+    "MenuCode": "AP.PAYMENT.AUTH",
+    "ParentMenuCode": "AP",
+    "Caption": "Authorise Payment \u0026Run...",
+    "FormClass": "frmPaymentRun",
+    "FormArgument": null,
+    "PermissionCode": "AP.PAYMENT.APPROVE",
+    "SortOrder": 31,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.PAYMENT.REL",
+    "ParentMenuCode": "AP",
+    "Caption": "Release Payment Run...",
+    "FormClass": "frmPaymentRun",
+    "FormArgument": null,
+    "PermissionCode": "AP.PAYMENT.RELEASE",
+    "SortOrder": 32,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT",
+    "ParentMenuCode": "AP",
+    "Caption": "Creditors Repor\u0026ts",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT.AGED",
+    "ParentMenuCode": "AP.RPT",
+    "Caption": "\u0026Aged Creditors...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "APAGED",
+    "PermissionCode": "AP.ENQUIRY.VIEW",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT.REMIT",
+    "ParentMenuCode": "AP.RPT",
+    "Caption": "\u0026Remittance Advices...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "APREMIT",
+    "PermissionCode": "AP.PAYMENT.RELEASE",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT.BACS",
+    "ParentMenuCode": "AP.RPT",
+    "Caption": "\u0026Bacs Payment File...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "APBACS",
+    "PermissionCode": "AP.PAYMENT.RELEASE",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT.PPR",
+    "ParentMenuCode": "AP.RPT",
+    "Caption": "\u0026Payment Practices Report...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "APPPR",
+    "PermissionCode": "AP.PRACTICES.REPORT",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AP.RPT.VAT6M",
+    "ParentMenuCode": "AP.RPT",
+    "Caption": "Six Month \u0026Unpaid Input VAT...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "APVAT6M",
+    "PermissionCode": "AP.ENQUIRY.VIEW",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.CUSTOMER.ENQ",
+    "ParentMenuCode": "AR",
+    "Caption": "Customer \u0026Enquiry...",
+    "FormClass": "frmCustomerEnquiry",
+    "FormArgument": null,
+    "PermissionCode": "AR.ENQUIRY",
+    "SortOrder": 10,
+    "Shortcut": "F5"
+  },
+  {
+    "MenuCode": "AR.RECEIPT.ENTRY",
+    "ParentMenuCode": "AR",
+    "Caption": "\u0026Receipt Entry...",
+    "FormClass": "frmReceiptEntry",
+    "FormArgument": null,
+    "PermissionCode": "AR.RECEIPT.ENTER",
+    "SortOrder": 20,
+    "Shortcut": "F6"
+  },
+  {
+    "MenuCode": "AR.CREDIT.WORKLIST",
+    "ParentMenuCode": "AR",
+    "Caption": "Credit Control \u0026Worklist...",
+    "FormClass": "frmCreditControl",
+    "FormArgument": null,
+    "PermissionCode": "AR.ENQUIRY",
+    "SortOrder": 30,
+    "Shortcut": "F7"
+  },
+  {
+    "MenuCode": "AR.CREDIT.MAINT",
+    "ParentMenuCode": "AR",
+    "Caption": "\u0026Credit Limits and Holds...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "AR.CREDIT",
+    "PermissionCode": "AR.CREDIT.SET",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.OVERRIDE.MAINT",
+    "ParentMenuCode": "AR",
+    "Caption": "Credit \u0026Overrides...",
+    "FormClass": "frmCreditOverride",
+    "FormArgument": null,
+    "PermissionCode": "AR.CREDIT.OVERRIDE",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.DD.MAINT",
+    "ParentMenuCode": "AR",
+    "Caption": "\u0026Direct Debit Mandates...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "AR.DDMANDATE",
+    "PermissionCode": "AR.DD.MANAGE",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.RPT",
+    "ParentMenuCode": "AR",
+    "Caption": "Debtors Repor\u0026ts",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.RPT.AGED",
+    "ParentMenuCode": "AR.RPT",
+    "Caption": "\u0026Aged Debt...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "AGEDDEBT",
+    "PermissionCode": "AR.ENQUIRY",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.RPT.STATEMENT",
+    "ParentMenuCode": "AR.RPT",
+    "Caption": "Customer \u0026Statements...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "STATEMNT",
+    "PermissionCode": "AR.STATEMENT.RUN",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.RPT.DUNNING",
+    "ParentMenuCode": "AR.RPT",
+    "Caption": "\u0026Dunning Letters...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "DUNNING",
+    "PermissionCode": "AR.DUNNING.RUN",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.RPT.DDCOLL",
+    "ParentMenuCode": "AR.RPT",
+    "Caption": "Direct Debit \u0026Collections...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "DDCOLL",
+    "PermissionCode": "AR.DD.COLLECT.RUN",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.RPT.RECON",
+    "ParentMenuCode": "AR.RPT",
+    "Caption": "Debtors to Ledger \u0026Reconciliation...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "ARRECON",
+    "PermissionCode": "AR.ENQUIRY",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "AR.RPT.EINV",
+    "ParentMenuCode": "AR.RPT",
+    "Caption": "\u0026Electronic Invoice Export...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "EINVUBL",
+    "PermissionCode": "AR.INVOICE.POST",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM.EDIT",
+    "ParentMenuCode": "BOM",
+    "Caption": "\u0026Bill Maintenance...",
+    "FormClass": "frmBomEditor",
+    "FormArgument": null,
+    "PermissionCode": "BOM.MAINT",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM.HEADERS",
+    "ParentMenuCode": "BOM",
+    "Caption": "Bill \u0026Headers (list)...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "BOM.HEADER",
+    "PermissionCode": "BOM.MAINT",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM.EXPLODE",
+    "ParentMenuCode": "BOM",
+    "Caption": "\u0026Explosion Enquiry...",
+    "FormClass": "frmBomExplosion",
+    "FormArgument": null,
+    "PermissionCode": "BOM.EXPLODE.RUN",
+    "SortOrder": 40,
+    "Shortcut": "Ctrl\u002BE"
+  },
+  {
+    "MenuCode": "BOM.WHEREUSED",
+    "ParentMenuCode": "BOM",
+    "Caption": "\u0026Where Used Enquiry...",
+    "FormClass": "frmBomWhereUsed",
+    "FormArgument": null,
+    "PermissionCode": "BOM.WHEREUSED.VIEW",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM.COMPARE",
+    "ParentMenuCode": "BOM",
+    "Caption": "Revision \u0026Comparison...",
+    "FormClass": "frmBomExplosion",
+    "FormArgument": "COMPARE",
+    "PermissionCode": "BOM.VIEW",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM.CHANGE",
+    "ParentMenuCode": "BOM",
+    "Caption": "Engineering \u0026Changes...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "BOM.CHANGE",
+    "PermissionCode": "BOM.CHANGE.APPROVE",
+    "SortOrder": 70,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM.CHANGE.PREVIEW",
+    "ParentMenuCode": "BOM",
+    "Caption": "Bulk Change \u0026Preview...",
+    "FormClass": "frmBomBulkPreview",
+    "FormArgument": null,
+    "PermissionCode": "BOM.VIEW",
+    "SortOrder": 75,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM.RPT.INDENT",
+    "ParentMenuCode": "BOM",
+    "Caption": "Indented Parts \u0026List...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "BOMRP010",
+    "PermissionCode": "BOM.VIEW",
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "BOM.RPT.COSTED",
+    "ParentMenuCode": "BOM",
+    "Caption": "Costed E\u0026xplosion...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "BOMRP020",
+    "PermissionCode": "BOM.COST.ROLLUP",
+    "SortOrder": 100,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.ENQUIRY",
+    "ParentMenuCode": "CST",
+    "Caption": "Item Cost \u0026Enquiry...",
+    "FormClass": "frmCostEnquiry",
+    "FormArgument": null,
+    "PermissionCode": "CST.COST.VIEW",
+    "SortOrder": 10,
+    "Shortcut": "Ctrl\u002BK"
+  },
+  {
+    "MenuCode": "CST.COSTSET",
+    "ParentMenuCode": "CST",
+    "Caption": "\u0026Cost Sets...",
+    "FormClass": "frmCostSet",
+    "FormArgument": null,
+    "PermissionCode": "CST.STANDARD.MAINT",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.ROLLUP",
+    "ParentMenuCode": "CST",
+    "Caption": "\u0026Roll-up and What-if...",
+    "FormClass": "frmCostRollup",
+    "FormArgument": null,
+    "PermissionCode": "CST.STANDARD.MAINT",
+    "SortOrder": 30,
+    "Shortcut": "Ctrl\u002BR"
+  },
+  {
+    "MenuCode": "CST.RATES",
+    "ParentMenuCode": "CST",
+    "Caption": "\u0026Work Centre Rates...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CST.RATES",
+    "PermissionCode": "CST.RATE.MAINT",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.ELEMENTS",
+    "ParentMenuCode": "CST",
+    "Caption": "Cost \u0026Elements...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CST.ELEMENT",
+    "PermissionCode": "CST.RATE.MAINT",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.POLICY",
+    "ParentMenuCode": "CST",
+    "Caption": "Valuation \u0026Policy...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CST.POLICY",
+    "PermissionCode": "CST.RATE.MAINT",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.JOB",
+    "ParentMenuCode": "CST",
+    "Caption": "\u0026Job Cost Enquiry...",
+    "FormClass": "frmJobCost",
+    "FormArgument": null,
+    "PermissionCode": "CST.JOB.MAINT",
+    "SortOrder": 70,
+    "Shortcut": "Ctrl\u002BJ"
+  },
+  {
+    "MenuCode": "CST.WIP",
+    "ParentMenuCode": "CST",
+    "Caption": "Work in \u0026Progress...",
+    "FormClass": "frmJobCost",
+    "FormArgument": "WIP",
+    "PermissionCode": "CST.WIP.VIEW",
+    "SortOrder": 80,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.VARIANCE",
+    "ParentMenuCode": "CST",
+    "Caption": "\u0026Variance Analysis...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "CSTRP030",
+    "PermissionCode": "CST.VARIANCE.VIEW",
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.LANDED",
+    "ParentMenuCode": "CST",
+    "Caption": "\u0026Landed Cost Allocation...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CST.LANDED",
+    "PermissionCode": "CST.LANDED.MAINT",
+    "SortOrder": 100,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.NRV",
+    "ParentMenuCode": "CST",
+    "Caption": "\u0026Net Realisable Value...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CST.NRV",
+    "PermissionCode": "CST.NRV.POST",
+    "SortOrder": 110,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.RPT.VAL",
+    "ParentMenuCode": "CST",
+    "Caption": "Inventory Va\u0026luation...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "CSTRP010",
+    "PermissionCode": "CST.COST.VIEW",
+    "SortOrder": 130,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.RPT.JOB",
+    "ParentMenuCode": "CST",
+    "Caption": "Job Profita\u0026bility...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "CSTRP020",
+    "PermissionCode": "CST.JOB.MAINT",
+    "SortOrder": 140,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.RPT.WIP",
+    "ParentMenuCode": "CST",
+    "Caption": "\u0026Work in Progress Roll-forward...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "CSTRP050",
+    "PermissionCode": "CST.JOB.MAINT",
+    "SortOrder": 145,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "CST.RPT.COMPARE",
+    "ParentMenuCode": "CST",
+    "Caption": "Cost Set Co\u0026mparison...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "CSTRP040",
+    "PermissionCode": "CST.STANDARD.MAINT",
+    "SortOrder": 150,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FILE.COMPANY",
+    "ParentMenuCode": "FILE",
+    "Caption": "Select \u0026Company / Site...",
+    "FormClass": null,
+    "FormArgument": "$COMPANY",
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FILE.RUNAS",
+    "ParentMenuCode": "FILE",
+    "Caption": "Continue as \u0026User...",
+    "FormClass": null,
+    "FormArgument": "$RUNAS",
+    "PermissionCode": null,
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FILE.SPOOL",
+    "ParentMenuCode": "FILE",
+    "Caption": "View \u0026Spool File...",
+    "FormClass": "frmSpoolViewer",
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 30,
+    "Shortcut": "Ctrl\u002BO"
+  },
+  {
+    "MenuCode": "FILE.PRINTSET",
+    "ParentMenuCode": "FILE",
+    "Caption": "P\u0026rinter Setup...",
+    "FormClass": null,
+    "FormArgument": "$PRINTSETUP",
+    "PermissionCode": null,
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FILE.EXIT",
+    "ParentMenuCode": "FILE",
+    "Caption": "E\u0026xit",
+    "FormClass": null,
+    "FormArgument": "$EXIT",
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": "Alt\u002BF4"
+  },
+  {
+    "MenuCode": "FIN.JOURNAL.ENTRY",
+    "ParentMenuCode": "FIN",
+    "Caption": "\u0026Journal Entry...",
+    "FormClass": "frmJournalEntry",
+    "FormArgument": null,
+    "PermissionCode": "FIN.JOURNAL.ENTER",
+    "SortOrder": 10,
+    "Shortcut": "F5"
+  },
+  {
+    "MenuCode": "FIN.JOURNAL.ENQ",
+    "ParentMenuCode": "FIN",
+    "Caption": "Journal \u0026Enquiry...",
+    "FormClass": "frmJournalEnquiry",
+    "FormArgument": null,
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 20,
+    "Shortcut": "F6"
+  },
+  {
+    "MenuCode": "FIN.PERIOD.CLOSE",
+    "ParentMenuCode": "FIN",
+    "Caption": "\u0026Period Close Checklist...",
+    "FormClass": "frmPeriodClose",
+    "FormArgument": null,
+    "PermissionCode": "FIN.PERIOD.VIEW",
+    "SortOrder": 30,
+    "Shortcut": "F7"
+  },
+  {
+    "MenuCode": "FIN.VAT.RETURN",
+    "ParentMenuCode": "FIN",
+    "Caption": "\u0026VAT Return...",
+    "FormClass": "frmVatReturn",
+    "FormArgument": null,
+    "PermissionCode": "FIN.VAT.PREPARE",
+    "SortOrder": 40,
+    "Shortcut": "F8"
+  },
+  {
+    "MenuCode": "FIN.VAT.REVIEW",
+    "ParentMenuCode": "FIN",
+    "Caption": "VAT Review / \u0026Finalise...",
+    "FormClass": "frmVatReturn",
+    "FormArgument": null,
+    "PermissionCode": "FIN.VAT.APPROVE",
+    "SortOrder": 41,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.VAT.LOCALFILE",
+    "ParentMenuCode": "FIN",
+    "Caption": "VAT \u0026Local File (not transmitted)...",
+    "FormClass": "frmVatReturn",
+    "FormArgument": null,
+    "PermissionCode": "FIN.VAT.SUBMIT",
+    "SortOrder": 42,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.BANK.RECON",
+    "ParentMenuCode": "FIN",
+    "Caption": "\u0026Bank Reconciliation...",
+    "FormClass": "frmBankRecon",
+    "FormArgument": null,
+    "PermissionCode": "FIN.BANK.RECONCILE",
+    "SortOrder": 50,
+    "Shortcut": "F9"
+  },
+  {
+    "MenuCode": "FIN.MAINT",
+    "ParentMenuCode": "FIN",
+    "Caption": "Finance \u0026Maintenance",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 70,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RUN",
+    "ParentMenuCode": "FIN",
+    "Caption": "Finance \u0026Runs",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 80,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RPT",
+    "ParentMenuCode": "FIN",
+    "Caption": "Finance Repor\u0026ts",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.MAINT.ACCOUNT",
+    "ParentMenuCode": "FIN.MAINT",
+    "Caption": "Chart of \u0026Accounts...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "FIN.ACCOUNT",
+    "PermissionCode": "FIN.ACCOUNT.MAINT",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.MAINT.ACCLASS",
+    "ParentMenuCode": "FIN.MAINT",
+    "Caption": "Account \u0026Classes...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "FIN.ACCLASS",
+    "PermissionCode": "FIN.ACCOUNT.MAINT",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.MAINT.VATCODE",
+    "ParentMenuCode": "FIN.MAINT",
+    "Caption": "\u0026VAT Codes...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "FIN.VATCODE",
+    "PermissionCode": "FIN.VAT.APPROVE",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.MAINT.VATRATE",
+    "ParentMenuCode": "FIN.MAINT",
+    "Caption": "VAT \u0026Rates...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "FIN.VATRATE",
+    "PermissionCode": "FIN.VAT.APPROVE",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.MAINT.BUDGET",
+    "ParentMenuCode": "FIN.MAINT",
+    "Caption": "\u0026Budget Versions...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "FIN.BUDGET",
+    "PermissionCode": "FIN.BUDGET.MAINT",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.MAINT.BUDGLINE",
+    "ParentMenuCode": "FIN.MAINT",
+    "Caption": "Budget \u0026Lines...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "FIN.BUDGETLINE",
+    "PermissionCode": "FIN.BUDGET.MAINT",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.MAINT.BANK",
+    "ParentMenuCode": "FIN.MAINT",
+    "Caption": "Bank A\u0026ccounts...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "FIN.BANK",
+    "PermissionCode": "FIN.BANK.MAINT",
+    "SortOrder": 70,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RPT.TB",
+    "ParentMenuCode": "FIN.RPT",
+    "Caption": "\u0026Trial Balance...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "TBRPT",
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RPT.PL",
+    "ParentMenuCode": "FIN.RPT",
+    "Caption": "\u0026Profit and Loss...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "PLRPT",
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RPT.BS",
+    "ParentMenuCode": "FIN.RPT",
+    "Caption": "\u0026Balance Sheet...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "BSRPT",
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RPT.CASHBOOK",
+    "ParentMenuCode": "FIN.RPT",
+    "Caption": "\u0026Cash Book...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "CASHBOOK",
+    "PermissionCode": "FIN.BANK.RECONCILE",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RPT.BUDGET",
+    "ParentMenuCode": "FIN.RPT",
+    "Caption": "Budget \u0026Variance...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "BUDGRPT",
+    "PermissionCode": "FIN.BUDGET.MAINT",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RUN.RECUR",
+    "ParentMenuCode": "FIN.RUN",
+    "Caption": "\u0026Recurring Journals...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "RECURJNL",
+    "PermissionCode": "FIN.RECURRING.MAINT",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RUN.REVAL",
+    "ParentMenuCode": "FIN.RUN",
+    "Caption": "Currency Re\u0026valuation...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "REVALRUN",
+    "PermissionCode": "FIN.REVAL.RUN",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RUN.YEAREND",
+    "ParentMenuCode": "FIN.RUN",
+    "Caption": "\u0026Year End...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "YEAREND",
+    "PermissionCode": "FIN.YEAREND.RUN",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "FIN.RUN.MTD",
+    "ParentMenuCode": "FIN.RUN",
+    "Caption": "\u0026MTD Submission File...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "MTDJSON",
+    "PermissionCode": "FIN.VAT.SUBMIT",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "HELP.CONTENTS",
+    "ParentMenuCode": "HELP",
+    "Caption": "\u0026Contents",
+    "FormClass": null,
+    "FormArgument": "$HELP",
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": "F1"
+  },
+  {
+    "MenuCode": "HELP.ABOUT",
+    "ParentMenuCode": "HELP",
+    "Caption": "\u0026About STERP - Stefan\u0027s ERP...",
+    "FormClass": null,
+    "FormArgument": "$ABOUT",
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.ITEM",
+    "ParentMenuCode": "ITM",
+    "Caption": "\u0026Item and Part Maintenance...",
+    "FormClass": "frmItemMaster",
+    "FormArgument": null,
+    "PermissionCode": "ITM.ITEM.VIEW",
+    "SortOrder": 10,
+    "Shortcut": "Ctrl\u002BI"
+  },
+  {
+    "MenuCode": "ITM.STOCKENQ",
+    "ParentMenuCode": "ITM",
+    "Caption": "Stock \u0026Enquiry...",
+    "FormClass": "frmStockEnquiry",
+    "FormArgument": null,
+    "PermissionCode": "ITM.STOCK.VIEW",
+    "SortOrder": 20,
+    "Shortcut": "Ctrl\u002BK"
+  },
+  {
+    "MenuCode": "ITM.STOCKMOVE",
+    "ParentMenuCode": "ITM",
+    "Caption": "Stock \u0026Movement Entry...",
+    "FormClass": "frmStockMovement",
+    "FormArgument": null,
+    "PermissionCode": "ITM.STOCK.ADJUST",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.STOCKCOUNT",
+    "ParentMenuCode": "ITM",
+    "Caption": "Stock \u0026Count and Adjustment...",
+    "FormClass": "frmStockCount",
+    "FormArgument": null,
+    "PermissionCode": "ITM.COUNT.ENTER",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.UOM",
+    "ParentMenuCode": "ITM",
+    "Caption": "\u0026Units of Measure...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.UOM",
+    "PermissionCode": "ITM.UOM.MAINT",
+    "SortOrder": 100,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.ITEMUOM",
+    "ParentMenuCode": "ITM",
+    "Caption": "Item Unit Con\u0026versions...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.ITEMUOM",
+    "PermissionCode": "ITM.UOM.MAINT",
+    "SortOrder": 110,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.ITEMREV",
+    "ParentMenuCode": "ITM",
+    "Caption": "Item \u0026Revisions...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.ITEMREV",
+    "PermissionCode": "ITM.ITEM.MAINT",
+    "SortOrder": 120,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.ITEMSITE",
+    "ParentMenuCode": "ITM",
+    "Caption": "Item \u0026Site Planning Data...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.ITEMSITE",
+    "PermissionCode": "ITM.ITEM.MAINT",
+    "SortOrder": 130,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.PARTNER",
+    "ParentMenuCode": "ITM",
+    "Caption": "\u0026Partner Part Numbers...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.PARTNER",
+    "PermissionCode": "ITM.ITEM.MAINT",
+    "SortOrder": 140,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.SUBST",
+    "ParentMenuCode": "ITM",
+    "Caption": "Approved Su\u0026bstitutes...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.SUBST",
+    "PermissionCode": "ITM.ITEM.MAINT",
+    "SortOrder": 150,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.WAREHOUSE",
+    "ParentMenuCode": "ITM",
+    "Caption": "\u0026Warehouses...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.WAREHOUSE",
+    "PermissionCode": "ITM.LOCATION.MAINT",
+    "SortOrder": 160,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.LOCATION",
+    "ParentMenuCode": "ITM",
+    "Caption": "Stock \u0026Locations...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.LOCATION",
+    "PermissionCode": "ITM.LOCATION.MAINT",
+    "SortOrder": 170,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.LOT",
+    "ParentMenuCode": "ITM",
+    "Caption": "Lo\u0026ts...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.LOT",
+    "PermissionCode": "ITM.LOT.MAINT",
+    "SortOrder": 180,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.SERIAL",
+    "ParentMenuCode": "ITM",
+    "Caption": "Serial \u0026Numbers...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.SERIAL",
+    "PermissionCode": "ITM.LOT.MAINT",
+    "SortOrder": 190,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.VATCLASS",
+    "ParentMenuCode": "ITM",
+    "Caption": "Item V\u0026AT Liability...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.VATCLASS",
+    "PermissionCode": "ITM.ITEM.MAINT",
+    "SortOrder": 200,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.CUSTOMS",
+    "ParentMenuCode": "ITM",
+    "Caption": "Commodit\u0026y Codes and Origin...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.CUSTOMS",
+    "PermissionCode": "ITM.CUSTOMS.MAINT",
+    "SortOrder": 210,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.PACKAGING",
+    "ParentMenuCode": "ITM",
+    "Caption": "Packa\u0026ging Composition...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.PACKAGING",
+    "PermissionCode": "ITM.CUSTOMS.MAINT",
+    "SortOrder": 220,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.COUNTLINE",
+    "ParentMenuCode": "ITM",
+    "Caption": "Count Lin\u0026e Entry...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "ITM.COUNTLINE",
+    "PermissionCode": "ITM.COUNT.ENTER",
+    "SortOrder": 230,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "ITM.REPORTS",
+    "ParentMenuCode": "ITM",
+    "Caption": "Stock Re\u0026ports...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "itm",
+    "PermissionCode": "RPT.RUN",
+    "SortOrder": 300,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT.MAINT",
+    "ParentMenuCode": "KIT",
+    "Caption": "Kit \u0026Maintenance...",
+    "FormClass": "frmKitMaint",
+    "FormArgument": null,
+    "PermissionCode": "KIT.EXEC.CREATE",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT.DEFS",
+    "ParentMenuCode": "KIT",
+    "Caption": "Commercial Kit \u0026Definitions...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "KIT.DEF",
+    "PermissionCode": "KIT.DEF.MAINT",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT.TRIAL",
+    "ParentMenuCode": "KIT",
+    "Caption": "\u0026Trial Kitting...",
+    "FormClass": "frmKitTrial",
+    "FormArgument": null,
+    "PermissionCode": "KIT.TRIAL.RUN",
+    "SortOrder": 40,
+    "Shortcut": "Ctrl\u002BT"
+  },
+  {
+    "MenuCode": "KIT.EXEC",
+    "ParentMenuCode": "KIT",
+    "Caption": "Kit \u0026Execution...",
+    "FormClass": "frmKitExecution",
+    "FormArgument": null,
+    "PermissionCode": "KIT.ISSUE.POST",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT.GENEALOGY",
+    "ParentMenuCode": "KIT",
+    "Caption": "\u0026Genealogy Enquiry...",
+    "FormClass": "frmKitGenealogy",
+    "FormArgument": null,
+    "PermissionCode": "KIT.ENQUIRY.VIEW",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT.DISASSY",
+    "ParentMenuCode": "KIT",
+    "Caption": "\u0026Disassembly...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "KIT.DISASSY",
+    "PermissionCode": "KIT.DISASSEMBLE.POST",
+    "SortOrder": 70,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT.RPT.READY",
+    "ParentMenuCode": "KIT",
+    "Caption": "Kit \u0026Readiness...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "KITRP010",
+    "PermissionCode": "KIT.ENQUIRY.VIEW",
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT.RPT.EXEC",
+    "ParentMenuCode": "KIT",
+    "Caption": "Kit E\u0026xecution Position...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "KITRP020",
+    "PermissionCode": "KIT.ENQUIRY.VIEW",
+    "SortOrder": 100,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "KIT.RPT.SHORT",
+    "ParentMenuCode": "KIT",
+    "Caption": "Kit \u0026Shortage List...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "KITRP030",
+    "PermissionCode": "KIT.ENQUIRY.VIEW",
+    "SortOrder": 110,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.REQ.ENTRY",
+    "ParentMenuCode": "PO",
+    "Caption": "\u0026Requisitions...",
+    "FormClass": "frmRequisition",
+    "FormArgument": null,
+    "PermissionCode": "PO.REQ.ENTER",
+    "SortOrder": 10,
+    "Shortcut": "F5"
+  },
+  {
+    "MenuCode": "PO.ORDER.ENTRY",
+    "ParentMenuCode": "PO",
+    "Caption": "\u0026Purchase Orders...",
+    "FormClass": "frmPurchaseOrder",
+    "FormArgument": null,
+    "PermissionCode": "PO.ORDER.ENTER",
+    "SortOrder": 20,
+    "Shortcut": "F6"
+  },
+  {
+    "MenuCode": "PO.RECEIPT.ENTRY",
+    "ParentMenuCode": "PO",
+    "Caption": "\u0026Goods Receipt and Inspection...",
+    "FormClass": "frmGoodsReceipt",
+    "FormArgument": null,
+    "PermissionCode": "PO.RECEIPT.CONFIRM",
+    "SortOrder": 30,
+    "Shortcut": "F7"
+  },
+  {
+    "MenuCode": "PO.SOURCE.MAINT",
+    "ParentMenuCode": "PO",
+    "Caption": "\u0026Supplier Sources...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "PO.SOURCE",
+    "PermissionCode": "PO.SOURCE.MAINT",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.PRICE.MAINT",
+    "ParentMenuCode": "PO",
+    "Caption": "Purchase P\u0026rices...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "PO.PRICE",
+    "PermissionCode": "PO.PRICE.MAINT",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.TOL.MAINT",
+    "ParentMenuCode": "PO",
+    "Caption": "\u0026Tolerance Rules...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "PO.TOLERANCE",
+    "PermissionCode": "PO.TOLERANCE.MAINT",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.RPT",
+    "ParentMenuCode": "PO",
+    "Caption": "Purchasing Repor\u0026ts",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.RPT.PIPE",
+    "ParentMenuCode": "PO.RPT",
+    "Caption": "Pipeline and \u0026GRNI...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "POPIPE",
+    "PermissionCode": "PO.ENQUIRY.VIEW",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.RPT.OVERDUE",
+    "ParentMenuCode": "PO.RPT",
+    "Caption": "\u0026Overdue Orders...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "OVERDUE",
+    "PermissionCode": "PO.ENQUIRY.VIEW",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.RPT.SUPPPERF",
+    "ParentMenuCode": "PO.RPT",
+    "Caption": "Supplier \u0026Performance...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "SUPPPERF",
+    "PermissionCode": "PO.ENQUIRY.VIEW",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.RPT.PODOC",
+    "ParentMenuCode": "PO.RPT",
+    "Caption": "Print Purchase Order \u0026Document...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "PODOC",
+    "PermissionCode": "PO.ORDER.RELEASE",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "PO.RPT.REQGEN",
+    "ParentMenuCode": "PO.RPT",
+    "Caption": "\u0026Requisition Generation...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "REQGEN",
+    "PermissionCode": "PO.REQ.ENTER",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.CONTROLS",
+    "ParentMenuCode": "RPT",
+    "Caption": "\u0026Controls and reconciliation",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.LAUNCH",
+    "ParentMenuCode": "RPT",
+    "Caption": "\u0026Run Report...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": null,
+    "PermissionCode": "RPT.RUN",
+    "SortOrder": 10,
+    "Shortcut": "Ctrl\u002BR"
+  },
+  {
+    "MenuCode": "RPT.SPOOL",
+    "ParentMenuCode": "RPT",
+    "Caption": "\u0026Spool File Viewer...",
+    "FormClass": "frmSpoolViewer",
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.JOBS",
+    "ParentMenuCode": "RPT",
+    "Caption": "\u0026Job Monitor...",
+    "FormClass": "frmJobMonitor",
+    "FormArgument": null,
+    "PermissionCode": "SYS.JOB.VIEW",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.CONTROLS.RECON",
+    "ParentMenuCode": "RPT.CONTROLS",
+    "Caption": "Control account \u0026reconciliation",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "RPT-015",
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.CONTROLS.EXCP",
+    "ParentMenuCode": "RPT.CONTROLS",
+    "Caption": "\u0026Exception ageing and escalation",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "RPT-016",
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.CONTROLS.OBLIG",
+    "ParentMenuCode": "RPT.CONTROLS",
+    "Caption": "Statutory \u0026obligations register",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "XMD.OBLIGREG",
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.CONTROLS.KPI",
+    "ParentMenuCode": "RPT.CONTROLS",
+    "Caption": "On time in full (\u0026KPI)",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "XMD.KPIOTIF",
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.CONTROLS.CHAIN",
+    "ParentMenuCode": "RPT.CONTROLS",
+    "Caption": "Business chain \u0026trace",
+    "FormClass": "frmChainTrace",
+    "FormArgument": null,
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.CONTROLS.CHAINRPT",
+    "ParentMenuCode": "RPT.CONTROLS",
+    "Caption": "Chain trace \u0026report",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "XMD.CHAINRPT",
+    "PermissionCode": "FIN.ENQUIRY.VIEW",
+    "SortOrder": 55,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "RPT.CONTROLS.CONV",
+    "ParentMenuCode": "RPT.CONTROLS",
+    "Caption": "Legacy conversion \u0026load",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "XMD.CONVLOAD",
+    "PermissionCode": "FIN.JOURNAL.POST",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.ORDER.ENTRY",
+    "ParentMenuCode": "SO",
+    "Caption": "Sales \u0026Order Entry...",
+    "FormClass": "frmSalesOrderEntry",
+    "FormArgument": null,
+    "PermissionCode": "SO.ORDER.ENTER",
+    "SortOrder": 10,
+    "Shortcut": "Ctrl\u002BShift\u002BO"
+  },
+  {
+    "MenuCode": "AR.OVERRIDE.REQUEST",
+    "ParentMenuCode": "SO",
+    "Caption": "Request Credit \u0026Override...",
+    "FormClass": "frmCreditOverride",
+    "FormArgument": "REQUEST",
+    "PermissionCode": "SO.ORDER.ENTER",
+    "SortOrder": 15,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.DESPATCH.CONF",
+    "ParentMenuCode": "SO",
+    "Caption": "\u0026Despatch Confirmation...",
+    "FormClass": "frmDespatchConfirm",
+    "FormArgument": null,
+    "PermissionCode": "SO.DESPATCH.CONFIRM",
+    "SortOrder": 20,
+    "Shortcut": "Ctrl\u002BShift\u002BD"
+  },
+  {
+    "MenuCode": "SO.INVOICE.RUN",
+    "ParentMenuCode": "SO",
+    "Caption": "Sales \u0026Invoice Run...",
+    "FormClass": "frmSalesInvoiceRun",
+    "FormArgument": null,
+    "PermissionCode": "SO.INVOICE.RUN",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.RETURN.MAINT",
+    "ParentMenuCode": "SO",
+    "Caption": "\u0026Returns and Authorisations...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "SO.RETURN",
+    "PermissionCode": "SO.RETURN.AUTHORISE",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.PRICE.MAINT",
+    "ParentMenuCode": "SO",
+    "Caption": "\u0026Price Lists...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "SO.PRICELIST",
+    "PermissionCode": "SO.PRICELIST.MAINTAIN",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.PRICELINE.MAINT",
+    "ParentMenuCode": "SO",
+    "Caption": "Price List \u0026Breaks...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "SO.PRICELINE",
+    "PermissionCode": "SO.PRICELIST.MAINTAIN",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.REBATE.MAINT",
+    "ParentMenuCode": "SO",
+    "Caption": "Re\u0026bate Agreements...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "SO.REBATE",
+    "PermissionCode": "SO.REBATE.MAINTAIN",
+    "SortOrder": 70,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.RPT",
+    "ParentMenuCode": "SO",
+    "Caption": "Sales Repor\u0026ts",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.RPT.BACKLOG",
+    "ParentMenuCode": "SO.RPT",
+    "Caption": "Sales \u0026Backlog and Fulfilment...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "SO",
+    "PermissionCode": "SO.ENQUIRY.VIEW",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SO.RPT.ANALYSIS",
+    "ParentMenuCode": "SO.RPT",
+    "Caption": "Sales \u0026Analysis...",
+    "FormClass": "frmReportLauncher",
+    "FormArgument": "SO",
+    "PermissionCode": "SO.ENQUIRY.VIEW",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.PARAM",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "System \u0026Parameters...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.PARAM",
+    "PermissionCode": "SYS.PARAM.MAINT",
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.COMPANY",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "C\u0026ompanies...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.COMPANY",
+    "PermissionCode": "SYS.COMPANY.MAINT",
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.SITE",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "\u0026Sites...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.SITE",
+    "PermissionCode": "SYS.SITE.MAINT",
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.USER",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "\u0026Users...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.USER",
+    "PermissionCode": "SYS.USER.MAINT",
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.ROLE",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "\u0026Roles...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.ROLE",
+    "PermissionCode": "SYS.ROLE.MAINT",
+    "SortOrder": 50,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.USERROLE",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "User Ro\u0026les...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.USERROLE",
+    "PermissionCode": "SYS.ROLE.MAINT",
+    "SortOrder": 60,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.PERM",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Per\u0026missions...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.PERM",
+    "PermissionCode": "SYS.ROLE.MAINT",
+    "SortOrder": 70,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.CURRENCY",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Curre\u0026ncies...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.CURRENCY",
+    "PermissionCode": "SYS.FX.MAINT",
+    "SortOrder": 80,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.FXRATE",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "E\u0026xchange Rates...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.FXRATE",
+    "PermissionCode": "SYS.FX.MAINT",
+    "SortOrder": 90,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.PAYTERMS",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Pa\u0026yment Terms...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.PAYTERMS",
+    "PermissionCode": "SYS.PARAM.MAINT",
+    "SortOrder": 100,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.CALENDAR",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Calen\u0026dars...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.CALENDAR",
+    "PermissionCode": "SYS.CALENDAR.MAINT",
+    "SortOrder": 110,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.HOLIDAY",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Calendar \u0026Holidays...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.HOLIDAY",
+    "PermissionCode": "SYS.CALENDAR.MAINT",
+    "SortOrder": 120,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.NUMSER",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Num\u0026ber Series...",
+    "FormClass": "frmGenericMaint",
+    "FormArgument": "CORE.NUMSER",
+    "PermissionCode": "SYS.NUMBER.MAINT",
+    "SortOrder": 130,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.MAINT",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "File Main\u0026tenance...",
+    "FormClass": "frmMaintLauncher",
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 140,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.APPROVAL",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "\u0026Approvals Inbox...",
+    "FormClass": "frmApprovals",
+    "FormArgument": null,
+    "PermissionCode": "SYS.APPROVAL.VIEW",
+    "SortOrder": 200,
+    "Shortcut": "F8"
+  },
+  {
+    "MenuCode": "SYS.EXCEPTION",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "\u0026Exception Worklist...",
+    "FormClass": "frmExceptions",
+    "FormArgument": null,
+    "PermissionCode": "SYS.EXCEPTION.VIEW",
+    "SortOrder": 210,
+    "Shortcut": "F9"
+  },
+  {
+    "MenuCode": "SYS.AUDIT",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Audit En\u0026quiry...",
+    "FormClass": "frmAudit",
+    "FormArgument": null,
+    "PermissionCode": "SYS.AUDIT.VIEW",
+    "SortOrder": 220,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.JOBS",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "\u0026Job Monitor...",
+    "FormClass": "frmJobMonitor",
+    "FormArgument": null,
+    "PermissionCode": "SYS.JOB.VIEW",
+    "SortOrder": 230,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "SYS.ENGINE",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Engine Dia\u0026gnostics...",
+    "FormClass": "frmEngineDiag",
+    "FormArgument": null,
+    "PermissionCode": "SYS.ADMIN",
+    "SortOrder": 240,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "XMD.JOBS",
+    "ParentMenuCode": "SYSTEM",
+    "Caption": "Job streams",
+    "FormClass": null,
+    "FormArgument": null,
+    "PermissionCode": null,
+    "SortOrder": 900,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.CASCADE",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "\u0026Cascade",
+    "FormClass": null,
+    "FormArgument": "$CASCADE",
+    "PermissionCode": null,
+    "SortOrder": 10,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.TILEH",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "Tile \u0026Horizontally",
+    "FormClass": null,
+    "FormArgument": "$TILEH",
+    "PermissionCode": null,
+    "SortOrder": 20,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.TILEV",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "Tile \u0026Vertically",
+    "FormClass": null,
+    "FormArgument": "$TILEV",
+    "PermissionCode": null,
+    "SortOrder": 30,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.ARRANGE",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "\u0026Arrange Icons",
+    "FormClass": null,
+    "FormArgument": "$ARRANGE",
+    "PermissionCode": null,
+    "SortOrder": 40,
+    "Shortcut": null
+  },
+  {
+    "MenuCode": "WIN.CLOSEALL",
+    "ParentMenuCode": "WINDOW",
+    "Caption": "C\u0026lose All",
+    "FormClass": null,
+    "FormArgument": "$CLOSEALL",
+    "PermissionCode": null,
+    "SortOrder": 50,
+    "Shortcut": null
+  }
+]

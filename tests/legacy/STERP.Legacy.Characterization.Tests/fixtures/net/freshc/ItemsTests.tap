@@ -1,0 +1,7 @@
+ok - itm: a movement of a demo receipt is on file with its source and reason  # REQ: ITM-015,ITM-017
+ok - itm: a stock count with a variance and an approved adjustment is seeded  # REQ: ITM-018
+ok - itm: alias search finds an item by its partner part number  # REQ: ITM-009,D-21
+ok - itm: availability answers with the six buckets  # REQ: ITM-013
+ok - itm: stock enquiry reports buckets by condition and ownership  # REQ: ITM-012,ITM-023
+ok - itm: the item master facade reads a seeded item and its tabs  # REQ: ITM-001,ITM-005
+ok - itm: the module's menu, maintenance screens and reports are registered  # REQ: ITM-024,COM-019

@@ -1,0 +1,281 @@
+{
+ "source": "memory/STERP-App/agent-06/application-specs/STERP-WEB.md section 7.2",
+ "routes": [
+  {
+   "formClass": "frmApprovals",
+   "slice": "PLATFORM",
+   "route": "/platform/approvals",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmAudit",
+   "slice": "PLATFORM",
+   "route": "/platform/audit",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmBankRecon",
+   "slice": "FIN",
+   "route": "/fin/bank-recon",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmBomBulkPreview",
+   "slice": "BOM",
+   "route": "/bom/bom-bulk-preview",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmBomEditor",
+   "slice": "BOM",
+   "route": "/bom/bom-editor",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmBomExplosion",
+   "slice": "BOM",
+   "route": "/bom/bom-explosion",
+   "menuRows": 2
+  },
+  {
+   "formClass": "frmBomWhereUsed",
+   "slice": "BOM",
+   "route": "/bom/bom-where-used",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmChainTrace",
+   "slice": "XMD",
+   "route": "/xmd/chain-trace",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmCostEnquiry",
+   "slice": "CST",
+   "route": "/cst/cost-enquiry",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmCostRollup",
+   "slice": "CST",
+   "route": "/cst/cost-rollup",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmCostSet",
+   "slice": "CST",
+   "route": "/cst/cost-set",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmCreditControl",
+   "slice": "AR",
+   "route": "/ar/credit-control",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmCreditOverride",
+   "slice": "AR",
+   "route": "/ar/credit-override",
+   "menuRows": 2
+  },
+  {
+   "formClass": "frmCustomerEnquiry",
+   "slice": "AR",
+   "route": "/ar/customer-enquiry",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmDespatchConfirm",
+   "slice": "SO",
+   "route": "/so/despatch-confirm",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmEngineDiag",
+   "slice": "PLATFORM",
+   "route": "/platform/engine-diag",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmExceptions",
+   "slice": "PLATFORM",
+   "route": "/platform/exceptions",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmGenericMaint",
+   "slice": "PLATFORM",
+   "route": "/platform/generic-maint/{maintCode}",
+   "menuRows": 52
+  },
+  {
+   "formClass": "frmGoodsReceipt",
+   "slice": "PO",
+   "route": "/po/goods-receipt",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmInvoiceRegister",
+   "slice": "AP",
+   "route": "/ap/invoice-register",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmItemMaster",
+   "slice": "ITM",
+   "route": "/itm/item-master",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmJobCost",
+   "slice": "CST",
+   "route": "/cst/job-cost",
+   "menuRows": 2
+  },
+  {
+   "formClass": "frmJobMonitor",
+   "slice": "PLATFORM",
+   "route": "/platform/job-monitor",
+   "menuRows": 2
+  },
+  {
+   "formClass": "frmJournalEnquiry",
+   "slice": "FIN",
+   "route": "/fin/journal-enquiry",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmJournalEntry",
+   "slice": "FIN",
+   "route": "/fin/journal-entry",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmKitExecution",
+   "slice": "KIT",
+   "route": "/kit/kit-execution",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmKitGenealogy",
+   "slice": "KIT",
+   "route": "/kit/kit-genealogy",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmKitMaint",
+   "slice": "KIT",
+   "route": "/kit/kit-maint",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmKitTrial",
+   "slice": "KIT",
+   "route": "/kit/kit-trial",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmLogin",
+   "slice": "PLATFORM",
+   "route": "/platform/login",
+   "menuRows": 0
+  },
+  {
+   "formClass": "frmLookup",
+   "slice": "PLATFORM",
+   "route": "/platform/lookup",
+   "menuRows": 0
+  },
+  {
+   "formClass": "frmMaintLauncher",
+   "slice": "PLATFORM",
+   "route": "/platform/maint-launcher",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmPaymentRun",
+   "slice": "AP",
+   "route": "/ap/payment-run",
+   "menuRows": 3
+  },
+  {
+   "formClass": "frmPeriodClose",
+   "slice": "FIN",
+   "route": "/fin/period-close",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmPurchaseOrder",
+   "slice": "PO",
+   "route": "/po/purchase-order",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmReceiptEntry",
+   "slice": "AR",
+   "route": "/ar/receipt-entry",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmReportLauncher",
+   "slice": "PLATFORM",
+   "route": "/platform/report-launcher/{reportArgument}",
+   "menuRows": 45
+  },
+  {
+   "formClass": "frmRequisition",
+   "slice": "PO",
+   "route": "/po/requisition",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmSalesInvoiceRun",
+   "slice": "SO",
+   "route": "/so/sales-invoice-run",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmSalesOrderEntry",
+   "slice": "SO",
+   "route": "/so/sales-order-entry",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmSpoolViewer",
+   "slice": "PLATFORM",
+   "route": "/platform/spool-viewer",
+   "menuRows": 2
+  },
+  {
+   "formClass": "frmStockCount",
+   "slice": "ITM",
+   "route": "/itm/stock-count",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmStockEnquiry",
+   "slice": "ITM",
+   "route": "/itm/stock-enquiry",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmStockMovement",
+   "slice": "ITM",
+   "route": "/itm/stock-movement",
+   "menuRows": 1
+  },
+  {
+   "formClass": "frmSupplierVerify",
+   "slice": "AP",
+   "route": "/ap/supplier-verify",
+   "menuRows": 2
+  },
+  {
+   "formClass": "frmVatReturn",
+   "slice": "FIN",
+   "route": "/fin/vat-return",
+   "menuRows": 3
+  }
+ ]
+}

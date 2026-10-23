@@ -1,0 +1,175 @@
+/* STERP-WEB house style: the classic Windows 2000 palette and Microsoft Sans Serif 8.25 pt of UiStyle.vb:10-25
+   (visual likeness is advisory; text cues never rely on colour, COM-024 / contracts 9.6). */
+:root {
+    --st-face: #d4d0c8;
+    --st-face-text: #000000;
+    --st-window: #ffffff;
+    --st-shadow: #808080;
+    --st-dark: #404040;
+    --st-light: #ffffff;
+    --st-workspace: #808080;
+    --st-chosen: #000080;
+    --st-chosen-text: #ffffff;
+    --st-disabled: #808080;
+    --st-title-a: #0a246a;
+    --st-title-b: #a6caf0;
+    --st-title-ia: #808080;
+    --st-title-ib: #c0c0c0;
+    --st-font: "Microsoft Sans Serif", Tahoma, Arial, sans-serif;
+    --st-fixed: "Courier New", Courier, monospace;
+}
+
+html, body { margin: 0; padding: 0; height: 100%; }
+body { font: 11px var(--st-font); color: var(--st-face-text); background: var(--st-face); overflow: hidden; }
+button, input, select, textarea { font: 11px var(--st-font); color: var(--st-face-text); }
+u { text-decoration: underline; }
+.st-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* raised / sunken 3D borders */
+.st-raised { border: 1px solid; border-color: var(--st-light) var(--st-dark) var(--st-dark) var(--st-light); box-shadow: inset -1px -1px 0 var(--st-shadow); }
+.st-sunken { border: 1px solid; border-color: var(--st-shadow) var(--st-light) var(--st-light) var(--st-shadow); box-shadow: inset 1px 1px 0 var(--st-dark); }
+.st-sunken-outer { border: 1px solid; border-color: var(--st-shadow) var(--st-light) var(--st-light) var(--st-shadow); }
+
+/* ------------------------------------------------------------------ shell */
+.st-shell { display: flex; flex-direction: column; height: 100vh; background: var(--st-face); }
+.st-menubar { display: flex; flex-wrap: wrap; align-items: stretch; padding: 1px 2px; background: var(--st-face); border-bottom: 1px solid var(--st-shadow); position: relative; z-index: 30; user-select: none; }
+.st-menu-top { position: relative; }
+.st-menu-top > .st-menu-head { padding: 3px 7px; cursor: default; display: block; border: 1px solid transparent; }
+.st-menu-top > .st-menu-head:focus { outline: 1px dotted #000; outline-offset: -2px; }
+.st-menu-top.st-open > .st-menu-head { background: var(--st-chosen); color: var(--st-chosen-text); }
+.st-dropdown { position: absolute; left: 0; top: 100%; min-width: 180px; background: var(--st-face); color: var(--st-face-text); padding: 2px; z-index: 40; white-space: nowrap; }
+.st-dropdown .st-dropdown { left: 100%; top: -3px; }
+.st-menurow { display: flex; align-items: center; padding: 3px 6px 3px 20px; cursor: default; position: relative; }
+.st-menurow:hover, .st-menurow.st-hot { background: var(--st-chosen); color: var(--st-chosen-text); }
+.st-menurow > .st-menuitem { flex: 1 1 auto; outline: none; }
+.st-menurow > .st-sc { padding-left: 24px; }
+.st-menurow > .st-arrow { padding-left: 16px; }
+.st-menurow > .st-arrow::after { content: "\25B8"; }
+.st-menusep { height: 0; margin: 3px 1px; border-top: 1px solid var(--st-shadow); border-bottom: 1px solid var(--st-light); }
+.st-menu-empty { padding: 3px 7px; color: var(--st-disabled); }
+
+.st-toolbar { display: flex; align-items: center; padding: 1px 2px; background: var(--st-face); border-bottom: 1px solid var(--st-shadow); min-height: 25px; user-select: none; }
+.st-toolbar .st-grip { width: 3px; height: 18px; margin: 0 3px 0 1px; border-left: 1px solid var(--st-light); border-right: 1px solid var(--st-shadow); }
+.st-tool { display: inline-flex; align-items: center; gap: 3px; background: transparent; border: 1px solid transparent; padding: 2px 5px; margin: 0 1px; cursor: default; white-space: nowrap; }
+.st-tool:hover { border-color: var(--st-light) var(--st-shadow) var(--st-shadow) var(--st-light); }
+.st-tool:active { border-color: var(--st-shadow) var(--st-light) var(--st-light) var(--st-shadow); }
+.st-tool:focus-visible { outline: 1px dotted #000; }
+.st-tool:disabled { color: var(--st-disabled); }
+.st-toolsep { width: 0; height: 18px; margin: 0 3px; border-left: 1px solid var(--st-shadow); border-right: 1px solid var(--st-light); }
+.st-toolbar .st-legend { margin-left: auto; padding: 0 6px; white-space: pre; }
+.st-glyph { width: 16px; height: 16px; flex: 0 0 16px; }
+
+.st-workspace { position: relative; z-index: 0; isolation: isolate; flex: 1 1 auto; overflow: hidden; background: var(--st-workspace); }
+.st-statusbar { display: flex; gap: 2px; padding: 2px; background: var(--st-face); border-top: 1px solid var(--st-light); }
+.st-statusbar > div { padding: 1px 4px; white-space: pre; overflow: hidden; height: 15px; line-height: 15px; } /* text as set, spaces kept (ToolStripStatusLabel) */
+.st-statusbar .st-sb-msg { flex: 1 1 auto; }
+.st-statusbar .st-sb-user { width: 150px; }
+.st-statusbar .st-sb-co, .st-statusbar .st-sb-site { width: 70px; }
+.st-statusbar .st-sb-period { width: 120px; }
+.st-statusbar .st-sb-date { width: 72px; }
+.st-statusbar .st-sb-engine { width: 110px; }
+.st-statusbar .st-sb-caps { width: 38px; }
+.st-statusbar .st-sb-num { width: 36px; }
+
+/* ----------------------------------------------------------- child windows */
+.st-window { position: absolute; display: flex; flex-direction: column; background: var(--st-face); padding: 2px; min-width: 160px; outline: none; }
+.st-window.st-min { height: auto !important; width: 160px !important; }
+.st-window.st-min .st-wbody, .st-window.st-min .st-wstatus { display: none; }
+.st-titlebar { display: flex; align-items: center; height: 18px; padding: 0 2px 0 3px; color: #fff; font-weight: bold; background: linear-gradient(90deg, var(--st-title-ia), var(--st-title-ib)); user-select: none; cursor: default; }
+.st-window.st-active .st-titlebar { background: linear-gradient(90deg, var(--st-title-a), var(--st-title-b)); }
+.st-titlebar .st-title { flex: 1 1 auto; overflow: hidden; white-space: pre; text-overflow: ellipsis; }
+.st-capbtn { width: 16px; height: 14px; padding: 0; margin-left: 2px; background: var(--st-face); color: #000; font: bold 9px var(--st-font); line-height: 10px; display: inline-flex; align-items: center; justify-content: center; }
+.st-wbody { position: relative; flex: 1 1 auto; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+.st-wstatus { display: flex; height: 18px; border-top: 1px solid var(--st-shadow); }
+.st-wstatus .st-cue { width: 70px; flex: 0 0 70px; padding: 2px 3px; white-space: pre; border-right: 1px solid var(--st-shadow); }
+.st-wstatus .st-stext { flex: 1 1 auto; padding: 2px 4px; white-space: pre; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------------------------------------------------------------- page bits */
+.st-page { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.st-pagetools { display: flex; align-items: center; flex-wrap: wrap; padding: 1px; border-bottom: 1px solid var(--st-shadow); }
+.st-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 4px 6px; }
+.st-filter { display: inline-flex; align-items: center; gap: 6px; }
+.st-field { display: flex; align-items: center; gap: 4px; margin: 3px 0; }
+.st-field > label { flex: 0 0 auto; }
+.st-input { border: 1px solid; border-color: var(--st-shadow) var(--st-light) var(--st-light) var(--st-shadow); box-shadow: inset 1px 1px 0 var(--st-dark); background: var(--st-window); padding: 2px 3px; height: 14px; }
+.st-input[readonly], .st-input:disabled { background: var(--st-face); }
+select.st-input { height: 20px; padding: 1px; }
+textarea.st-input { height: auto; }
+.st-input.st-right { text-align: right; }
+.st-value { border: 1px solid; border-color: var(--st-shadow) var(--st-light) var(--st-light) var(--st-shadow); padding: 1px 3px; min-height: 14px; background: var(--st-face); white-space: pre; overflow: hidden; }
+.st-group { border: 1px solid var(--st-shadow); box-shadow: 1px 1px 0 var(--st-light), inset 1px 1px 0 var(--st-light); margin: 6px 4px 4px; padding: 6px 8px 6px; position: relative; }
+.st-group > legend { padding: 0 3px; }
+.st-button { min-width: 76px; height: 23px; background: var(--st-face); border: 1px solid; border-color: var(--st-light) var(--st-dark) var(--st-dark) var(--st-light); box-shadow: inset -1px -1px 0 var(--st-shadow); padding: 0 8px; cursor: default; }
+.st-button:active { border-color: var(--st-dark) var(--st-light) var(--st-light) var(--st-dark); box-shadow: inset 1px 1px 0 var(--st-shadow); }
+.st-button:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
+.st-button:disabled { color: var(--st-disabled); text-shadow: 1px 1px 0 var(--st-light); }
+.st-button.st-small { min-width: 26px; padding: 0 3px; }
+.st-help { color: var(--st-shadow); padding: 0 6px; }
+.st-pre { font: 12px var(--st-fixed); white-space: pre; margin: 0; padding: 4px; background: var(--st-window); overflow: auto; flex: 1 1 auto; min-height: 0; }
+.st-pre:focus { outline: 1px dotted #000; outline-offset: -2px; }
+.st-placeholder { margin: 18px; padding: 12px; background: var(--st-window); }
+
+/* ---------------------------------------------------------------- grid */
+.st-gridbox { flex: 1 1 auto; min-height: 60px; overflow: auto; background: var(--st-face); margin: 0; position: relative; }
+.st-grid { border-collapse: collapse; background: var(--st-window); min-width: 100%; table-layout: auto; }
+.st-grid th { position: sticky; top: 0; z-index: 1; background: var(--st-face); font-weight: normal; text-align: left; padding: 2px 4px; height: 15px; white-space: nowrap; border: 1px solid; border-color: var(--st-light) var(--st-shadow) var(--st-shadow) var(--st-light); }
+.st-grid th.st-rowhead, .st-grid td.st-rowhead { width: 12px; min-width: 12px; padding: 0 2px; background: var(--st-face); border-right: 1px solid var(--st-shadow); }
+.st-grid td { padding: 1px 4px; height: 15px; white-space: nowrap; border-bottom: 1px solid #c0c0c0; }
+.st-grid td.st-fill, .st-grid th.st-fill { width: 100%; }
+.st-grid tr.st-sel td:not(.st-rowhead) { background: var(--st-chosen); color: var(--st-chosen-text); }
+.st-grid tr.st-sel td.st-rowhead::before { content: "\25B8"; }
+.st-grid td.st-r { text-align: right; }
+.st-grid td.st-c { text-align: center; }
+.st-grid:focus { outline: none; }
+.st-gridbox:focus-within tr.st-sel td:not(.st-rowhead) { outline: 1px dotted #ff0; outline-offset: -1px; }
+.st-empty { padding: 30px 8px; text-align: center; color: var(--st-shadow); background: var(--st-window); }
+
+/* ---------------------------------------------------------------- dialogs */
+.st-modal-layer { position: fixed; inset: 0; z-index: 100; }
+.st-modal-layer.st-dim { background: rgba(0, 0, 0, 0.02); }
+.st-dialog { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); min-width: 300px; max-width: 760px; background: var(--st-face); padding: 2px; display: flex; flex-direction: column; }
+.st-dialog .st-titlebar { background: linear-gradient(90deg, var(--st-title-a), var(--st-title-b)); }
+.st-dialog-body { display: flex; gap: 12px; padding: 12px 12px 8px; align-items: flex-start; }
+.st-dialog-text { white-space: pre-wrap; max-height: 60vh; overflow: auto; min-width: 200px; }
+.st-dialog-buttons { display: flex; justify-content: center; gap: 6px; padding: 6px 12px 10px; }
+.st-icon { width: 32px; height: 32px; flex: 0 0 32px; }
+.st-input-prompt { display: block; margin-bottom: 6px; white-space: pre-wrap; }
+
+/* ---------------------------------------------------------------- splash / ended */
+.st-splash { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); width: 422px; background: var(--st-face); padding: 0 0 12px; }
+.st-splash .st-frame { height: 6px; background: var(--st-chosen); }
+.st-splash h1 { font: bold 20pt var(--st-font); color: var(--st-chosen); margin: 14px 16px 0; }
+.st-splash .st-sub { font: 11pt var(--st-font); margin: 2px 18px 10px; }
+.st-splash .st-line { margin: 2px 18px; }
+.st-splash .st-step { margin: 12px 16px 0; padding: 2px 4px; min-height: 14px; white-space: pre-wrap; }
+.st-ended { margin: 40px auto; max-width: 560px; padding: 16px; background: var(--st-face); }
+
+/* ---------------------------------------------------------------- operator console */
+.st-console { flex: 1 1 auto; background: #000; color: #c0c0c0; font: 13px var(--st-fixed); padding: 6px 8px; overflow: auto; white-space: pre; outline: none; }
+.st-console .st-con-line { height: 16px; line-height: 16px; }
+.st-console .st-con-hi { color: #fff; }
+.st-console .st-con-msg { color: #ffff55; }
+.st-console label { color: #fff; }
+.st-console input { background: #000; color: #55ff55; border: 0; border-bottom: 1px solid #55ff55; font: 13px var(--st-fixed); padding: 0 2px; outline: none; }
+
+@media print {
+    .st-menubar, .st-toolbar, .st-statusbar, .st-titlebar, .st-wstatus, .st-pagetools { display: none !important; }
+    .st-workspace { background: #fff; overflow: visible; }
+    .st-window { position: static !important; display: none; }
+    .st-window.st-active { display: flex; width: auto !important; height: auto !important; }
+}
+
+/* ------------------------------------------------------------------ tab control (TabControl) */
+.st-tabstrip { display: flex; align-items: flex-end; padding: 2px 2px 0; position: relative; z-index: 1; }
+.st-tab { background: var(--st-face); border: 1px solid; border-color: var(--st-light) var(--st-dark) transparent var(--st-light); border-radius: 2px 2px 0 0; padding: 2px 6px 3px; margin-right: -1px; cursor: default; position: relative; top: 1px; }
+.st-tab.st-tab-sel { padding: 3px 8px 4px; top: 1px; margin: 0 -1px; z-index: 2; border-bottom-color: var(--st-face); }
+.st-tab:focus-visible > * { outline: 1px dotted #000; }
+.st-tabpanel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; border: 1px solid; border-color: var(--st-light) var(--st-dark) var(--st-dark) var(--st-light); padding: 3px; }
+
+/* ------------------------------------------------------------------ absolute legacy layout (designer coordinates) */
+.st-canvas { position: relative; flex: 0 0 auto; }
+.st-canvas > .st-at { position: absolute; display: flex; align-items: center; }
+.st-canvas .st-cap { position: absolute; white-space: nowrap; overflow: hidden; }
+.st-canvas .st-input, .st-canvas select { position: absolute; }
+.st-canvas .st-tick { position: absolute; display: flex; align-items: center; gap: 3px; white-space: nowrap; }
+.st-caption-line { white-space: nowrap; overflow: hidden; }

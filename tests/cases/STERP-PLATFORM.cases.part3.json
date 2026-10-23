@@ -1,0 +1,87 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-PLATFORM",
+  "authored_by": "Agent 07 attempt a07-20261020T154730Z-b88d28f6 - shared-in-place coexistence obligations (contracts 6.7, 6.8, 6.10, 11)",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-PLATFORM-042",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-042-EDGE-COEXIST-INTERLEAVED-WRITERS",
+          "ac": null,
+          "title": "Interleaved legacy and target saves of one company row: last writer wins, every save audited as SYSADM",
+          "layer": "e2e",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {"login": "SYSADM", "company": "STC", "site": "RDG"},
+          "covers": ["coexistence", "audit", "concurrency"],
+          "steps": [
+            {"save": "legacyA", "sql": "EXEC core.usp_UiMaintSave @MaintCode='CORE.COMPANY', @UserCode='SYSADM', @CompanyCode='STC', @Mode='CHANGE', @Data=N'<r><c n=\"CompanyCode\" v=\"CAL\" /><c n=\"Eori\" v=\"GB000000000001\" /></r>'"},
+            {"save": "target", "call": "platform_saveMaintenanceRow", "path": {"maintCode": "CORE.COMPANY"}, "body": {"mode": "CHANGE", "values": {"CompanyCode": "CAL", "Eori": "GB000000000002"}}, "idempotencyKey": "A07-COEX-0001"},
+            {"save": "middle", "sql": "SELECT Eori, ModifiedBy FROM core.Company WHERE CompanyCode = 'CAL'"},
+            {"save": "legacyC", "sql": "EXEC core.usp_UiMaintSave @MaintCode='CORE.COMPANY', @UserCode='SYSADM', @CompanyCode='STC', @Mode='CHANGE', @Data=N'<r><c n=\"CompanyCode\" v=\"CAL\" /><c n=\"Eori\" v=\"GB000000000003\" /></r>'"}
+          ],
+          "assertions": [
+            {"on": "target", "status": 200},
+            {"on": "middle", "json": "$[0].Eori", "equals": "GB000000000002"},
+            {"on": "middle", "json": "$[0].ModifiedBy", "equals": "SYSADM"},
+            {"sql": "SELECT Eori FROM core.Company WHERE CompanyCode = 'CAL'", "equals": "GB000000000003"},
+            {"sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'core.Company' AND EntityKey = 'CAL' AND Action = 'UPDATE' AND Source = 'TRIGGER' AND UserCode = 'SYSADM'", "equals": 3},
+            {"sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'CORE.COMPANY' AND EntityKey = 'CAL' AND Action = 'CHANGE' AND Source = 'STERP.exe' AND UserCode = 'SYSADM'", "equals": 3}
+          ],
+          "derivation": "Legacy oracle LO-COEX-01 (memory/STERP-App/agent-07/work/legacy-oracle-coexistence.out.txt): two legacy saves through core.usp_UiMaintSave on the isolated freshc deploy gave last-writer-wins Eori, ModifiedBy SYSADM and per save one core.Company UPDATE trigger row plus one CORE.COMPANY CHANGE STERP.exe row; the target save must reproduce the same procedure call (contracts 6.5, 6.8; platform_saveMaintenanceRow description; usp_UiMaintSave.sql:8-123).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-PLATFORM-042-EDGE-UNREGISTERED-COLUMN",
+          "ac": null,
+          "title": "A save that carries only an unregistered column is refused with E-0095 and writes nothing",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {"login": "SYSADM", "company": "STC", "site": "RDG"},
+          "covers": ["error-mapping", "edge-record"],
+          "steps": [
+            {"save": "r", "call": "platform_saveMaintenanceRow", "path": {"maintCode": "CORE.COMPANY"}, "body": {"mode": "CHANGE", "values": {"CompanyCode": "CAL", "TradingName": "Caledon Target"}}}
+          ],
+          "assertions": [
+            {"on": "r", "problem": {"status": 422, "type": "business-rule", "reasonCode": "E-0095"}},
+            {"sql": "SELECT TradingName FROM core.Company WHERE CompanyCode = 'CAL'", "equals": "Caledon Assemblies"},
+            {"sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityKey = 'CAL' AND Action IN ('UPDATE', 'CHANGE')", "equals": 0}
+          ],
+          "derivation": "Legacy oracle LO-COEX-01: CHANGE with only TradingName (not a core.MaintColumn row of CORE.COMPANY) raised 50095 'STERP-E-0095: Nothing to save.' and left the row and core.AuditLog unchanged; contracts 4.6 maps THROW 5xxxx 'STERP-<s>-<code>' to 422 business-rule with reasonCode <s>-<code>.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PLATFORM-046",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PLATFORM-046-EDGE-COEXIST-LEGACY-JOBRUN-VISIBLE",
+          "ac": null,
+          "title": "A run registered by the legacy batch path is listed by the target job monitor",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {"login": "SYSADM", "company": "STC", "site": "RDG"},
+          "covers": ["coexistence"],
+          "steps": [
+            {"save": "legacy", "sql": "EXEC core.usp_JobRunStart @JobName='NIGHTLY', @CompanyCode='STC', @SubmittedBy='OPS', @SiteCode=NULL, @Arguments='MODE=PREVIEW'"},
+            {"save": "r", "call": "jobs_listRuns", "query": {"fromDate": "2000-01-01", "status": "ALL"}}
+          ],
+          "assertions": [
+            {"on": "r", "status": 200},
+            {"on": "r", "json": "$.items", "count": 1},
+            {"on": "r", "json": "$.items[0].jobName", "equals": "NIGHTLY"},
+            {"on": "r", "json": "$.items[0].submittedBy", "equals": "OPS"},
+            {"on": "r", "json": "$.items[0].status", "equals": "RUNNING"},
+            {"on": "r", "json": "$.items[0].returnCode", "isNull": true}
+          ],
+          "derivation": "Legacy oracle LO-COEX-02: core.usp_JobRunStart (jobs\\SETENV.cmd:99) registered NIGHTLY/STC/OPS as RUNNING with no return code and core.usp_UiJobList returned it; jobs_listRuns executes core.usp_UiJobList and lists runs of legacy and target writers alike (contracts 6.10).",
+          "confidence": "observed"
+        }
+      ]
+    }
+  ]
+}

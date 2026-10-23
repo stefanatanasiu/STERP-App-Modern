@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Modules.Ar</RootNamespace>
+    <Description>STERP-AR slice (wave W2): Debtors: customers, credit control, receipts, allocation, invoicing/posting, dunning, direct debits, e-invoices.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Platform\STERP.Platform.Hosting\STERP.Platform.Hosting.csproj" />
+
+  </ItemGroup>
+  <!-- engines are written against the kernel services of branch w/kernel; compiled once it is merged -->
+  <PropertyGroup Condition="Exists('$(MSBuildThisFileDirectory)..\..\Platform\STERP.Platform.Kernel\Data\Sqlio.cs')">
+    <DefineConstants>$(DefineConstants);STERP_KERNEL</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="!Exists('$(MSBuildThisFileDirectory)..\..\Platform\STERP.Platform.Kernel\Data\Sqlio.cs')">
+    <Compile Remove="Application\*Engine.cs" />
+    <Compile Remove="Endpoints\EngineEndpoints.cs" />
+  </ItemGroup>
+</Project>

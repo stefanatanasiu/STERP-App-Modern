@@ -1,0 +1,67 @@
+@inject ShellService Shell
+@* One drop-down (ToolStripDropDown). Each entry is a menuitem named by its caption only; the shortcut text and a nested
+   drop-down are siblings of the menuitem (not part of its accessible name). *@
+<div class="st-dropdown st-raised" role="menu">
+    @{ var first = true; }
+    @foreach (var entry in Shell.ItemsOf(Node))
+    {
+        var item = entry;
+        var hasChildren = item.Children.Count > 0;
+        var open = hasChildren && Shell.IsOpen(item);
+        if (item.Window is not null && first)
+        {
+            first = false;
+            <div class="st-menusep" role="separator"></div>
+        }
+        <div class="st-menurow @(item.Code == Shell.HotCode || open ? "st-hot" : null)" role="none" @key="item.Code"
+             @onclick="() => ClickAsync(item)" @onclick:stopPropagation="true" @onmouseenter="() => Hover(item)">
+            <div class="st-menuitem" role="menuitem" tabindex="-1"
+                 aria-haspopup="@(hasChildren ? "menu" : null)" aria-expanded="@(hasChildren ? (open ? "true" : "false") : null)"
+                 aria-keyshortcuts="@(item.Shortcut.Length > 0 ? AriaShortcut(item.Shortcut) : null)"><StMnemonic Text="@item.Caption" /></div>
+            @if (item.Shortcut.Length > 0)
+            {
+                <span class="st-sc" aria-hidden="true">@item.Shortcut</span>
+            }
+            @if (hasChildren)
+            {
+                <span class="st-arrow" aria-hidden="true"></span>
+            }
+            @if (open)
+            {
+                <StMenuDropdown Node="item" Depth="Depth + 1" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public MenuNode Node { get; set; } = default!;
+
+    /// <summary>Number of open drop-downs up to and including this one.</summary>
+    [Parameter] public int Depth { get; set; }
+
+    private Task ClickAsync(MenuNode item)
+    {
+        if (item.Children.Count > 0)
+        {
+            Shell.OpenSub(item, Depth);
+            return Task.CompletedTask;
+        }
+        return Shell.Observe(Shell.MenuItemClickedAsync(item));
+    }
+
+    private void Hover(MenuNode item)
+    {
+        if (item.Children.Count > 0)
+        {
+            if (!Shell.IsOpen(item)) Shell.OpenSub(item, Depth);
+        }
+        else if (Shell.OpenPath.Count > Depth)
+        {
+            while (Shell.OpenPath.Count > Depth) Shell.OpenPath.RemoveAt(Shell.OpenPath.Count - 1);
+            Shell.NotifyChanged();
+        }
+    }
+
+    private static string AriaShortcut(string shortcut) => shortcut.Replace("Ctrl+", "Control+", StringComparison.OrdinalIgnoreCase);
+}

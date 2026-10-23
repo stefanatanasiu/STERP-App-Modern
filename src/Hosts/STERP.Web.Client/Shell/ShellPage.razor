@@ -1,0 +1,8 @@
+@page "/"
+@page "/{*Path}"
+@* Every route opens the shell (deep links of STERP-WEB section 7.2 open their page after sign-on). *@
+<StShell />
+
+@code {
+    [Parameter] public string? Path { get; set; }
+}

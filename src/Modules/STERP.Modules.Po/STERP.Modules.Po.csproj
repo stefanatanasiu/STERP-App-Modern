@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Modules.Po</RootNamespace>
+    <Description>STERP-PO slice (wave W6): Purchasing: requisitions, purchase orders, approvals, goods receipt, inspection.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Platform\STERP.Platform.Hosting\STERP.Platform.Hosting.csproj" />
+    <ProjectReference Include="..\STERP.Modules.Itm\STERP.Modules.Itm.csproj" />
+  </ItemGroup>
+</Project>

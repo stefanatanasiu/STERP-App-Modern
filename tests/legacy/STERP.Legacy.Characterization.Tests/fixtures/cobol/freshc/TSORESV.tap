@@ -1,0 +1,25 @@
+# suite TSORESV sales reservation
+ok 1 - sales demand always reserves as SALESORDER
+ok 2 - the demand reference is the order number
+ok 3 - the demand line is the order line number
+ok 4 - a missing item is refused, never guessed
+ok 5 - a missing item reports SRV0001
+ok 6 - a zero quantity cannot be reserved
+ok 7 - a reservation must name its demand
+ok 8 - nothing was reserved by a rejected request
+ok 9 - an unknown function is refused with 08
+ok 10 - an unknown function reports SRV0008
+ok 11 - an unknown demand holds no reservations
+ok 12 - AC-043 a reservation is granted
+ok 13 - AC-043 free stock falls by exactly what was taken
+ok 14 - AC-043 the reservation has an identity
+ok 15 - AC-043 the reservation is active
+ok 16 - AC-043 a competing order cannot take reserved units
+ok 17 - AC-043 the shortfall is reported, not hidden
+ok 18 - AC-043 a partial allocation warns with SRV0003
+ok 19 - shelf life is tested 30 days after despatch
+ok 20 - a released reservation reports RELEASED
+ok 21 - revalidation answers 00 or 06, never silently 08
+1..21
+# TSORESV sales reservation passed 00021 failed 00000
+# exit 0

@@ -1,0 +1,10 @@
+# cst-jobs
+ok 1 - asking for the contract returns the sub-job under it -- REQ: CST-014
+ok 2 - the baseline is the approved version, not the proposal -- REQ: CST-015
+ok 3 - the sub-job carries its own cost and the parent is not charged twice -- REQ: CST-016  AC: AC-C5
+ok 4 - the contract has cost 2100.00 and committed 900.00 against 5000.00 -- REQ: CST-016  AC: AC-C5
+ok 5 - closing work in progress is the roll-forward and not a plug -- REQ: CST-018
+ok 6 - 1000.00 opening, 2300.00 in and 1100.00 out leaves 1200.00 -- REQ: CST-018
+ok 7 - the worklist shows the latest period, not the first one it finds -- REQ: CST-018, CST-020
+ok 8 - a job hierarchy stops at two levels -- REQ: CST-014
+ok 9 - a cost is actual, accrued, committed or an estimate and says which -- REQ: CST-016

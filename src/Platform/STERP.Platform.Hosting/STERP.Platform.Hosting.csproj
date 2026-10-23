@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Platform.Hosting</RootNamespace>
+    <Description>STERP host pipeline shared by STERP.Api and STERP.Jobs: contract-first routing from the binding OpenAPI documents, Negotiate authentication, STERP user/context resolution, screen gate, outcome/problem mapping, OpenAPI publication, health and schema drift check, job runner and run resources.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
+    <PackageReference Include="YamlDotNet" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Platform.Kernel\STERP.Platform.Kernel.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- binding Agent 06 documents (byte-identical copies, contracts 4.11 / FR-STERP-API-014) -->
+    <EmbeddedResource Include="..\..\..\contracts\openapi\*.openapi.yaml" LogicalName="openapi/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\..\contracts\frozen-schema.json" LogicalName="contracts/frozen-schema.json" Condition="Exists('..\..\..\contracts\frozen-schema.json')" />
+  </ItemGroup>
+</Project>

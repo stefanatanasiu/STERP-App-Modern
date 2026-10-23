@@ -1,0 +1,9 @@
+ok - bom: an indented explosion through the facade answers with occurrences and depth  # REQ: BOM-014,BOM-032
+ok - bom: the COMMAREA layouts of the bill engines parse and carry their windows  # REQ: BOM-014,BOM-020,BOM-021,BOM-032
+ok - bom: the facade reads the B1 frame bill, its lines and its release evidence  # REQ: BOM-001,BOM-002,BOM-006,BOM-008
+ok - bom: the module's menu, maintenance screens and reports are registered  # REQ: BOM-024,BOM-032,COM-019
+ok - bom: the netted plan reports the buildable quantity the screen shows  # REQ: BOM-020,BOM-022
+ok - bom: the release gate refuses an unvalidated revision and the reason reaches the screen  # REQ: BOM-003,BOM-004,BOM-029
+ok - bom: the revision comparison answers with the engineering change between two revisions  # REQ: BOM-025,BOM-029
+ok - bom: the three BOM screens are STERP base forms and open on the seeded B1 data  # REQ: BOM-014,BOM-023,BOM-024,COM-024
+ok - bom: where used finds the indirect parent of a B1 component  # REQ: BOM-023,BOM-031

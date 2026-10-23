@@ -1,0 +1,62 @@
+# suite TARLATE late payment interest
+ok 1 - the statutory claim calculates
+ok 2 - the reference rate is 4.00%
+ok 3 - the statutory margin is 8%
+ok 4 - base plus 8% gives 12.00%
+ok 5 - interest 5,000 x 12% x 30 / 365 is 49.32
+ok 6 - compensation on a 5,000.00 debt is 70.00
+ok 7 - the debt falls in compensation band 2
+ok 8 - the total claim is 119.32
+ok 9 - neither amount carries VAT
+ok 10 - the calculation is explained on the claim
+ok 11 - a 900.00 debt attracts 40.00
+ok 12 - 900.00 is compensation band 1
+ok 13 - 999.99 is still the 40.00 band
+ok 14 - 1,000.00 exactly attracts 70.00
+ok 15 - 1,000.00 is compensation band 2
+ok 16 - 9,999.99 is the top of the 70.00 band
+ok 17 - 10,000.00 exactly attracts 100.00
+ok 18 - 10,000.00 is compensation band 3
+ok 19 - a 12,000.00 debt attracts 100.00
+ok 20 - a full year at 12% on 10,000 is 1,200.00
+ok 21 - one day on 5,000 at 12% is 1.64
+ok 22 - on the due date no interest has accrued
+ok 23 - and no compensation is due yet
+ok 24 - a debt not yet due shows no days overdue
+ok 25 - and attracts no statutory interest
+ok 26 - a non qualifying debt warns
+ok 27 - the warning names the qualifying rule
+ok 28 - no interest on a non qualifying debt
+ok 29 - no compensation on a non qualifying debt
+ok 30 - a substantial alternative remedy warns
+ok 31 - the alternative remedy rule is quoted
+ok 32 - an alternative remedy displaces compensation
+ok 33 - a settled invoice carries no interest
+ok 34 - the no principal rule is quoted
+ok 35 - a waiver without a reason is blocked
+ok 36 - the waiver reason rule is quoted
+ok 37 - a March 2027 claim uses the 31/12/2026 rate
+ok 38 - the statutory 8% is added to the base rate
+ok 39 - an October 2026 claim uses the 30/06/2026 rate
+ok 40 - the rate source is recorded
+ok 41 - evidenced recovery costs join the claim
+ok 42 - an unknown invoice is not found
+ok 43 - the open item rule is quoted
+ok 44 - the principal comes from the ledger
+ok 45 - 15/09/2026 due, 15/10/2026 is 30 days late
+ok 46 - interest on the real receivable is 49.32
+ok 47 - compensation on the real receivable is 70.00
+ok 48 - a recorded claim awaits approval
+ok 49 - the approval rule is quoted
+ok 50 - the claim is held as calculated
+ok 51 - the claim has its own reference
+ok 52 - the stored claim totals 119.32
+ok 53 - the claim is linked to the original invoice
+ok 54 - the credit manager approves the claim
+ok 55 - the claim becomes approved
+ok 56 - an unknown claim cannot be approved
+ok 57 - a reasoned waiver is accepted
+ok 58 - the claim is waived
+1..58
+# TARLATE late payment interest passed 00058 failed 00000
+# exit 0

@@ -1,0 +1,4 @@
+ok - engine: LINK PING echoes COMP-3, SIGN SEPARATE and zoned tables  # REQ: COM-011 AC: AC-001
+ok - engine: PING reads the STERP database through SQLIO  # REQ: COM-011
+ok - engine: an unknown program comes back as RC 16 not an exception  # REQ: COM-011,COM-017
+ok - engine: the program directory is published to the client  # REQ: COM-011

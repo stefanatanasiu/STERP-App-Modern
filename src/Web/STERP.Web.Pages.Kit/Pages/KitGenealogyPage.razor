@@ -1,0 +1,93 @@
+@inherits StListPage
+@* frmKitGenealogy (page:kit/genealogy-enquiry, FR-STERP-KIT-053): GENEALOG trace FORWARD, BACKWARD or WHEREUSD (F10, also
+   F5 once an item or kit is keyed) and the recall list of the database procedure (frmKitGenealogy.vb:13-90). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StSelectField Caption="&Direction:" Inline="true" Width="110" Items="Directions" @bind-Value="_direction" Id="@Uid("direction")" />
+        <StTextField Caption="&Item:" Inline="true" Width="150" @bind-Value="_item" Id="@Uid("item")" />
+        <StTextField Caption="&Lot:" Inline="true" Width="110" @bind-Value="_lot" Id="@Uid("lot")" />
+        <StTextField Caption="&Serial:" Inline="true" Width="110" @bind-Value="_serial" Id="@Uid("serial")" />
+        <StTextField Caption="&Kit:" Inline="true" Width="130" @bind-Value="_kit" Id="@Uid("kit")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Trace (F10)" Glyph="ENGINE" OnClick="TraceAsync" />
+        <StToolButton Text="Recall list" Glyph="FIND" OnClick="RecallAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Directions = StSelectField.Of("FORWARD", "BACKWARD", "WHEREUSD");
+
+    private string _direction = "FORWARD";
+    private string _item = "";
+    private string _lot = "";
+    private string _serial = "";
+    private string _kit = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Genealogy Enquiry");
+        if (FormArgument != "") _item = FormArgument;
+    }
+
+    /// <summary>LoadData: guidance while nothing is keyed, otherwise the trace.</summary>
+    protected override async Task LoadDataAsync()
+    {
+        if (Code(_item) == "" && Code(_kit) == "")
+        {
+            SetStatus("Enter an item with its lot or serial, or a kit reference, then Trace (F10).", "");
+            return;
+        }
+        await TraceAsync();
+    }
+
+    protected override Task OnConfirmAsync() => TraceAsync();
+
+    private async Task TraceAsync()
+    {
+        if (Code(_item) == "" && Code(_kit) == "")
+        {
+            SetStatus("Enter an item or a kit reference first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var direction = _direction;
+            var r = await Api.GetAsync("/api/kit/v1/genealogy/trace" + Query.Build(
+                ("direction", direction), ("itemCode", Code(_item)), ("lotCode", Code(_lot)), ("serialNo", Code(_serial)),
+                ("kitRef", Code(_kit)), ("maxDepth", "10")));
+            var data = KitLegacy.Payload(r);
+            Populate(KitLegacy.Table(KitLegacy.GeneaSpec, data?["lines"]));
+            if (!await ShowResultAsync(r)) return;
+            var truncated = KitLegacy.Text(data, "truncated") == "Y";
+            SetStatus(direction + ": " + KitLegacy.Count(data, "kitCnt") + " kit(s), depth " +
+                      KitLegacy.Count(data, "depthReached") + ", " + KitLegacy.Count(data, "substituteCnt") +
+                      " substitution(s), " + KitLegacy.Count(data, "returnCnt") + " return(s), " +
+                      KitLegacy.Count(data, "scrapCnt") + " scrap" +
+                      (truncated ? "  *** TRUNCATED" : ""),
+                      truncated ? CueWarning : CueOk);
+        });
+    }
+
+    /// <summary>The whole recall list from the database, for an export (KIT-019).</summary>
+    private async Task RecallAsync()
+    {
+        if (Code(_item) == "")
+        {
+            SetStatus("A recall list needs an item code.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/kit/v1/genealogy/recall-list" + Query.Build(
+                ("itemCode", Code(_item)), ("lotCode", Code(_lot)), ("serialNo", Code(_serial)), ("maxDepth", "5")));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(KitLegacy.ResultSet(KitLegacy.RecallColumns, r.Json));
+        });
+    }
+
+    private static string Code(string text) => KitLegacy.Code(text);
+}

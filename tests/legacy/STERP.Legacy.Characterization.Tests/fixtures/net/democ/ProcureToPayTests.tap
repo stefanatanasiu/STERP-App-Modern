@@ -1,0 +1,10 @@
+ok - acc: a change of supplier bank details is verified and independently approved  # REQ: AP-002,AP-027,COM-003 AC: AC-127
+ok - acc: a recognised liability can be blocked for payment without being unrecognised  # REQ: AP-008,AP-009,AP-010,AP-022 AC: AC-031,AC-032
+ok - acc: a requisition sources, codes and prices a non-stock request before it can be ordered  # REQ: PO-001,PO-002,PO-003,PO-004 AC: AC-050,AC-051
+ok - acc: a schedule and an acknowledgement are kept as history, not as an overwrite  # REQ: PO-007,PO-008,PO-022 AC: AC-052
+ok - acc: an order price has a source, a budget check and an issue authority  # REQ: PO-004,PO-005,PO-006 AC: AC-051
+ok - acc: linked supply, subcontract and blanket call-off stay within their agreed limits  # REQ: PO-018,PO-019,PO-021,PO-023,PO-024 AC: AC-057,AC-058
+ok - acc: payment selection is proposed, independently approved and only then released  # REQ: AP-013,AP-014,AP-015,AP-016,AP-017,AP-018,COM-003 AC: AC-034,AC-035,AC-036
+not ok - acc: procure to pay - requisition, independent approval, order, receipt, three way match and payment  # REQ: XMD-002,PO-001,PO-005,PO-006,PO-009,AP-005,AP-006,AP-013,RPT-009 AC: AC-098
+#   StAssertException: the delivery schedule records the counted quantity: expected <4> but was <0>
+ok - acc: supplier statements, the cash forecast and deductions reconcile to the ledger  # REQ: AP-019,AP-020,AP-021,AP-024,RPT-002 AC: AC-037,AC-038,AC-107

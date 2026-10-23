@@ -1,0 +1,4 @@
+ok - bom bulk gui: exact rendered preview route does not grant approval  # REQ: BOM-024,COM-002
+ok - bom bulk gui: native authority refuses direct preview and engineer apply  # REQ: COM-002,BOM-024
+ok - bom bulk gui: preview refusal and invalid replacement retain outcomes and no bills  # REQ: BOM-018,BOM-024
+ok - bom bulk gui: shown screen F10 renders native refusal F5 clears stale results  # REQ: BOM-024,COM-024

@@ -1,0 +1,4728 @@
+openapi: "3.1.0"
+info:
+  title: "STERP Bills of material API (STERP-BOM)"
+  version: "1.0.0+a06-20261020T112437Z-034eff00"
+  description: "Online and batch API of the Bills of material slice (target application STERP-BOM, wave W8) of the modernized STERP ERP. It replaces the legacy VB facades BomService and BomBulkService, the GnuCOBOL programs of cobol/online/bom and cobol/batch/bom and the bom stored procedures as used by the WinForms client (frmBomEditor, frmBomExplosion, frmBomWhereUsed, frmBomBulkPreview) and the report catalogue (BOMRP010, BOMRP020, BOMRP030, BOMRP040, RPT-012). Legacy behaviour is the contract: every operation reproduces the observed legacy outcome, messages, reason codes and data effects for the same inputs and database state (application specification STERP-BOM.md; shared conventions 01-shared-platform-contracts.md). Online operations run on STERP.Api; job submissions run on STERP.Jobs and are polled through the platform resources /api/jobs/v1/runs/{jobRunId}. The public in-process contracts used by the KIT and CST slices (BOMEXPL, BOMCOST) are documented by the component schemas BomExplosionEngineArea and BomCostEngineArea and are never called over HTTP."
+servers:
+  - url: "https://localhost:7101"
+    description: "STERP.Api (online)"
+security:
+  - windows: []
+tags:
+  - name: "Explosion Enquiry"
+    description: "Legacy menu BOM.EXPLODE (frmBomExplosion): indented, single-level, leaf, costed and netted readings."
+  - name: "Where Used Enquiry"
+    description: "Legacy menu BOM.WHEREUSED (frmBomWhereUsed) and the Where used tool of frmBomExplosion."
+  - name: "Revision Comparison"
+    description: "Legacy menu BOM.COMPARE (frmBomExplosion with argument COMPARE)."
+  - name: "Bill Maintenance"
+    description: "Legacy menu BOM.EDIT (frmBomEditor): structure reads, validation, release."
+  - name: "Bulk Change Preview"
+    description: "Legacy menu BOM.CHANGE.PREVIEW (frmBomBulkPreview)."
+  - name: "Reports (BOMRP010)"
+    description: "Indented Parts List / Costed Explosion (catalogue BOMRP010, BOMRP020, RPT-012)."
+  - name: "Reports (BOMRP030)"
+    description: "Where used and revision comparison listings (catalogue BOMRP030, BOMRP040)."
+paths:
+  "/api/bom/v1/items/{parentItemCode}/explode":
+    post:
+      operationId: "bom_explodeBill"
+      summary: "Explosion enquiry: single level, indented or leaf view of one gross explosion"
+      description: "Reproduces BomService.Explode (dotnet/STERP.Business/Bom/BomService.vb:138-195): BOMLEAF SINGLE/INDENT/FLATTEN (cobol/online/bom/BOMLEAF.cob:67-309) runs one GROSS explosion through BOMEXPL (phantoms expanded, notes and by-products included) and pages the result; the API returns every line in engine order. Completeness, stop summary, occurrence count and depth come from the first engine call. The outcome is that of the last engine call the facade made: an explosion with more than one window returns RC 0 from the last page call even when the calculation was INCOMPLETE (data.completeness tells). Errors: RC 8 BOM0504 unknown item, BOM0503 negative quantity, BOM0513 cycle, BOMSELCT reasons when no bill is selected; RC 12 SQL0001. FR-STERP-BOM-010. Example values are illustrative; the legacy oracle is authoritative."
+      tags:
+        - "Explosion Enquiry"
+      parameters:
+        - name: "parentItemCode"
+          in: "path"
+          required: true
+          description: "Parent item code (BL/BC/BN-PARENT-ITEM X(40)); the screen upper-cases it."
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "BL-PARENT-ITEM PIC X(40)"
+            x-sterp-length: 40
+          example: "FG-BIKE-COMMUTE-M"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        description: "Explosion parameters as entered on the Explosion Enquiry screen."
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/BomExplodeRequest"
+            example:
+              revision: ""
+              quantity: 10
+              effectiveDate: "2026-10-07"
+              view: "INDENTED"
+              maxDepth: 0
+      responses:
+        "200":
+          description: "Explosion (RC 0 or 4)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomExplosionEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: ""
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  completeness: "COMPLETE"
+                  stopSummary: "Stopped: purchased 0, use stock 0, depth limit 0, no child bill 0"
+                  occurrences: 95
+                  depthReached: 4
+                  lines:
+                    - level: 0
+                      item: "FG-BIKE-COMMUTE-M"
+                      revision: ""
+                      description: "Complete bicycle, commuter, medium"
+                      kind: "INTERMED"
+                      supply: "MAKE"
+                      basis: "PROPORTION"
+                      usage: 1.0
+                      unit: "EA"
+                      required: 10.0
+                      unrounded: 10.0
+                      stopReason: "ROOT"
+                      path: "FG-BIKE-COMMUTE-M"
+                      warning: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-010"
+        - "FR-STERP-BOM-021"
+        - "FR-STERP-BOM-040"
+      x-sterp-legacy:
+        forms:
+          - "frmBomExplosion.ExplodeClicked dotnet/STERP.Desktop/Forms/Bom/frmBomExplosion.vb:70-99"
+        facade:
+          - "BomService.Explode dotnet/STERP.Business/Bom/BomService.vb:138-195"
+          - "BomService.ViewToFunction dotnet/STERP.Business/Bom/BomService.vb:399-408"
+        programs:
+          - "BOMLEAF SINGLE|INDENT|FLATTEN cobol/online/bom/BOMLEAF.cob:67-309"
+          - "BOMEXPL EXPLODE|NODE cobol/online/bom/BOMEXPL.cob:183-1335"
+          - "BOMSELCT, BOMREAD, BOMMATH, BOMWORK, BOMSUPPL (internal callees)"
+        procedures: []
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only. Reproduces the COBOL engine session of the facade call: every statement is a SELECT executed in autocommit (no SQLIO BEGN on this path); no row is written. In-process calls run on the caller's connection."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/items/{parentItemCode}/cost":
+    post:
+      operationId: "bom_costBill"
+      summary: "Costed explosion roll-up against a cost set"
+      description: "Reproduces BomService.CostedExplosion (BomService.vb:247-308): BOMCOST COST then GETLINE pages (cobol/online/bom/BOMCOST.cob:114-374). Every occurrence is valued once (material at the ranked rate of the cost set or item standard cost, conversion per manufactured node, services and cost-only lines at their line rate, by-products as recovery credit, notes and phantoms at zero), each extended value ROUNDED to 2 decimals; unit cost = ROUNDED(total / quantity) to 6 decimals; a missing rate makes the result INCOMPLETE. conversionCost equals BC-CONVERSION-COST + BC-SETUP-COST as the legacy screen showed it (SME-640). When COST returns RC <= 4 the outcome is that of the last GETLINE (RC 0), so a BOM0810 warning shows only as data.missingRates > 0. FR-STERP-BOM-011. Example: ten DEMO-FRAME at BOMDEMO (TBOMCOST B1)."
+      tags:
+        - "Explosion Enquiry"
+      parameters:
+        - name: "parentItemCode"
+          in: "path"
+          required: true
+          description: "Parent item code (BL/BC/BN-PARENT-ITEM X(40)); the screen upper-cases it."
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "BL-PARENT-ITEM PIC X(40)"
+            x-sterp-length: 40
+          example: "FG-BIKE-COMMUTE-M"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        description: "Costing parameters; the screen sends the Cost set field (default BOMDEMO)."
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/BomCostRequest"
+            example:
+              revision: ""
+              quantity: 10
+              effectiveDate: "2026-10-07"
+              costSet: "BOMDEMO"
+      responses:
+        "200":
+          description: "Costed roll-up (RC 0 or 4)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomCostedExplosionEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: ""
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  completeness: "COMPLETE"
+                  occurrences: 12
+                  missingRates: 0
+                  totalCost: 100.1
+                  unitCost: 10.01
+                  materialCost: 70.1
+                  conversionCost: 40.0
+                  recoveryCredit: 0.0
+                  errorPath: ""
+                  lines:
+                    - level: 0
+                      item: "DEMO-FRAME"
+                      revision: ""
+                      description: "Demonstration frame assembly (B1 root)"
+                      kind: "INTERMED"
+                      element: "LAB"
+                      source: "BOMHEADER"
+                      required: 10.0
+                      unit: "EA"
+                      unitCost: 10.0
+                      extendedCost: 15.0
+                      branchCost: 0.0
+                      path: "DEMO-FRAME"
+                      warning: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-011"
+        - "FR-STERP-BOM-021"
+        - "FR-STERP-BOM-041"
+      x-sterp-legacy:
+        forms:
+          - "frmBomExplosion.ExplodeClicked (view COSTED) dotnet/STERP.Desktop/Forms/Bom/frmBomExplosion.vb:91-92"
+        facade:
+          - "BomService.CostedExplosion dotnet/STERP.Business/Bom/BomService.vb:247-308"
+        programs:
+          - "BOMCOST COST|GETLINE cobol/online/bom/BOMCOST.cob:114-452"
+          - "BOMEXPL (FR-STERP-BOM-040)"
+        procedures: []
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only. Reproduces the COBOL engine session of the facade call: every statement is a SELECT executed in autocommit (no SQLIO BEGN on this path); no row is written. In-process calls run on the caller's connection."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/items/{parentItemCode}/net":
+    post:
+      operationId: "bom_netBillRequirement"
+      summary: "Netted plan: eligible stock and supply consumed once"
+      description: "Reproduces BomService.NettedPlan (BomService.vb:198-244): BOMNET NET then GETLINE pages (cobol/online/bom/BOMNET.cob:103-381). Free stock of the finished parent is taken first, the remainder is exploded in NET mode against live stock (BOMSUPPL), short leaves are counted; RC 8 BOM0710 when the explosion is ERROR, RC 4 BOM0711 when a leaf is short (masked by the final GETLINE, RC 0), maximum buildable 0. Tier-1 seam SEAM-LINK-015 (SME-1245). FR-STERP-BOM-012."
+      tags:
+        - "Explosion Enquiry"
+      parameters:
+        - name: "parentItemCode"
+          in: "path"
+          required: true
+          description: "Parent item code (BL/BC/BN-PARENT-ITEM X(40)); the screen upper-cases it."
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "BL-PARENT-ITEM PIC X(40)"
+            x-sterp-length: 40
+          example: "FG-BIKE-COMMUTE-M"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        description: "Netting parameters."
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/BomNetRequest"
+            example:
+              quantity: 10
+              effectiveDate: "2026-10-07"
+      responses:
+        "200":
+          description: "Netted plan (RC 0 or 4)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomNettedPlanEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: ""
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  maxBuildable: 0.0
+                  shortages: 0
+                  completeness: "COMPLETE"
+                  lines:
+                    - level: 0
+                      item: "DEMO-FRAME"
+                      description: "Demonstration frame assembly (B1 root)"
+                      unit: "EA"
+                      required: 10.0
+                      stockUsed: 0.0
+                      inbound: 0.0
+                      toMake: 10.0
+                      shortage: 0.0
+                      excess: 0.0
+                      stopReason: "ROOT"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-012"
+        - "FR-STERP-BOM-021"
+        - "FR-STERP-BOM-040"
+      x-sterp-legacy:
+        forms:
+          - "frmBomExplosion.ExplodeClicked (view NETTED) dotnet/STERP.Desktop/Forms/Bom/frmBomExplosion.vb:89-90"
+        facade:
+          - "BomService.NettedPlan dotnet/STERP.Business/Bom/BomService.vb:198-244"
+        programs:
+          - "BOMNET NET|GETLINE cobol/online/bom/BOMNET.cob:73-381"
+          - "BOMSUPPL cobol/online/bom/BOMSUPPL.cob"
+          - "BOMEXPL (FR-STERP-BOM-040)"
+        procedures: []
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only. Reproduces the COBOL engine session of the facade call: every statement is a SELECT executed in autocommit (no SQLIO BEGN on this path); no row is written. In-process calls run on the caller's connection."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/items/{componentItemCode}/where-used":
+    get:
+      operationId: "bom_getWhereUsed"
+      summary: "Where used: direct and indirect parents of a component"
+      description: "Reproduces BomService.WhereUsed (BomService.vb:372-377): bom.usp_BomWhereUsed with the session company, the component, the as-at date, the levels (outside 1..25 the procedure uses 12) and the draft flag; @VariantCode and @IncludeDemand keep their defaults. Only the first result set is returned, as SqlHelper.ExecuteDataTable did (SqlHelper.cs:87-91). Rows ordered by Level, ParentItemCode, BomRef, BomRevision. FR-STERP-BOM-013."
+      tags:
+        - "Where Used Enquiry"
+      parameters:
+        - name: "componentItemCode"
+          in: "path"
+          required: true
+          description: "Component item code (@ComponentItemCode varchar(40))."
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "bom.usp_BomWhereUsed.@ComponentItemCode varchar(40)"
+            x-sterp-length: 40
+          example: "DEMO-PIN"
+        - name: "asOf"
+          in: "query"
+          required: true
+          description: "As-at date (@AsOf)."
+          schema:
+            type: "string"
+            format: "date"
+            x-sterp-legacy-field: "@AsOf date"
+          example: "2026-10-07"
+        - name: "maxLevels"
+          in: "query"
+          required: true
+          description: "Levels (@MaxLevels smallint); the screen sends 25 for ALL."
+          schema:
+            type: "integer"
+            format: "int32"
+            x-sterp-legacy-field: "@MaxLevels smallint"
+          example: 25
+        - name: "includeDraft"
+          in: "query"
+          required: true
+          description: "Include DRAFT and REVIEW bills (@IncludeDraft bit)."
+          schema:
+            type: "boolean"
+            x-sterp-legacy-field: "@IncludeDraft bit"
+          example: true
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Where-used rows."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomWhereUsedList"
+              example:
+                items:
+                  - level: 1
+                    bomHeaderId: 1001
+                    bomRef: "BOM-DEMO-FRAME"
+                    bomRevision: "A"
+                    status: "RELEASED"
+                    parentItemCode: "DEMO-FRAME"
+                    componentItemCode: "DEMO-PIN"
+                    variantCode: null
+                    purpose: "STANDARD"
+                    effectiveFrom: "2026-01-01"
+                    effectiveTo: null
+                    usageQty: 1.0
+                    uomCode: "EA"
+                    usageBasis: "PROPORTION"
+                    isOptional: false
+                    alternateGroup: null
+                    pathText: "DEMO-PIN < DEMO-FRAME"
+                    qtyPerTopUnit: 1.0
+                    isDirect: true
+                count: 1
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-013"
+        - "FR-STERP-BOM-021"
+        - "FR-STERP-BOM-022"
+      x-sterp-legacy:
+        forms:
+          - "frmBomWhereUsed.FindClicked dotnet/STERP.Desktop/Forms/Bom/frmBomWhereUsed.vb:57-84"
+          - "frmBomExplosion.WhereUsedClicked dotnet/STERP.Desktop/Forms/Bom/frmBomExplosion.vb:123-136"
+        facade:
+          - "BomService.WhereUsed dotnet/STERP.Business/Bom/BomService.vb:372-377"
+        programs: []
+        procedures:
+          - "bom.usp_BomWhereUsed db/procs/bom/usp_BomWhereUsed.sql:16-66"
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call on its own short ADO.NET connection in autocommit (legacy SqlHelper.ExecuteDataTable, dotnet/STERP.Data/SqlHelper.cs:56-91); the procedure opens no transaction and writes nothing."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.VIEW"
+          - "BOM.WHEREUSED.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+          - "menu:BOM.WHEREUSED=BOM.WHEREUSED.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/bills/{bomRef}/revision-comparison":
+    get:
+      operationId: "bom_compareBillRevisions"
+      summary: "Revision comparison with standard-cost impact"
+      description: "Reproduces BomService.CompareRevisions (BomService.vb:380-386): bom.usp_BomCompareRevisions with the session company, the bill, the two revisions and the cost set (empty -> NULL). THROW 51421 E-BOM0901 (a revision does not exist) and 51422 E-BOM0902 (same revision) become 422 business-rule problems. Example values are illustrative. FR-STERP-BOM-014."
+      tags:
+        - "Revision Comparison"
+      parameters:
+        - name: "bomRef"
+          in: "path"
+          required: true
+          description: "Bill reference (bom.BomHeader.BomRef varchar(30)); the screens upper-case it."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+            x-sterp-length: 30
+          example: "BK-COMMUTE-M"
+        - name: "fromRevision"
+          in: "query"
+          required: true
+          description: "@FromRevision varchar(4)."
+          schema:
+            type: "string"
+            maxLength: 4
+            x-sterp-length: 4
+            x-sterp-legacy-field: "@FromRevision varchar(4)"
+          example: "A"
+        - name: "toRevision"
+          in: "query"
+          required: true
+          description: "@ToRevision varchar(4)."
+          schema:
+            type: "string"
+            maxLength: 4
+            x-sterp-length: 4
+            x-sterp-legacy-field: "@ToRevision varchar(4)"
+          example: "B"
+        - name: "costSetCode"
+          in: "query"
+          required: false
+          description: "@CostSetCode varchar(20); empty or absent -> NULL."
+          schema:
+            type: "string"
+            maxLength: 20
+            x-sterp-length: 20
+            x-sterp-legacy-field: "@CostSetCode varchar(20)"
+          example: "BOMDEMO"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Differences."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomRevisionDifferenceList"
+              example:
+                items:
+                  - changeType: "CHANGED"
+                    componentItemCode: "DEMO-PIN"
+                    alternateGroup: null
+                    fromQtyPerUnit: 1.0
+                    toQtyPerUnit: 2.0
+                    qtyDifference: 1.0
+                    fromUom: "EA"
+                    toUom: "EA"
+                    fromBasisType: "PROPORTION"
+                    toBasisType: "PROPORTION"
+                    fromScrap: 0.0
+                    toScrap: 0.0
+                    fromSupply: "PURCHASED"
+                    toSupply: "PURCHASED"
+                    fromRev: null
+                    toRev: null
+                    fromEff: null
+                    toEff: null
+                    changedFields: "quantity"
+                    unitCost: 0.25
+                    costImpact: 0.25
+                count: 1
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          description: "Procedure refusal (E-BOM0901, E-BOM0902)."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/ProblemDetails"
+              example:
+                type: "https://sterp.local/problems/business-rule"
+                title: "Business rule refused the request"
+                status: 422
+                detail: "one of the revisions to compare does not exist"
+                returnCode: null
+                reasonCode: "E-BOM0901"
+                severity: "E"
+                messageCount: 1
+                correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-014"
+        - "FR-STERP-BOM-021"
+      x-sterp-legacy:
+        forms:
+          - "frmBomExplosion.CompareClicked dotnet/STERP.Desktop/Forms/Bom/frmBomExplosion.vb:140-165"
+        facade:
+          - "BomService.CompareRevisions dotnet/STERP.Business/Bom/BomService.vb:380-386"
+        programs: []
+        procedures:
+          - "bom.usp_BomCompareRevisions db/procs/bom/usp_BomCompareRevisions.sql:14-91"
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call on its own short ADO.NET connection in autocommit (legacy SqlHelper.ExecuteDataTable, dotnet/STERP.Data/SqlHelper.cs:56-91); the procedure opens no transaction and writes nothing."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/bill-revisions":
+    get:
+      operationId: "bom_listBillRevisions"
+      summary: "Every revision of a bill or of a parent item"
+      description: "Reproduces BomService.Revisions (dotnet/STERP.Business/Bom/BomService.vb:343-345): bom.usp_BomStructure @Mode = REVISIONS with @CompanyCode = the session company (usp_BomStructure.sql:31-116). Empty strings become NULL (SqlHelper.cs:33); a NULL revision resolves to the revision effective on @AsOf, released first, then latest effective-from, highest revision, highest id. Direct list response in procedure order. Example values are illustrative. FR-STERP-BOM-015."
+      tags:
+        - "Bill Maintenance"
+      parameters:
+        - name: "bomRef"
+          in: "query"
+          required: false
+          description: "@BomRef varchar(30); blank -> NULL."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-length: 30
+            x-sterp-legacy-field: "@BomRef varchar(30)"
+          example: "BK-COMMUTE-M"
+        - name: "parentItemCode"
+          in: "query"
+          required: false
+          description: "@ParentItemCode varchar(40); blank -> NULL; with neither filter the result is empty."
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-length: 40
+            x-sterp-legacy-field: "@ParentItemCode varchar(40)"
+          example: "FG-BIKE-COMMUTE-M"
+        - name: "asOf"
+          in: "query"
+          required: true
+          description: "@AsOf date (the editor sends the workstation date)."
+          schema:
+            type: "string"
+            format: "date"
+            x-sterp-legacy-field: "@AsOf date"
+          example: "2026-10-19"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Result set rows."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomBillRevisionList"
+              example:
+                items:
+                  - bomHeaderId: 1101
+                    companyCode: "STC"
+                    siteCode: null
+                    bomRef: "BK-COMMUTE-M"
+                    bomRevision: "A"
+                    parentItemCode: "FG-BIKE-COMMUTE-M"
+                    purpose: "STANDARD"
+                    variantCode: null
+                    jobRef: null
+                    description: "Commuter bicycle, medium: frame, fork, wheels, drivetrain, cockpit and accessories"
+                    status: "RELEASED"
+                    nominalBasis: 1.0
+                    yieldFactor: 1.0
+                    productionQuantum: 1.0
+                    batchSize: 10.0
+                    isPhantom: false
+                    effectiveFrom: "2026-01-01"
+                    effectiveTo: null
+                    authorUser: null
+                    reviewerUser: "ENGMGR"
+                    releasedBy: "ENGMGR"
+                    releasedAt: "2026-10-01T09:00:00.0000000"
+                    changeRef: null
+                    componentCount: 12
+                    isEffectiveNow: true
+                    selectionRank: 1
+                count: 1
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-015"
+        - "FR-STERP-BOM-020"
+        - "FR-STERP-BOM-021"
+      x-sterp-legacy:
+        forms:
+          - "frmBomEditor.LoadBill/LoadTab dotnet/STERP.Desktop/Forms/Bom/frmBomEditor.vb:94-159"
+          - "frmBomExplosion.CompareClicked dotnet/STERP.Desktop/Forms/Bom/frmBomExplosion.vb:149"
+        facade:
+          - "BomService.Revisions dotnet/STERP.Business/Bom/BomService.vb:343-345"
+          - "BomService.ReadStructure dotnet/STERP.Business/Bom/BomService.vb:364-369"
+        programs: []
+        procedures:
+          - "bom.usp_BomStructure db/procs/bom/usp_BomStructure.sql:21-116"
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call on its own short ADO.NET connection in autocommit (legacy SqlHelper.ExecuteDataTable, dotnet/STERP.Data/SqlHelper.cs:56-91); the procedure opens no transaction and writes nothing."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.MAINT"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EDIT=BOM.MAINT"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/bills/{bomRef}/header":
+    get:
+      operationId: "bom_getBillHeader"
+      summary: "One bill revision header (zero or one row)"
+      description: "Reproduces BomService.BillHeader (dotnet/STERP.Business/Bom/BomService.vb:348-352): bom.usp_BomStructure @Mode = HEADER with @CompanyCode = the session company (usp_BomStructure.sql:31-116). Empty strings become NULL (SqlHelper.cs:33); a NULL revision resolves to the revision effective on @AsOf, released first, then latest effective-from, highest revision, highest id. Direct list response in procedure order. Example values are illustrative. FR-STERP-BOM-015."
+      tags:
+        - "Bill Maintenance"
+      parameters:
+        - name: "bomRef"
+          in: "path"
+          required: true
+          description: "Bill reference (bom.BomHeader.BomRef varchar(30)); the screens upper-case it."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+            x-sterp-length: 30
+          example: "BK-COMMUTE-M"
+        - name: "revision"
+          in: "query"
+          required: false
+          description: "@BomRevision varchar(4); blank or absent -> the revision effective on asOf."
+          schema:
+            type: "string"
+            maxLength: 4
+            x-sterp-length: 4
+            x-sterp-legacy-field: "@BomRevision varchar(4)"
+          example: "A"
+        - name: "asOf"
+          in: "query"
+          required: true
+          description: "@AsOf date (the editor sends the workstation date)."
+          schema:
+            type: "string"
+            format: "date"
+            x-sterp-legacy-field: "@AsOf date"
+          example: "2026-10-19"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Result set rows."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomBillHeaderList"
+              example:
+                items:
+                  - bomHeaderId: 1101
+                    companyCode: "STC"
+                    siteCode: null
+                    bomRef: "BK-COMMUTE-M"
+                    bomRevision: "A"
+                    parentItemCode: "FG-BIKE-COMMUTE-M"
+                    purpose: "STANDARD"
+                    variantCode: null
+                    jobRef: null
+                    description: "Commuter bicycle, medium: frame, fork, wheels, drivetrain, cockpit and accessories"
+                    status: "RELEASED"
+                    nominalBasis: 1.0
+                    yieldFactor: 1.0
+                    productionQuantum: 1.0
+                    batchSize: 10.0
+                    isPhantom: false
+                    effectiveFrom: "2026-01-01"
+                    effectiveTo: null
+                    authorUser: null
+                    reviewerUser: "ENGMGR"
+                    releasedBy: "ENGMGR"
+                    releasedAt: "2026-10-01T09:00:00.0000000"
+                    changeRef: null
+                    parentRevision: null
+                    costingLotSize: null
+                    changeReason: null
+                    engineeringNotes: null
+                    parentDescription: "Complete bicycle, commuter, medium"
+                    stockUom: "EA"
+                    componentCount: 12
+                    byProductCount: 0
+                    isFrozen: true
+                count: 1
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-015"
+        - "FR-STERP-BOM-020"
+      x-sterp-legacy:
+        forms:
+          - "frmBomEditor.LoadBill/LoadTab dotnet/STERP.Desktop/Forms/Bom/frmBomEditor.vb:94-159"
+        facade:
+          - "BomService.BillHeader dotnet/STERP.Business/Bom/BomService.vb:348-352"
+          - "BomService.ReadStructure dotnet/STERP.Business/Bom/BomService.vb:364-369"
+        programs: []
+        procedures:
+          - "bom.usp_BomStructure db/procs/bom/usp_BomStructure.sql:21-116"
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call on its own short ADO.NET connection in autocommit (legacy SqlHelper.ExecuteDataTable, dotnet/STERP.Data/SqlHelper.cs:56-91); the procedure opens no transaction and writes nothing."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.MAINT"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EDIT=BOM.MAINT"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/bills/{bomRef}/components":
+    get:
+      operationId: "bom_listBillComponents"
+      summary: "Component occurrences of one revision"
+      description: "Reproduces BomService.BillLines (dotnet/STERP.Business/Bom/BomService.vb:355-357): bom.usp_BomStructure @Mode = LINES with @CompanyCode = the session company (usp_BomStructure.sql:31-116). Empty strings become NULL (SqlHelper.cs:33); a NULL revision resolves to the revision effective on @AsOf, released first, then latest effective-from, highest revision, highest id. Direct list response in procedure order. Example values are illustrative. FR-STERP-BOM-015."
+      tags:
+        - "Bill Maintenance"
+      parameters:
+        - name: "bomRef"
+          in: "path"
+          required: true
+          description: "Bill reference (bom.BomHeader.BomRef varchar(30)); the screens upper-case it."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+            x-sterp-length: 30
+          example: "BK-COMMUTE-M"
+        - name: "revision"
+          in: "query"
+          required: false
+          description: "@BomRevision varchar(4); blank or absent -> the revision effective on asOf."
+          schema:
+            type: "string"
+            maxLength: 4
+            x-sterp-length: 4
+            x-sterp-legacy-field: "@BomRevision varchar(4)"
+          example: "A"
+        - name: "asOf"
+          in: "query"
+          required: true
+          description: "@AsOf date (the editor sends the workstation date)."
+          schema:
+            type: "string"
+            format: "date"
+            x-sterp-legacy-field: "@AsOf date"
+          example: "2026-10-19"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Result set rows."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomBillComponentList"
+              example:
+                items: []
+                count: 0
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-015"
+        - "FR-STERP-BOM-020"
+      x-sterp-legacy:
+        forms:
+          - "frmBomEditor.LoadBill/LoadTab dotnet/STERP.Desktop/Forms/Bom/frmBomEditor.vb:94-159"
+        facade:
+          - "BomService.BillLines dotnet/STERP.Business/Bom/BomService.vb:355-357"
+          - "BomService.ReadStructure dotnet/STERP.Business/Bom/BomService.vb:364-369"
+        programs: []
+        procedures:
+          - "bom.usp_BomStructure db/procs/bom/usp_BomStructure.sql:21-116"
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call on its own short ADO.NET connection in autocommit (legacy SqlHelper.ExecuteDataTable, dotnet/STERP.Data/SqlHelper.cs:56-91); the procedure opens no transaction and writes nothing."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.MAINT"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EDIT=BOM.MAINT"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/bills/{bomRef}/by-products":
+    get:
+      operationId: "bom_listBillByProducts"
+      summary: "By-product recoveries of one revision"
+      description: "Reproduces BomService.ByProducts (dotnet/STERP.Business/Bom/BomService.vb:360-362): bom.usp_BomStructure @Mode = BYPRODUCT with @CompanyCode = the session company (usp_BomStructure.sql:31-116). Empty strings become NULL (SqlHelper.cs:33); a NULL revision resolves to the revision effective on @AsOf, released first, then latest effective-from, highest revision, highest id. Direct list response in procedure order. Example values are illustrative. FR-STERP-BOM-015."
+      tags:
+        - "Bill Maintenance"
+      parameters:
+        - name: "bomRef"
+          in: "path"
+          required: true
+          description: "Bill reference (bom.BomHeader.BomRef varchar(30)); the screens upper-case it."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+            x-sterp-length: 30
+          example: "BK-COMMUTE-M"
+        - name: "revision"
+          in: "query"
+          required: false
+          description: "@BomRevision varchar(4); blank or absent -> the revision effective on asOf."
+          schema:
+            type: "string"
+            maxLength: 4
+            x-sterp-length: 4
+            x-sterp-legacy-field: "@BomRevision varchar(4)"
+          example: "A"
+        - name: "asOf"
+          in: "query"
+          required: true
+          description: "@AsOf date (the editor sends the workstation date)."
+          schema:
+            type: "string"
+            format: "date"
+            x-sterp-legacy-field: "@AsOf date"
+          example: "2026-10-19"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "Result set rows."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomBillByProductList"
+              example:
+                items: []
+                count: 0
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-015"
+        - "FR-STERP-BOM-020"
+      x-sterp-legacy:
+        forms:
+          - "frmBomEditor.LoadBill/LoadTab dotnet/STERP.Desktop/Forms/Bom/frmBomEditor.vb:94-159"
+        facade:
+          - "BomService.ByProducts dotnet/STERP.Business/Bom/BomService.vb:360-362"
+          - "BomService.ReadStructure dotnet/STERP.Business/Bom/BomService.vb:364-369"
+        programs: []
+        procedures:
+          - "bom.usp_BomStructure db/procs/bom/usp_BomStructure.sql:21-116"
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call on its own short ADO.NET connection in autocommit (legacy SqlHelper.ExecuteDataTable, dotnet/STERP.Data/SqlHelper.cs:56-91); the procedure opens no transaction and writes nothing."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.EXPLODE.RUN"
+          - "BOM.MAINT"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.COMPARE=BOM.VIEW"
+          - "menu:BOM.EDIT=BOM.MAINT"
+          - "menu:BOM.EXPLODE=BOM.EXPLODE.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/bills/{bomRef}/validate":
+    post:
+      operationId: "bom_validateBill"
+      summary: "Validate a bill revision without recording (BOMVALID CHECK)"
+      description: "Reproduces BomService.Validate with record = false as frmBomEditor calls it (BomService.vb:311-340; frmBomEditor.vb:169): BOMVALID CHECK with BV-BOM-REF, BV-BOM-REV, the date and BV-FIND-MAX 50; BV-BOM-ID is never set and BOMVALID reads the bill by id only (BOMVALID.cob:123-156), so the legacy path answers RC 16 BOM0303 \"No bill of materials holds that identity\" (404). Reproduced pending SME-629 (BC-BOM-02). When a bill is found the full rule set applies: FAIL RC 8 BOM0340 -> 422 with data (no findings, SME-1766), WARNING RC 4 BOM0341 and PASS RC 0 -> 200 with up to 50 findings. CHECK writes nothing. FR-STERP-BOM-016."
+      tags:
+        - "Bill Maintenance"
+      parameters:
+        - name: "bomRef"
+          in: "path"
+          required: true
+          description: "Bill reference (BV-BOM-REF / @BomRef)."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+            x-sterp-length: 30
+          example: "BK-COMMUTE-M"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        description: "Validation parameters."
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/BomValidateRequest"
+            example:
+              bomRevision: "A"
+              effectiveDate: "2026-10-19"
+      responses:
+        "200":
+          description: "PASS or WARNING."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomValidationEnvelope"
+              example:
+                outcome:
+                  returnCode: 4
+                  severity: "WARNING"
+                  reasonCode: "BOM0341"
+                  message: "Validation passed with warnings to review"
+                  messageCount: 1
+                  documentRef: ""
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  outcome: "WARNING"
+                  errorCount: 0
+                  warningCount: 1
+                  releaseAllowed: true
+                  cyclePath: ""
+                  findings:
+                    - severity: "WARNING"
+                      reason: "BOM0330"
+                      lineNum: 20
+                      item: "DEMO-PACK"
+                      path: "DEMO-FRAME/20:DEMO-PACK"
+                      message: "This line expands a bill that is not marked phantom"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          description: "Legacy editor path: bill not found by id (RC 16 BOM0303)."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/ProblemDetails"
+              example:
+                type: "https://sterp.local/problems/not-found"
+                title: "Not found"
+                status: 404
+                detail: "No bill of materials holds that identity"
+                returnCode: 16
+                reasonCode: "BOM0303"
+                severity: "NOT FOUND"
+                messageCount: 1
+                correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        "422":
+          description: "FAIL (RC 8 BOM0340) with the result the facade kept."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/BomValidationProblem"
+              example:
+                type: "https://sterp.local/problems/business-rule"
+                title: "Business rule refused the request"
+                status: 422
+                detail: "Validation failed with 2 error(s) - this bill cannot be released"
+                returnCode: 8
+                reasonCode: "BOM0340"
+                severity: "ERROR"
+                messageCount: 1
+                correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+                data:
+                  outcome: "FAIL"
+                  errorCount: 2
+                  warningCount: 0
+                  releaseAllowed: false
+                  cyclePath: ""
+                  findings: []
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-016"
+        - "FR-STERP-BOM-020"
+        - "FR-STERP-BOM-042"
+      x-sterp-legacy:
+        forms:
+          - "frmBomEditor.ValidateClicked dotnet/STERP.Desktop/Forms/Bom/frmBomEditor.vb:163-180"
+        facade:
+          - "BomService.Validate dotnet/STERP.Business/Bom/BomService.vb:311-340"
+          - "BomService.NewFindingTable dotnet/STERP.Business/Bom/BomService.vb:448-457"
+        programs:
+          - "BOMVALID CHECK cobol/online/bom/BOMVALID.cob:75-570"
+          - "BOMREAD BILL cobol/online/bom/BOMREAD.cob:123-396"
+          - "BOMSELCT SELECT, CYCLECHK CHECK (internal callees)"
+        procedures: []
+        reports: []
+        jobs: []
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read-only engine call (CHECK records nothing, BOMVALID.cob:108-121); SELECTs in autocommit."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.MAINT"
+        sources:
+          - "menu:BOM.EDIT=BOM.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/bills/{bomRef}/revisions/{bomRevision}/release":
+    post:
+      operationId: "bom_releaseBillRevision"
+      summary: "Release a validated bill revision through the release gate"
+      description: "Reproduces BomService.Release (BomService.vb:389-397): bom.usp_ReleaseBom (usp_ReleaseBom.sql:17-130) with the session company and user, the reviewer, effective-from, supersede revision and reason (empty -> NULL) and @CorrelationId = Idempotency-Key. The procedure refuses in this order: E-BOM0401 not found, E-BOM0403 caller lacks BOM.RELEASE, E-BOM0404 released, E-BOM0405 superseded/retired, E-BOM0406 not validated, E-BOM0407 latest validation FAIL, E-BOM0408 content changed, E-BOM0409 no reviewer, E-BOM0410 reviewer is author or releaser, E-BOM0411 reviewer lacks authority, E-BOM0412 supersede revision missing; otherwise one transaction supersedes, releases, audits and records the idempotency key. A replay with the same key returns REPEAT. Example values are illustrative. FR-STERP-BOM-017."
+      tags:
+        - "Bill Maintenance"
+      parameters:
+        - name: "bomRef"
+          in: "path"
+          required: true
+          description: "Bill reference (BV-BOM-REF / @BomRef)."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+            x-sterp-length: 30
+          example: "BK-COMMUTE-M"
+        - name: "bomRevision"
+          in: "path"
+          required: true
+          description: "Revision to release (@BomRevision)."
+          schema:
+            type: "string"
+            maxLength: 4
+            x-sterp-legacy-field: "bom.BomHeader.BomRevision varchar(4)"
+            x-sterp-length: 4
+          example: "B"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        description: "Release parameters as prompted by the editor."
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/BomReleaseRequest"
+            example:
+              reviewerUser: "QAMGR"
+              effectiveFrom: "2026-10-19"
+              supersedeRevision: ""
+              reason: "Engineering release"
+      responses:
+        "200":
+          description: "RELEASED or REPEAT row."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomReleaseOutcomeList"
+              example:
+                items:
+                  - outcome: "RELEASED"
+                    bomRef: "BOM-DEMO-PANEL"
+                    bomRevision: "B"
+                    parentItemCode: "DEMO-PANEL"
+                    releasedBy: "ENGMGR"
+                    reviewerUser: "QAMGR"
+                    effectiveFrom: "2026-10-19"
+                    supersededRevision: null
+                    validationId: 42
+                    resultRef: null
+                    message: "STERP-I-BOM0401: revision released and frozen"
+                count: 1
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          description: "Release refused by the procedure."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/ProblemDetails"
+              example:
+                type: "https://sterp.local/problems/business-rule"
+                title: "Business rule refused the request"
+                status: 422
+                detail: "user is not authorised to release bills of material"
+                returnCode: null
+                reasonCode: "E-BOM0403"
+                severity: "E"
+                messageCount: 1
+                correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-017"
+        - "FR-STERP-BOM-020"
+      x-sterp-legacy:
+        forms:
+          - "frmBomEditor.ReleaseClicked dotnet/STERP.Desktop/Forms/Bom/frmBomEditor.vb:184-210"
+        facade:
+          - "BomService.Release dotnet/STERP.Business/Bom/BomService.vb:389-397"
+        programs: []
+        procedures:
+          - "bom.usp_ReleaseBom db/procs/bom/usp_ReleaseBom.sql:17-130"
+          - "core.usp_WriteAudit"
+        reports: []
+        jobs: []
+      x-sterp-permission:
+        - "BOM.RELEASE"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One procedure call on its own connection. Checks run in autocommit; the procedure's own BEGIN TRAN..COMMIT (XACT_ABORT ON) covers the supersede update, the release update, core.usp_WriteAudit and the core.IdempotencyKey insert, which commit together or not at all."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.MAINT"
+        sources:
+          - "menu:BOM.EDIT=BOM.MAINT"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/engineering-changes/{changeRef}/preview":
+    post:
+      operationId: "bom_previewBulkChange"
+      summary: "Bulk engineering change preview (replace one component across bills)"
+      description: "Reproduces BomBulkService.Preview (BomBulkService.vb:16-63): BOMBULK PREVIEW then GETLINE pages (cobol/online/bom/BOMBULK.cob:101-891) with action REPLACE. Checks BOM.VIEW (refusal RC 6 PRM0006 -> 202 HOLD), validates the request (BOM1401-BOM1407), returns a stored APPLIED outcome as RC 4 BOM1410, selects at most 200 targets (BOM1413) or none (RC 16 BOM1409), records the change header, builds and validates one proposal per target through BOMBREV inside an engine unit of work that is always rolled back, then records the change lines and header (Status PREVIEW). One failed proposal refuses the whole change: RC 8 BOM1411 -> 422 whose problem carries the complete preview in data. Otherwise reason BOM1415 (preview only). FR-STERP-BOM-018."
+      tags:
+        - "Bulk Change Preview"
+      parameters:
+        - name: "changeRef"
+          in: "path"
+          required: true
+          description: "Change reference (BB-CHANGE-REF)."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "BB-CHANGE-REF PIC X(30)"
+            x-sterp-length: 30
+          example: "ECO-BOMDEMO-001"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        description: "Preview parameters as entered on the Bulk Change Preview screen (demo workflow 2 step 4)."
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/BomBulkPreviewRequest"
+            example:
+              oldItem: "DEMO-PIN"
+              newItem: "DEMO-PIN-HD"
+              effectiveDate: "2026-11-01"
+              scope: "ITEM"
+              scopeItem: ""
+              includeDraft: true
+      responses:
+        "200":
+          description: "Preview accepted (RC 0, or RC 4 BOM1410/BOM1413)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomBulkPreviewEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: "BOM1415"
+                  message: "STERP-I-BOM1415: preview only - nothing has been changed. 7 bill(s) in scope; 7 to change (5 as a new revision, 2 as a draft amendment); 0 skipped; 0 failed validation"
+                  messageCount: 0
+                  documentRef: ""
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  targetCount: 7
+                  failedCount: 0
+                  appliedCount: 0
+                  mayApply: true
+                  summary: "7 bill(s) in scope; 7 to change (5 as a new revision, 2 as a draft amendment); 0 skipped; 0 failed validation"
+                  refusal: ""
+                  lines:
+                    - bill: "BOM-DEMO-FRAME"
+                      revision: "A"
+                      proposedRevision: "B"
+                      parent: "DEMO-FRAME"
+                      treatment: "NEWREV"
+                      outcome: "PENDING"
+                      reason: ""
+                      detail: "New draft revision B of BOM-DEMO-FRAME; the released revision is untouched."
+                      line: 30
+                      beforeQty: 1.0
+                      afterQty: 1.0
+        "202":
+          description: "RC 6 PRM0006: the user does not hold BOM.VIEW."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/BomBulkPreviewEnvelope"
+              example:
+                outcome:
+                  returnCode: 6
+                  severity: "HOLD"
+                  reasonCode: "PRM0006"
+                  message: "SALESREP does not hold BOM.VIEW"
+                  messageCount: 1
+                  documentRef: ""
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  targetCount: 0
+                  failedCount: 0
+                  appliedCount: 0
+                  mayApply: false
+                  summary: ""
+                  refusal: ""
+                  lines: []
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          description: "RC 16 BOM1409: no bill in scope."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/ProblemDetails"
+              example:
+                type: "https://sterp.local/problems/not-found"
+                title: "Not found"
+                status: 404
+                detail: "No bill in scope ITEM would be touched by change ECO-BOMDEMO-002"
+                returnCode: 16
+                reasonCode: "BOM1409"
+                severity: "NOT FOUND"
+                messageCount: 1
+                correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+        "422":
+          description: "RC 8: invalid request (BOM1401-BOM1407) or BOM1411 refusal with the preview."
+          content:
+            "application/problem+json":
+              schema:
+                "$ref": "#/components/schemas/BomBulkPreviewProblem"
+              example:
+                type: "https://sterp.local/problems/business-rule"
+                title: "Business rule refused the request"
+                status: 422
+                detail: "STERP-E-BOM1411: 1 proposed revision(s) fail validation, so no bill is changed at all - correct them and preview again"
+                returnCode: 8
+                reasonCode: "BOM1411"
+                severity: "ERROR"
+                messageCount: 1
+                correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+                data:
+                  targetCount: 7
+                  failedCount: 1
+                  appliedCount: 0
+                  mayApply: false
+                  summary: "7 bill(s) in scope; 6 to change (4 as a new revision, 2 as a draft amendment); 0 skipped; 1 failed validation"
+                  refusal: "STERP-E-BOM1411: 1 proposed revision(s) fail validation, so no bill is changed at all - correct them and preview again"
+                  lines:
+                    - bill: "BOM-DEMO-FRAME"
+                      revision: "A"
+                      proposedRevision: "B"
+                      parent: "DEMO-FRAME"
+                      treatment: "NEWREV"
+                      outcome: "PENDING"
+                      reason: ""
+                      detail: "New draft revision B of BOM-DEMO-FRAME; the released revision is untouched."
+                      line: 30
+                      beforeQty: 1.0
+                      afterQty: 1.0
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-018"
+        - "FR-STERP-BOM-023"
+        - "FR-STERP-BOM-042"
+      x-sterp-legacy:
+        forms:
+          - "frmBomBulkPreview.PreviewClicked dotnet/STERP.Desktop/Forms/Bom/frmBomBulkPreview.vb:53-72"
+        facade:
+          - "BomBulkService.Preview dotnet/STERP.Business/Bom/BomBulkService.vb:16-63"
+        programs:
+          - "BOMBULK PREVIEW|GETLINE cobol/online/bom/BOMBULK.cob:101-891"
+          - "BOMBREV PROPOSE cobol/online/bom/BOMBREV.cob:83-805"
+          - "PERMCHK, BOMREAD, CYCLECHK EDGE, WHEREUSD ALL|GETLINE, BOMVALID CHECK (callees)"
+        procedures:
+          - "core.usp_CheckPermission (through PERMCHK)"
+        reports: []
+        jobs: []
+      x-sterp-permission:
+        - "BOM.VIEW"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "COBOL engine session (contracts 6.4): permission and change reads; INSERT bom.BomChange committed in autocommit; SQLIO BEGN; all proposal writes of BOMBREV (new headers, copied and changed component lines); SQLIO ROLB; then DELETE/INSERT bom.BomChangeLine and UPDATE bom.BomChange committed in autocommit (BOMBULK.cob:170-201,495-569,639-733)."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.CHANGE.PREVIEW=BOM.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/bom/v1/jobs/BOMRP010/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "bom_submitBomrp010Run"
+      summary: "Submit the indented / leaf / costed explosion listing BOMRP010"
+      description: "Runs the re-implemented BOMRP010 (cobol/batch/bom/BOMRP010.cob) with the legacy KEY=VALUE arguments: registers the run (core.JobRun), writes the 132-column listing to the spool and ends with return code 0 (also for incomplete calculations), 8 (engine error) or 12 (missing ITEM, spool failure). The permission checked is that of the catalogue row named by reportCode (BOMRP010/RPT-012 BOM.VIEW, BOMRP020 BOM.COST.ROLLUP). Status, SYSOUT and spool are the platform resources /api/jobs/v1/runs/{jobRunId}. FR-STERP-BOM-030."
+      tags:
+        - "Reports (BOMRP010)"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        description: "Legacy KEY=VALUE arguments as a JSON object (contracts 8.2)."
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/BomBomrp010Parameters"
+            example:
+              CO: "STC"
+              ITEM: "FG-BIKE-COMMUTE-M"
+              QTY: "10"
+              ASAT: "20261019"
+              MODE: "COSTED"
+              COSTSET: "BOMDEMO"
+              USER: "ENGINEER"
+              reportCode: "BOMRP020"
+      responses:
+        "202":
+          description: "Run accepted (contracts 8.3)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 4711
+                jobName: "BOMRP010"
+                status: "RUNNING"
+                startedAt: "2026-10-19T10:15:00.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/4711"
+                  sysout: "/api/jobs/v1/runs/4711/sysout"
+                  spool: "/api/jobs/v1/runs/4711/spool"
+                  result: "/api/jobs/v1/runs/4711/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-030"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher (platform) dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:43-110"
+        facade:
+          - "ReportService.Run dotnet/STERP.Business/System/ReportService.vb:98-170"
+        programs:
+          - "BOMRP010 cobol/batch/bom/BOMRP010.cob:1-638"
+          - "BOMLEAF, BOMCOST, BOMEXPL and their callees"
+        procedures:
+          - "core.usp_JobRunStart/End (JOBLOG)"
+        reports:
+          - "BOMRP010"
+          - "BOMRP020"
+          - "RPT-012"
+        jobs:
+          - "BOMRP010"
+      x-sterp-permission:
+        - "BOM.VIEW"
+        - "BOM.COST.ROLLUP"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Batch run in STERP.Jobs: core.usp_JobRunStart/End register the run in autocommit as JOBLOG did; the listing only reads."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.COST.ROLLUP"
+          - "BOM.VIEW"
+        sources:
+          - "menu:BOM.RPT.COSTED=BOM.COST.ROLLUP"
+          - "menu:BOM.RPT.INDENT=BOM.VIEW"
+          - "report:BOMRP010=BOM.VIEW"
+          - "report:BOMRP020=BOM.COST.ROLLUP"
+          - "report:RPT-012=BOM.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/bom/v1/jobs/BOMRP030/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "bom_submitBomrp030Run"
+      summary: "Submit the where-used / revision comparison listing BOMRP030"
+      description: "Runs the re-implemented BOMRP030 (cobol/batch/bom/BOMRP030.cob): MODE=WHEREUSED prints the uses, the top-level assemblies and the open demand through WHEREUSD; MODE=COMPARE prints the revision comparison through BOMCOMP with the cost impact. A refusal raises one worklist exception (EXCPRAIS) and ends with return code 4 (where-used) or 8 (comparison); missing arguments end with 12. Permission of the catalogue row named by reportCode (BOMRP030 BOM.WHEREUSED.VIEW, BOMRP040 BOM.VIEW). FR-STERP-BOM-031."
+      tags:
+        - "Reports (BOMRP030)"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        description: "Legacy KEY=VALUE arguments as a JSON object (contracts 8.2)."
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/BomBomrp030Parameters"
+            example:
+              CO: "STC"
+              ITEM: "DEMO-PIN"
+              ASAT: "20261019"
+              LEVELS: "25"
+              MODE: "WHEREUSED"
+              DRAFT: "Y"
+              USER: "ENGINEER"
+              reportCode: "BOMRP030"
+      responses:
+        "202":
+          description: "Run accepted (contracts 8.3)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 4711
+                jobName: "BOMRP030"
+                status: "RUNNING"
+                startedAt: "2026-10-19T10:15:00.0000000"
+                links:
+                  self: "/api/jobs/v1/runs/4711"
+                  sysout: "/api/jobs/v1/runs/4711/sysout"
+                  spool: "/api/jobs/v1/runs/4711/spool"
+                  result: "/api/jobs/v1/runs/4711/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-BOM-031"
+      x-sterp-legacy:
+        forms:
+          - "frmReportLauncher (platform) dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:43-110"
+        facade:
+          - "ReportService.Run dotnet/STERP.Business/System/ReportService.vb:98-170"
+        programs:
+          - "BOMRP030 cobol/batch/bom/BOMRP030.cob:1-1003"
+          - "WHEREUSD, BOMCOMP, BOMCOST and their callees"
+          - "EXCPRAIS (platform)"
+        procedures:
+          - "core.usp_JobRunStart/End (JOBLOG)"
+          - "core.usp_RaiseException (EXCPRAIS)"
+        reports:
+          - "BOMRP030"
+          - "BOMRP040"
+        jobs:
+          - "BOMRP030"
+      x-sterp-permission:
+        - "BOM.WHEREUSED.VIEW"
+        - "BOM.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Batch run in STERP.Jobs: core.usp_JobRunStart/End register the run in autocommit as JOBLOG did; the listing only reads, and a refusal writes one worklist exception through core.usp_RaiseException in autocommit."
+      x-sterp-wave: "W8"
+      x-sterp-screen-gate:
+        anyOf:
+          - "BOM.VIEW"
+          - "BOM.WHEREUSED.VIEW"
+        sources:
+          - "report:BOMRP030=BOM.WHEREUSED.VIEW"
+          - "report:BOMRP040=BOM.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+components:
+  securitySchemes:
+    windows:
+      type: "http"
+      scheme: "negotiate"
+      description: "Windows integrated authentication (Kerberos/NTLM). Browsers send the signed-on Windows identity automatically; curl: add --negotiate -u : (contracts section 5.1)."
+  parameters:
+    XSterpCompany:
+      name: "X-STERP-Company"
+      in: "header"
+      required: true
+      description: "Company code of the session (legacy SterpSession.CompanyCode -> CA-COMPANY / @CompanyCode). Must be in the caller's access list (core.usp_GetUserContext result set 2); otherwise 403 API0002."
+      schema:
+        type: "string"
+        maxLength: 10
+        x-sterp-legacy-field: "CA-COMPANY PIC X(10)"
+      example: "STC"
+    XSterpSite:
+      name: "X-STERP-Site"
+      in: "header"
+      required: false
+      description: "Site code of the session (legacy SterpSession.SiteCode -> CA-SITE). Required by site-scoped operations; must pair with the company in the access list."
+      schema:
+        type: "string"
+        maxLength: 10
+        x-sterp-legacy-field: "CA-SITE PIC X(10)"
+      example: "RDG"
+    XSterpBusinessDate:
+      name: "X-STERP-Business-Date"
+      in: "header"
+      required: false
+      description: "Business date (legacy SterpSession.BusinessDate -> CA-BUSINESS-DATE yyyyMMdd). Default: server local date, as legacy DateTime.Today (CobolGateway.cs:77)."
+      schema:
+        type: "string"
+        format: "date"
+        x-sterp-legacy-field: "CA-BUSINESS-DATE PIC 9(8)"
+      example: "2026-10-07"
+    XSterpRunAs:
+      name: "X-STERP-Run-As"
+      in: "header"
+      required: false
+      description: "SYSADM 'Continue as' user code (LoginService.SignOnAs). Honoured only when the authenticated user resolves to SYSADM; otherwise 403 API0003."
+      schema:
+        type: "string"
+        maxLength: 20
+        x-sterp-legacy-field: "CA-USER PIC X(20)"
+      example: "SALESREP"
+    IdempotencyKey:
+      name: "Idempotency-Key"
+      in: "header"
+      required: false
+      description: "Legacy correlation id (CA-CORRELATION-ID X(36)); default a new GUID per request (CobolGateway.cs:78). Send one stable key per user instruction where the legacy reused a correlation id (COM-015)."
+      schema:
+        type: "string"
+        maxLength: 36
+        x-sterp-legacy-field: "CA-CORRELATION-ID PIC X(36)"
+      example: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+  schemas:
+    Outcome:
+      type: "object"
+      description: "Legacy STCAHDR result (STERP-App/cobol/copy/STCAHDR.cpy:12-32; CobolResult.cs:6-26). returnCode 0 OK, 4 WARNING, 6 HOLD (HTTP 202). Failures (8, 12, 16) are returned as ProblemDetails."
+      required:
+        - "returnCode"
+        - "severity"
+        - "reasonCode"
+        - "message"
+        - "messageCount"
+        - "correlationId"
+      properties:
+        returnCode:
+          type: "integer"
+          enum:
+            - 0
+            - 4
+            - 6
+          x-sterp-legacy-field: "CA-RETURN-CODE PIC 9(2)"
+        severity:
+          type: "string"
+          enum:
+            - "OK"
+            - "WARNING"
+            - "HOLD"
+        reasonCode:
+          type: "string"
+          maxLength: 8
+          x-sterp-legacy-field: "CA-REASON-CODE PIC X(8)"
+        message:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "CA-MESSAGE PIC X(200)"
+        messageCount:
+          type: "integer"
+          x-sterp-legacy-field: "CA-MSG-COUNT PIC 9(2)"
+        documentRef:
+          type:
+            - "string"
+            - "null"
+          maxLength: 10
+          x-sterp-legacy-field: "CA-REQ-REF PIC X(10)"
+        correlationId:
+          type: "string"
+          maxLength: 36
+          x-sterp-legacy-field: "CA-CORRELATION-ID PIC X(36)"
+    ProblemDetails:
+      type: "object"
+      description: "RFC 9457 problem (contracts 4.6-4.7). type = https://sterp.local/problems/{business-rule|severe|not-found|validation|forbidden|unauthenticated|not-implemented}; detail = legacy message; reasonCode = legacy reason (or API#### for target-only conditions)."
+      required:
+        - "type"
+        - "title"
+        - "status"
+      properties:
+        type:
+          type: "string"
+          format: "uri"
+        title:
+          type: "string"
+        status:
+          type: "integer"
+        detail:
+          type:
+            - "string"
+            - "null"
+        instance:
+          type:
+            - "string"
+            - "null"
+        returnCode:
+          type:
+            - "integer"
+            - "null"
+          description: "legacy CA-RETURN-CODE (8, 12, 16 or other)"
+        reasonCode:
+          type:
+            - "string"
+            - "null"
+        severity:
+          type:
+            - "string"
+            - "null"
+          enum:
+            - "ERROR"
+            - "SEVERE"
+            - "NOT FOUND"
+            - "E"
+            - "W"
+            - "I"
+            - null
+        messageCount:
+          type:
+            - "integer"
+            - "null"
+        correlationId:
+          type:
+            - "string"
+            - "null"
+        traceId:
+          type:
+            - "string"
+            - "null"
+        errors:
+          type:
+            - "object"
+            - "null"
+          additionalProperties:
+            type: "array"
+            items:
+              type: "string"
+        data:
+          description: "Optional (contracts 4.7): for COBOL-backed operations whose legacy screen reads the COMMAREA after a refusal, the same data object the success envelope would carry."
+      example:
+        type: "https://sterp.local/problems/business-rule"
+        title: "Business rule refused the request"
+        status: 422
+        detail: "Period 202602 is hard closed."
+        returnCode: 8
+        reasonCode: "PER0003"
+        severity: "ERROR"
+        messageCount: 1
+        correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+        traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+    JobRunAccepted:
+      type: "object"
+      description: "Returned with HTTP 202 by every job submission (contracts 8.3). Poll /api/jobs/v1/runs/{jobRunId} on STERP.Jobs."
+      required:
+        - "jobRunId"
+        - "jobName"
+        - "status"
+      properties:
+        jobRunId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "core.JobRun.JobRunId bigint"
+        jobName:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "core.JobRun.JobName varchar(40)"
+        status:
+          type: "string"
+          enum:
+            - "RUNNING"
+            - "OK"
+            - "WARNING"
+            - "FAILED"
+            - "ABENDED"
+        startedAt:
+          type: "string"
+          format: "x-sterp-local-date-time"
+        links:
+          type: "object"
+          properties:
+            self:
+              type: "string"
+            sysout:
+              type: "string"
+            spool:
+              type: "string"
+            result:
+              type: "string"
+    ListEnvelope:
+      type: "object"
+      description: "Complete legacy result set in legacy order (contracts 4.10). Use allOf with an 'items' array of your row schema."
+      required:
+        - "items"
+        - "count"
+      properties:
+        items:
+          type: "array"
+          items: {}
+        count:
+          type: "integer"
+    BomExplodeRequest:
+      type: "object"
+      description: "Explosion enquiry request (legacy BomService.Explode parameters). Purpose STANDARD, re-explode Y and window 25 are fixed by the facade."
+      required:
+        - "quantity"
+        - "effectiveDate"
+      properties:
+        revision:
+          x-sterp-legacy-field: "BL-PARENT-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+          description: "Parent bill revision; blank lets the engine select the revision effective on the date (BomService.vb:144)."
+        quantity:
+          x-sterp-legacy-field: "BL-REQ-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          description: "Required good output of the parent (BomService.vb:146)."
+        effectiveDate:
+          x-sterp-legacy-field: "BL-EFF-DATE PIC 9(8)"
+          type: "string"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+          description: "Effective (as-at) date of the explosion (BomService.vb:147)."
+        view:
+          type: "string"
+          maxLength: 8
+          x-sterp-length: 8
+          x-sterp-legacy-field: "CA-FUNCTION PIC X(8) through BomService.ViewToFunction (BomService.vb:399-408)"
+          description: "SINGLE -> function SINGLE, LEAF -> FLATTEN, any other value (the GUI sends INDENTED) -> INDENT. Not a closed domain."
+          default: "INDENTED"
+        maxDepth:
+          x-sterp-legacy-field: "BL-MAX-DEPTH PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+          description: "Requested maximum depth; the GUI sends 0, which the engine replaces by 25 (BOMEXPL.cob:263-266)."
+          default: 0
+    BomExplosionLine:
+      type: "object"
+      description: "One window line of BOMLEAF as mapped by BomService.Explode (BomService.vb:171-184)."
+      properties:
+        level:
+          x-sterp-legacy-field: "BL-L-DEPTH PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+          description: "Depth of the occurrence (0 = root); 0 for every LEAF-view line."
+        item:
+          x-sterp-legacy-field: "BL-L-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        revision:
+          x-sterp-legacy-field: "BL-L-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        description:
+          x-sterp-legacy-field: "BL-L-DESC PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        kind:
+          x-sterp-legacy-field: "BL-L-NODE-TYPE PIC X(8)"
+          type: "string"
+          x-sterp-length: 8
+          description: "Node type (LEAF, INTERMED, PHANTOM, BYPROD, NOTE)."
+        supply:
+          x-sterp-legacy-field: "BL-L-SUPPLY PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        basis:
+          x-sterp-legacy-field: "BL-L-BASIS PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        usage:
+          x-sterp-legacy-field: "BL-L-USAGE PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        unit:
+          x-sterp-legacy-field: "BL-L-UOM PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+          description: "Stock unit of the item."
+        required:
+          x-sterp-legacy-field: "BL-L-REQ-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        unrounded:
+          x-sterp-legacy-field: "BL-L-UNROUNDED PIC S9(15)V9(9)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 24
+          x-sterp-scale: 9
+          x-sterp-signed: true
+        stopReason:
+          x-sterp-legacy-field: "BL-L-STOP PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        path:
+          x-sterp-legacy-field: "BL-L-PATH PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+          description: "Occurrence path, first 80 characters."
+        warning:
+          x-sterp-legacy-field: "BL-L-WARNING PIC X(60)"
+          type: "string"
+          x-sterp-length: 60
+    BomExplosion:
+      type: "object"
+      description: "Explosion result."
+      required:
+        - "completeness"
+        - "stopSummary"
+        - "occurrences"
+        - "depthReached"
+        - "lines"
+      properties:
+        completeness:
+          x-sterp-legacy-field: "BL-COMPLETENESS PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+          description: "COMPLETE, INCOMPLETE or ERROR, taken after the first engine call."
+        stopSummary:
+          x-sterp-legacy-field: "BL-STOP-SUMMARY PIC X(120)"
+          type: "string"
+          x-sterp-length: 120
+        occurrences:
+          x-sterp-legacy-field: "BL-OCC-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        depthReached:
+          x-sterp-legacy-field: "BL-DEPTH-REACHED PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        lines:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/BomExplosionLine"
+          description: "Every window line in engine order (all pages concatenated)."
+    BomExplosionEnvelope:
+      type: "object"
+      description: "Outcome of the last engine call made by the facade plus the explosion data."
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/BomExplosion"
+    BomCostRequest:
+      type: "object"
+      description: "Costed explosion request (BomService.CostedExplosion). Purpose STANDARD, max depth 0, currency GBP and netted N are fixed by the facade."
+      required:
+        - "quantity"
+        - "effectiveDate"
+      properties:
+        revision:
+          x-sterp-legacy-field: "BC-PARENT-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        quantity:
+          x-sterp-legacy-field: "BC-REQ-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        effectiveDate:
+          x-sterp-legacy-field: "BC-EFF-DATE PIC 9(8)"
+          type: "string"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+          description: "As-at date; also sent as BC-COST-DATE (BomService.vb:256-257)."
+        costSet:
+          x-sterp-legacy-field: "BC-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+          description: "Cost set code (GUI default BOMDEMO)."
+    BomCostedLine:
+      type: "object"
+      description: "One valued occurrence (BomService.vb:289-302)."
+      properties:
+        level:
+          x-sterp-legacy-field: "BC-L-DEPTH PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        item:
+          x-sterp-legacy-field: "BC-L-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        revision:
+          x-sterp-legacy-field: "BC-L-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        description:
+          x-sterp-legacy-field: "BC-L-DESC PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        kind:
+          x-sterp-legacy-field: "BC-L-NODE-TYPE PIC X(8)"
+          type: "string"
+          x-sterp-length: 8
+        element:
+          x-sterp-legacy-field: "BC-L-ELEMENT PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+          description: "Cost element (MAT, LAB, SUBC, RECY or the line element)."
+        source:
+          x-sterp-legacy-field: "BC-L-SOURCE PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+          description: "Rate source (COSTSET, ITEMSTD, MISSING, BOMHEADER, CSTONLY, NRV, PHANTOM, NONE)."
+        required:
+          x-sterp-legacy-field: "BC-L-REQ-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        unit:
+          x-sterp-legacy-field: "BC-L-UOM PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        unitCost:
+          x-sterp-legacy-field: "BC-L-UNIT-COST PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        extendedCost:
+          x-sterp-legacy-field: "BC-L-EXT-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        branchCost:
+          x-sterp-legacy-field: "BC-L-BRANCH PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          description: "Always 0 from GETLINE (BOMCOST.cob:369; SME-1743)."
+        path:
+          x-sterp-legacy-field: "BC-L-PATH PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+        warning:
+          x-sterp-legacy-field: "BC-L-WARNING PIC X(60)"
+          type: "string"
+          x-sterp-length: 60
+    BomCostedExplosion:
+      type: "object"
+      description: "Costed roll-up (BomService.vb:269-276)."
+      required:
+        - "completeness"
+        - "occurrences"
+        - "missingRates"
+        - "totalCost"
+        - "unitCost"
+        - "materialCost"
+        - "conversionCost"
+        - "recoveryCredit"
+        - "errorPath"
+        - "lines"
+      properties:
+        completeness:
+          x-sterp-legacy-field: "BC-COMPLETENESS PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        occurrences:
+          x-sterp-legacy-field: "BC-OCC-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        missingRates:
+          x-sterp-legacy-field: "BC-MISSING-RATES PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        totalCost:
+          x-sterp-legacy-field: "BC-TOTAL-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        unitCost:
+          x-sterp-legacy-field: "BC-UNIT-COST PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        materialCost:
+          x-sterp-legacy-field: "BC-MATERIAL-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        conversionCost:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 16
+          x-sterp-scale: 2
+          x-sterp-signed: true
+          x-sterp-legacy-field: "BC-CONVERSION-COST PIC S9(13)V9(2) + BC-SETUP-COST PIC S9(13)V9(2) (BomService.vb:275)"
+          description: "Conversion as shown by the legacy screen: BOMCOST conversion (which already contains setup) plus setup again (SME-640)."
+        recoveryCredit:
+          x-sterp-legacy-field: "BC-RECOVERY-CREDIT PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        errorPath:
+          x-sterp-legacy-field: "BC-ERROR-PATH PIC X(200)"
+          type: "string"
+          x-sterp-length: 200
+          description: "Engine error path (facade StopSummary)."
+        lines:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/BomCostedLine"
+    BomCostedExplosionEnvelope:
+      type: "object"
+      description: "Outcome of the last GETLINE (or of COST when it failed) plus the roll-up."
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/BomCostedExplosion"
+    BomNetRequest:
+      type: "object"
+      description: "Netted plan request (BomService.NettedPlan). Purpose STANDARD, max depth 20 and stock source LIVE are fixed by the facade; no revision is sent."
+      required:
+        - "quantity"
+        - "effectiveDate"
+      properties:
+        quantity:
+          x-sterp-legacy-field: "BN-REQ-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        effectiveDate:
+          x-sterp-legacy-field: "BN-EFF-DATE PIC 9(8)"
+          type: "string"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+          description: "As-at date."
+    BomNettedLine:
+      type: "object"
+      description: "One netted occurrence (BomService.vb:228-238)."
+      properties:
+        level:
+          x-sterp-legacy-field: "BN-L-DEPTH PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        item:
+          x-sterp-legacy-field: "BN-L-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        description:
+          x-sterp-legacy-field: "BN-L-DESC PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        unit:
+          x-sterp-legacy-field: "BN-L-UOM PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        required:
+          x-sterp-legacy-field: "BN-L-REQ-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        stockUsed:
+          x-sterp-legacy-field: "BN-L-STOCK-USED PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        inbound:
+          x-sterp-legacy-field: "BN-L-INBOUND PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          description: "Inbound used; no writer in the engine, so 0 (SME-620)."
+        toMake:
+          x-sterp-legacy-field: "BN-L-TO-MAKE PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          description: "Good quantity still to make."
+        shortage:
+          x-sterp-legacy-field: "BN-L-SHORTAGE PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        excess:
+          x-sterp-legacy-field: "BN-L-EXCESS PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        stopReason:
+          x-sterp-legacy-field: "BN-L-STOP PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+    BomNettedPlan:
+      type: "object"
+      description: "Netted plan (BomService.vb:214-216)."
+      required:
+        - "maxBuildable"
+        - "shortages"
+        - "completeness"
+        - "lines"
+      properties:
+        maxBuildable:
+          x-sterp-legacy-field: "BN-MAX-BUILDABLE PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+          description: "Always 0 after NET (BOMNET.cob:239-242)."
+        shortages:
+          x-sterp-legacy-field: "BN-SHORTAGE-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        completeness:
+          x-sterp-legacy-field: "BN-COMPLETENESS PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        lines:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/BomNettedLine"
+    BomNettedPlanEnvelope:
+      type: "object"
+      description: "Outcome of the last GETLINE (or of NET when it failed) plus the plan."
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/BomNettedPlan"
+    BomWhereUsedRow:
+      type: "object"
+      description: "First result set of bom.usp_BomWhereUsed (usp_BomWhereUsed.sql:51-57)."
+      properties:
+        level:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.usp_BomWhereUsed.Level smallint"
+          description: "1 = direct use; n = n levels above the component."
+        bomHeaderId:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.BomHeader.BomHeaderId int"
+        bomRef:
+          type: "string"
+          x-sterp-length: 30
+          x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+        bomRevision:
+          type: "string"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.BomHeader.BomRevision varchar(4)"
+        status:
+          type: "string"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "bom.BomHeader.Status varchar(12)"
+        parentItemCode:
+          type: "string"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "bom.BomHeader.ParentItemCode varchar(40)"
+        componentItemCode:
+          type: "string"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "bom.BomComponent.ComponentItemCode varchar(40)"
+        variantCode:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.VariantCode varchar(20)"
+        purpose:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomHeader.Purpose varchar(10)"
+        effectiveFrom:
+          type: "string"
+          format: "date"
+          x-sterp-legacy-field: "bom.BomHeader.EffectiveFrom date"
+        effectiveTo:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "bom.BomHeader.EffectiveTo date"
+        usageQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomComponent.UsageQty decimal(19,6)"
+        uomCode:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.UomCode varchar(10)"
+        usageBasis:
+          type: "string"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "bom.BomComponent.UsageBasis varchar(12)"
+        isOptional:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.BomComponent.IsOptional bit"
+        alternateGroup:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.AlternateGroup varchar(10)"
+        pathText:
+          type: "string"
+          x-sterp-length: 400
+          x-sterp-legacy-field: "bom.usp_BomWhereUsed.PathText varchar(400)"
+          description: "\"<component> < <parent> < ...\""
+        qtyPerTopUnit:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.usp_BomWhereUsed.QtyPerTopUnit decimal(19,6)"
+        isDirect:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.usp_BomWhereUsed.IsDirect bit"
+    BomWhereUsedList:
+      description: "Where-used rows ordered by Level, ParentItemCode, BomRef, BomRevision."
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/BomWhereUsedRow"
+    BomRevisionDifference:
+      type: "object"
+      description: "One difference row of bom.usp_BomCompareRevisions (usp_BomCompareRevisions.sql:53-90)."
+      properties:
+        changeType:
+          type: "string"
+          x-sterp-length: 9
+          x-sterp-legacy-field: "bom.usp_BomCompareRevisions.ChangeType varchar(9)"
+          description: "ADDED, REMOVED or CHANGED (UNCHANGED rows are filtered out)."
+        componentItemCode:
+          type: "string"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "bom.BomComponent.ComponentItemCode varchar(40)"
+        alternateGroup:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.AlternateGroup varchar(10)"
+        fromQtyPerUnit:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.usp_BomCompareRevisions.FromQtyPerUnit decimal(19,6)"
+        toQtyPerUnit:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.usp_BomCompareRevisions.ToQtyPerUnit decimal(19,6)"
+        qtyDifference:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.usp_BomCompareRevisions.QtyDifference decimal(19,6)"
+        fromUom:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.UomCode varchar(10)"
+        toUom:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.UomCode varchar(10)"
+        fromBasisType:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "bom.BomComponent.UsageBasis varchar(12)"
+        toBasisType:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "bom.BomComponent.UsageBasis varchar(12)"
+        fromScrap:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 9
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomComponent.ScrapPct decimal(9,6)"
+        toScrap:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 9
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomComponent.ScrapPct decimal(9,6)"
+        fromSupply:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.SupplyBehaviour varchar(10)"
+        toSupply:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.SupplyBehaviour varchar(10)"
+        fromRev:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.BomComponent.ComponentRevision varchar(4)"
+        toRev:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.BomComponent.ComponentRevision varchar(4)"
+        fromEff:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "bom.BomComponent.EffectiveFrom date"
+        toEff:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "bom.BomComponent.EffectiveFrom date"
+        changedFields:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 80
+          x-sterp-legacy-field: "bom.usp_BomCompareRevisions.ChangedFields varchar(80)"
+          description: "Comma list: quantity, unit, basis, scrap, supply, revision, effectivity."
+        unitCost:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "cst.StandardCost.TotalUnitCost decimal(19,6)"
+        costImpact:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-legacy-field: "bom.usp_BomCompareRevisions.CostImpact decimal(18,2)"
+    BomRevisionDifferenceList:
+      description: "Differences ordered by change type, then component."
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/BomRevisionDifference"
+    BomBillRevision:
+      type: "object"
+      description: "REVISIONS row of bom.usp_BomStructure (usp_BomStructure.sql:39-58)."
+      properties:
+        bomHeaderId:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.BomHeader.BomHeaderId int"
+        companyCode:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomHeader.CompanyCode varchar(10)"
+        siteCode:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomHeader.SiteCode varchar(10)"
+        bomRef:
+          type: "string"
+          x-sterp-length: 30
+          x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+        bomRevision:
+          type: "string"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.BomHeader.BomRevision varchar(4)"
+        parentItemCode:
+          type: "string"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "bom.BomHeader.ParentItemCode varchar(40)"
+        purpose:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomHeader.Purpose varchar(10)"
+        variantCode:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.VariantCode varchar(20)"
+        jobRef:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.JobRef varchar(20)"
+        description:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 150
+          x-sterp-legacy-field: "bom.BomHeader.Description varchar(150)"
+        status:
+          type: "string"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "bom.BomHeader.Status varchar(12)"
+        nominalBasis:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.NominalBasis decimal(19,6)"
+        yieldFactor:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 9
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.YieldFactor decimal(9,6)"
+        productionQuantum:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.ProductionQuantum decimal(19,6)"
+        batchSize:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.BatchSize decimal(19,6)"
+        isPhantom:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.BomHeader.IsPhantom bit"
+        effectiveFrom:
+          type: "string"
+          format: "date"
+          x-sterp-legacy-field: "bom.BomHeader.EffectiveFrom date"
+        effectiveTo:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "bom.BomHeader.EffectiveTo date"
+        authorUser:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.AuthorUser varchar(20)"
+        reviewerUser:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.ReviewerUser varchar(20)"
+        releasedBy:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.ReleasedBy varchar(20)"
+        releasedAt:
+          type:
+            - "string"
+            - "null"
+          format: "x-sterp-local-date-time"
+          x-sterp-legacy-field: "bom.BomHeader.ReleasedAt datetime2(3)"
+        changeRef:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 30
+          x-sterp-legacy-field: "bom.BomHeader.ChangeRef varchar(30)"
+        componentCount:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.usp_BomStructure.ComponentCount int"
+        isEffectiveNow:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.usp_BomStructure.IsEffectiveNow bit"
+        selectionRank:
+          type:
+            - "integer"
+            - "null"
+          format: "int64"
+          x-sterp-legacy-field: "bom.vw_BomCurrentRevision.SelectionRank bigint"
+    BomBillRevisionList:
+      description: "Revisions ordered by BomRef, EffectiveFrom descending, BomRevision descending."
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/BomBillRevision"
+    BomBillHeader:
+      type: "object"
+      description: "HEADER row of bom.usp_BomStructure (usp_BomStructure.sql:75-90)."
+      properties:
+        bomHeaderId:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.BomHeader.BomHeaderId int"
+        companyCode:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomHeader.CompanyCode varchar(10)"
+        siteCode:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomHeader.SiteCode varchar(10)"
+        bomRef:
+          type: "string"
+          x-sterp-length: 30
+          x-sterp-legacy-field: "bom.BomHeader.BomRef varchar(30)"
+        bomRevision:
+          type: "string"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.BomHeader.BomRevision varchar(4)"
+        parentItemCode:
+          type: "string"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "bom.BomHeader.ParentItemCode varchar(40)"
+        parentRevision:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.BomHeader.ParentRevision varchar(4)"
+        purpose:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomHeader.Purpose varchar(10)"
+        variantCode:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.VariantCode varchar(20)"
+        jobRef:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.JobRef varchar(20)"
+        description:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 150
+          x-sterp-legacy-field: "bom.BomHeader.Description varchar(150)"
+        nominalBasis:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.NominalBasis decimal(19,6)"
+        yieldFactor:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 9
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.YieldFactor decimal(9,6)"
+        productionQuantum:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.ProductionQuantum decimal(19,6)"
+        batchSize:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.BatchSize decimal(19,6)"
+        costingLotSize:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomHeader.CostingLotSize decimal(19,6)"
+        isPhantom:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.BomHeader.IsPhantom bit"
+        effectiveFrom:
+          type: "string"
+          format: "date"
+          x-sterp-legacy-field: "bom.BomHeader.EffectiveFrom date"
+        effectiveTo:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "bom.BomHeader.EffectiveTo date"
+        status:
+          type: "string"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "bom.BomHeader.Status varchar(12)"
+        authorUser:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.AuthorUser varchar(20)"
+        reviewerUser:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.ReviewerUser varchar(20)"
+        releasedBy:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomHeader.ReleasedBy varchar(20)"
+        releasedAt:
+          type:
+            - "string"
+            - "null"
+          format: "x-sterp-local-date-time"
+          x-sterp-legacy-field: "bom.BomHeader.ReleasedAt datetime2(3)"
+        changeRef:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 30
+          x-sterp-legacy-field: "bom.BomHeader.ChangeRef varchar(30)"
+        changeReason:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 200
+          x-sterp-legacy-field: "bom.BomHeader.ChangeReason varchar(200)"
+        engineeringNotes:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 400
+          x-sterp-legacy-field: "bom.BomHeader.EngineeringNotes varchar(400)"
+        parentDescription:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 100
+          x-sterp-legacy-field: "inv.Item.Description varchar(100)"
+        stockUom:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "inv.Item.StockUomCode varchar(10)"
+        componentCount:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.usp_BomStructure.ComponentCount int"
+        byProductCount:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.usp_BomStructure.ByProductCount int"
+        isFrozen:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.usp_BomStructure.IsFrozen bit"
+          description: "True for RELEASED, SUPERSEDED and RETIRED."
+    BomBillHeaderList:
+      description: "Zero or one header row (BomService.BillHeader returns Nothing without an error when empty)."
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/BomBillHeader"
+    BomBillComponent:
+      type: "object"
+      description: "LINES row of bom.usp_BomStructure over bom.vw_BomComponentUsage (usp_BomStructure.sql:105-115)."
+      properties:
+        lineNum:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.BomComponent.LineNum int"
+        pathRef:
+          type: "string"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomComponent.PathRef varchar(20)"
+        componentItemCode:
+          type: "string"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "bom.BomComponent.ComponentItemCode varchar(40)"
+        description:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 100
+          x-sterp-legacy-field: "inv.Item.Description varchar(100)"
+        componentRevision:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.BomComponent.ComponentRevision varchar(4)"
+        usageQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomComponent.UsageQty decimal(19,6)"
+        usageBasis:
+          type: "string"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "bom.BomComponent.UsageBasis varchar(12)"
+        uomCode:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.UomCode varchar(10)"
+        conversionFactor:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 9
+          x-sterp-legacy-field: "bom.BomComponent.ConversionFactor decimal(19,9)"
+        scrapPct:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 9
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomComponent.ScrapPct decimal(9,6)"
+        supplyBehaviour:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.SupplyBehaviour varchar(10)"
+        lineKind:
+          type: "string"
+          x-sterp-length: 26
+          x-sterp-legacy-field: "bom.vw_BomComponentUsage.LineKind varchar(26)"
+        isStockMaterial:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.vw_BomComponentUsage.IsStockMaterial bit"
+          description: "False for NOTE, SERVICE and COSTONLY lines (vw_BomEnquiry.sql:24-25)."
+        isOptional:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.BomComponent.IsOptional bit"
+        alternateGroup:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomComponent.AlternateGroup varchar(10)"
+        isSelected:
+          type: "boolean"
+          x-sterp-legacy-field: "bom.BomComponent.IsSelected bit"
+        qtyPerNominalUnit:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.vw_BomComponentUsage.QtyPerNominalUnit decimal(19,6)"
+        stockUnitQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.vw_BomComponentUsage.StockUnitQty decimal(19,6)"
+        inputWithScrap:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.vw_BomComponentUsage.InputWithScrap decimal(19,6)"
+        needOffsetDays:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.BomComponent.NeedOffsetDays smallint"
+        operationRef:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomComponent.OperationRef varchar(20)"
+        effectiveFrom:
+          type: "string"
+          format: "date"
+          x-sterp-legacy-field: "bom.vw_BomComponentUsage.EffectiveFrom date"
+        effectiveTo:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "bom.vw_BomComponentUsage.EffectiveTo date"
+        notes:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 300
+          x-sterp-legacy-field: "bom.BomComponent.Notes varchar(300)"
+    BomBillComponentList:
+      description: "Component occurrences ordered by LineNum."
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/BomBillComponent"
+    BomBillByProduct:
+      type: "object"
+      description: "BYPRODUCT row of bom.usp_BomStructure (usp_BomStructure.sql:93-102)."
+      properties:
+        lineNum:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "bom.BomByProduct.LineNum int"
+        byProductItemCode:
+          type: "string"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "bom.BomByProduct.ByProductItemCode varchar(40)"
+        description:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 100
+          x-sterp-legacy-field: "inv.Item.Description varchar(100)"
+        recoveryQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomByProduct.RecoveryQty decimal(19,6)"
+        uomCode:
+          type: "string"
+          x-sterp-length: 10
+          x-sterp-legacy-field: "bom.BomByProduct.UomCode varchar(10)"
+        conversionFactor:
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 9
+          x-sterp-legacy-field: "bom.BomByProduct.ConversionFactor decimal(19,9)"
+        valuationBasis:
+          type: "string"
+          x-sterp-length: 12
+          x-sterp-legacy-field: "bom.BomByProduct.ValuationBasis varchar(12)"
+        recoveryValue:
+          type:
+            - "number"
+            - "null"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-legacy-field: "bom.BomByProduct.RecoveryValue decimal(19,6)"
+        dispositionRule:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 60
+          x-sterp-legacy-field: "bom.BomByProduct.DispositionRule varchar(60)"
+        approvedBy:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.BomByProduct.ApprovedBy varchar(20)"
+    BomBillByProductList:
+      description: "By-product recoveries ordered by LineNum."
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/BomBillByProduct"
+    BomValidateRequest:
+      type: "object"
+      description: "Validation request (BomService.Validate with record = false, function CHECK). BV-BOM-ID is not sent, as in legacy (SME-629)."
+      required:
+        - "effectiveDate"
+      properties:
+        bomRevision:
+          x-sterp-legacy-field: "BV-BOM-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+          description: "Revision as typed in the editor (BV-BOM-REV); BOMVALID itself reads the bill by BV-BOM-ID only."
+        effectiveDate:
+          x-sterp-legacy-field: "BV-EFF-DATE PIC 9(8)"
+          type: "string"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+          description: "Validation date; the editor sends the workstation date (frmBomEditor.vb:169)."
+    BomValidationFinding:
+      type: "object"
+      description: "One finding (BomService.vb:331-336)."
+      properties:
+        severity:
+          x-sterp-legacy-field: "BV-F-SEVERITY PIC X(8)"
+          type: "string"
+          x-sterp-length: 8
+        reason:
+          x-sterp-legacy-field: "BV-F-REASON PIC X(8)"
+          type: "string"
+          x-sterp-length: 8
+        lineNum:
+          x-sterp-legacy-field: "BV-F-LINE-NUM PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        item:
+          x-sterp-legacy-field: "BV-F-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        path:
+          x-sterp-legacy-field: "BV-F-PATH PIC X(80)"
+          type: "string"
+          x-sterp-length: 80
+        message:
+          x-sterp-legacy-field: "BV-F-MESSAGE PIC X(120)"
+          type: "string"
+          x-sterp-length: 120
+    BomValidation:
+      type: "object"
+      description: "Validation result as kept by the facade (BomService.vb:322-338)."
+      required:
+        - "outcome"
+        - "errorCount"
+        - "warningCount"
+        - "releaseAllowed"
+        - "cyclePath"
+        - "findings"
+      properties:
+        outcome:
+          x-sterp-legacy-field: "BV-OUTCOME PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+          description: "PASS, WARNING or FAIL."
+        errorCount:
+          x-sterp-legacy-field: "BV-ERROR-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        warningCount:
+          x-sterp-legacy-field: "BV-WARNING-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        releaseAllowed:
+          type: "boolean"
+          x-sterp-legacy-field: "BV-RELEASE-OK PIC X (\"Y\" -> true, BomService.vb:325)"
+          x-sterp-length: 1
+        cyclePath:
+          x-sterp-legacy-field: "BV-CYCLE-PATH PIC X(200)"
+          type: "string"
+          x-sterp-length: 200
+        findings:
+          type: "array"
+          maxItems: 50
+          items:
+            "$ref": "#/components/schemas/BomValidationFinding"
+          description: "At most 50 findings; empty when the outcome is FAIL (facade parity, SME-1766)."
+    BomValidationEnvelope:
+      type: "object"
+      description: "Outcome (RC 0 PASS or RC 4 WARNING) plus the validation result."
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/BomValidation"
+    BomValidationProblem:
+      description: "RC 8 BOM0340 (FAIL): problem plus the result the facade kept (no findings)."
+      allOf:
+        - "$ref": "#/components/schemas/ProblemDetails"
+        - type: "object"
+          properties:
+            data:
+              "$ref": "#/components/schemas/BomValidation"
+    BomReleaseRequest:
+      type: "object"
+      description: "Release request (BomService.Release). Company, user and correlation id come from the context headers."
+      properties:
+        reviewerUser:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.@ReviewerUser varchar(20)"
+          description: "Reviewer who approved the revision; upper-cased by the editor; NULL takes the header reviewer."
+        effectiveFrom:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.@EffectiveFrom date"
+          description: "Effective-from date; the editor sends the workstation date; NULL keeps the header date."
+        supersedeRevision:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.@SupersedeRevision varchar(4)"
+          description: "Revision to supersede; empty -> NULL (SqlHelper.cs:33); the editor sends empty."
+        reason:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 200
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.@Reason varchar(200)"
+          description: "Release reason (editor default \"Engineering release\"); empty -> NULL."
+    BomReleaseOutcome:
+      type: "object"
+      description: "Result row of bom.usp_ReleaseBom (usp_ReleaseBom.sql:31-37,126-129)."
+      required:
+        - "outcome"
+        - "bomRef"
+        - "bomRevision"
+        - "message"
+      properties:
+        outcome:
+          type: "string"
+          x-sterp-length: 8
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.Outcome varchar(8)"
+          description: "RELEASED or REPEAT."
+        bomRef:
+          type: "string"
+          x-sterp-length: 30
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.BomRef varchar(30)"
+        bomRevision:
+          type: "string"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.BomRevision varchar(4)"
+        parentItemCode:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 40
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.ParentItemCode varchar(40)"
+          description: "RELEASED rows only."
+        releasedBy:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.ReleasedBy varchar(20)"
+          description: "RELEASED rows only."
+        reviewerUser:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 20
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.ReviewerUser varchar(20)"
+          description: "RELEASED rows only."
+        effectiveFrom:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.EffectiveFrom date"
+          description: "RELEASED rows only."
+        supersededRevision:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 4
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.SupersededRevision varchar(4)"
+          description: "RELEASED rows only."
+        validationId:
+          type:
+            - "integer"
+            - "null"
+          format: "int32"
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.ValidationId int"
+          description: "RELEASED rows only."
+        resultRef:
+          type:
+            - "string"
+            - "null"
+          x-sterp-length: 200
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.ResultRef varchar(200)"
+          description: "REPEAT rows only."
+        message:
+          type: "string"
+          x-sterp-length: 80
+          x-sterp-legacy-field: "bom.usp_ReleaseBom.Message varchar(80)"
+          description: "STERP-I-BOM0401 or STERP-I-BOM0402 text."
+    BomReleaseOutcomeList:
+      description: "The single result row of the procedure."
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+        - type: "object"
+          properties:
+            items:
+              type: "array"
+              items:
+                "$ref": "#/components/schemas/BomReleaseOutcome"
+    BomBulkPreviewRequest:
+      type: "object"
+      description: "Bulk change preview request (BomBulkService.Preview). Action REPLACE is fixed by the facade."
+      required:
+        - "oldItem"
+        - "newItem"
+        - "effectiveDate"
+        - "scope"
+        - "scopeItem"
+        - "includeDraft"
+      properties:
+        oldItem:
+          x-sterp-legacy-field: "BB-OLD-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+          description: "Component to replace (upper-cased by the screen and the engine)."
+        newItem:
+          x-sterp-legacy-field: "BB-NEW-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+          description: "Replacement component."
+        effectiveDate:
+          x-sterp-legacy-field: "BB-EFF-DATE PIC 9(8)"
+          type: "string"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+          description: "Effective date of the change (screen default: business date)."
+        scope:
+          x-sterp-legacy-field: "BB-SCOPE PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+          description: "ITEM, BOMREF or PARENT (blank -> ITEM; any other value selects no bill, SME-1751)."
+        scopeItem:
+          x-sterp-legacy-field: "BB-SCOPE-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+          description: "Bill reference (BOMREF) or parent item (PARENT); blank for ITEM."
+        includeDraft:
+          type: "boolean"
+          x-sterp-legacy-field: "BB-INCLUDE-DRAFT PIC X (true -> \"Y\", false -> \"N\", BomBulkService.vb:38)"
+          x-sterp-length: 1
+          description: "Include DRAFT and REVIEW bills (screen \"RELEASED AND DRAFT\")."
+    BomBulkPreviewLine:
+      type: "object"
+      description: "One per-bill outcome (BomBulkService.vb:51-56)."
+      properties:
+        bill:
+          x-sterp-legacy-field: "BB-L-BOM-REF PIC X(30)"
+          type: "string"
+          x-sterp-length: 30
+        revision:
+          x-sterp-legacy-field: "BB-L-BOM-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        proposedRevision:
+          x-sterp-legacy-field: "BB-L-NEW-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        parent:
+          x-sterp-legacy-field: "BB-L-PARENT PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        treatment:
+          x-sterp-legacy-field: "BB-L-TREATMENT PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+          description: "AMEND or NEWREV (blank when refused before treatment)."
+        outcome:
+          x-sterp-legacy-field: "BB-L-OUTCOME PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+          description: "PENDING, FAILED or SKIPPED in a preview."
+        reason:
+          x-sterp-legacy-field: "BB-L-REASON PIC X(8)"
+          type: "string"
+          x-sterp-length: 8
+        detail:
+          x-sterp-legacy-field: "BB-L-DETAIL PIC X(120)"
+          type: "string"
+          x-sterp-length: 120
+        line:
+          x-sterp-legacy-field: "BB-L-LINE-NUM PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        beforeQty:
+          x-sterp-legacy-field: "BB-L-OLD-QTY PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        afterQty:
+          x-sterp-legacy-field: "BB-L-NEW-QTY PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+    BomBulkPreview:
+      type: "object"
+      description: "Preview result as kept by BomBulkService (BomBulkService.vb:42-62)."
+      required:
+        - "targetCount"
+        - "failedCount"
+        - "appliedCount"
+        - "mayApply"
+        - "summary"
+        - "refusal"
+        - "lines"
+      properties:
+        targetCount:
+          x-sterp-legacy-field: "BB-TARGET-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        failedCount:
+          x-sterp-legacy-field: "BB-FAILED-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        appliedCount:
+          x-sterp-legacy-field: "BB-APPLIED-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        mayApply:
+          type: "boolean"
+          x-sterp-legacy-field: "BB-MAY-APPLY PIC X (\"Y\" -> true, BomBulkService.vb:45)"
+          x-sterp-length: 1
+        summary:
+          x-sterp-legacy-field: "BB-SUMMARY PIC X(200)"
+          type: "string"
+          x-sterp-length: 200
+        refusal:
+          x-sterp-legacy-field: "BB-REFUSAL PIC X(200)"
+          type: "string"
+          x-sterp-length: 200
+        lines:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/BomBulkPreviewLine"
+    BomBulkPreviewEnvelope:
+      type: "object"
+      description: "Outcome (RC 0, 4, or 6 HOLD) plus the preview."
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/BomBulkPreview"
+    BomBulkPreviewProblem:
+      description: "Refused preview (RC 8, for example BOM1411) with every per-bill outcome in data."
+      allOf:
+        - "$ref": "#/components/schemas/ProblemDetails"
+        - type: "object"
+          properties:
+            data:
+              "$ref": "#/components/schemas/BomBulkPreview"
+    BomBomrp010Parameters:
+      type: "object"
+      description: "BOMRP010 KEY=VALUE arguments (BOMRP010.cob:239-307) carried as JSON (contracts 8.2)."
+      properties:
+        CO:
+          type: "string"
+          maxLength: 10
+          x-sterp-length: 10
+          x-sterp-legacy-field: "CO= -> Ws-Co PIC X(10)"
+          description: "Company (default STC when absent, SME-023)."
+        SITE:
+          type: "string"
+          maxLength: 10
+          x-sterp-length: 10
+          x-sterp-legacy-field: "SITE= -> Ws-Site PIC X(10)"
+          description: "Site."
+        USER:
+          type: "string"
+          maxLength: 20
+          x-sterp-length: 20
+          x-sterp-legacy-field: "USER= -> Ws-User PIC X(20)"
+          description: "User (default ENGINEER; the launcher sends the caller, contracts 8.2)."
+        ASAT:
+          type: "string"
+          maxLength: 8
+          x-sterp-length: 8
+          x-sterp-legacy-field: "ASAT= -> Ws-Asat PIC 9(8)"
+          description: "As-at date yyyymmdd (default: machine date, SME-025)."
+          pattern: "^[0-9]{8}$"
+        LEVELS:
+          type: "string"
+          maxLength: 4
+          x-sterp-length: 4
+          x-sterp-legacy-field: "LEVELS= -> Ws-Levels PIC S9(4) (NUMVAL)"
+          description: "Explosion depth (default 20, SME-1731)."
+        QTY:
+          type: "string"
+          maxLength: 20
+          x-sterp-length: 20
+          x-sterp-legacy-field: "QTY= -> Ws-Qty PIC S9(13)V9(6) (NUMVAL)"
+          description: "Quantity (default 1)."
+        COSTSET:
+          type: "string"
+          maxLength: 20
+          x-sterp-length: 20
+          x-sterp-legacy-field: "COSTSET= -> Ws-Cost-Set PIC X(20)"
+          description: "Cost set."
+        MODE:
+          type: "string"
+          maxLength: 10
+          x-sterp-length: 10
+          x-sterp-legacy-field: "MODE= -> Ws-Mode PIC X(10)"
+          description: "INDENT (default and any other value), LEAF or COSTED."
+        ITEM:
+          type: "string"
+          maxLength: 40
+          x-sterp-length: 40
+          x-sterp-legacy-field: "ITEM= -> Ws-Item PIC X(40)"
+          description: "Parent item (required by the program; missing -> return code 12)."
+        REV:
+          type: "string"
+          maxLength: 4
+          x-sterp-length: 4
+          x-sterp-legacy-field: "REV= -> Ws-Rev PIC X(4)"
+          description: "Parent revision."
+        reportCode:
+          type: "string"
+          enum:
+            - "BOMRP010"
+            - "BOMRP020"
+            - "RPT-012"
+          default: "BOMRP010"
+          x-sterp-legacy-field: "core.ReportDef.ReportCode varchar(20)"
+          x-sterp-length: 20
+          description: "Catalogue row the run is launched from; its PermissionCode is checked (BOM.VIEW or BOM.COST.ROLLUP)."
+    BomBomrp030Parameters:
+      type: "object"
+      description: "BOMRP030 KEY=VALUE arguments (BOMRP030.cob:274-390) carried as JSON (contracts 8.2)."
+      properties:
+        CO:
+          type: "string"
+          maxLength: 10
+          x-sterp-length: 10
+          x-sterp-legacy-field: "CO= -> Ws-Co PIC X(10)"
+          description: "Company (default STC when absent, SME-023)."
+        SITE:
+          type: "string"
+          maxLength: 10
+          x-sterp-length: 10
+          x-sterp-legacy-field: "SITE= -> Ws-Site PIC X(10)"
+          description: "Site."
+        USER:
+          type: "string"
+          maxLength: 20
+          x-sterp-length: 20
+          x-sterp-legacy-field: "USER= -> Ws-User PIC X(20)"
+          description: "User (default ENGINEER; the launcher sends the caller, contracts 8.2)."
+        ASAT:
+          type: "string"
+          maxLength: 8
+          x-sterp-length: 8
+          x-sterp-legacy-field: "ASAT= -> Ws-Asat PIC 9(8)"
+          description: "As-at date yyyymmdd (default: machine date, SME-025)."
+          pattern: "^[0-9]{8}$"
+        LEVELS:
+          type: "string"
+          maxLength: 4
+          x-sterp-length: 4
+          x-sterp-legacy-field: "LEVELS= -> Ws-Levels PIC S9(4) (NUMVAL)"
+          description: "Where-used levels (default 25)."
+        QTY:
+          type: "string"
+          maxLength: 20
+          x-sterp-length: 20
+          x-sterp-legacy-field: "QTY= -> Ws-Qty PIC S9(13)V9(6) (NUMVAL)"
+          description: "Quantity (default 1)."
+        COSTSET:
+          type: "string"
+          maxLength: 20
+          x-sterp-length: 20
+          x-sterp-legacy-field: "COSTSET= -> Ws-Cost-Set PIC X(20)"
+          description: "Cost set for MODE=COMPARE (default BOMDEMO)."
+        MODE:
+          type: "string"
+          maxLength: 10
+          x-sterp-length: 10
+          x-sterp-legacy-field: "MODE= -> Ws-Mode PIC X(10)"
+          description: "WHEREUSED (default and any value other than COMPARE) or COMPARE."
+        ITEM:
+          type: "string"
+          maxLength: 40
+          x-sterp-length: 40
+          x-sterp-legacy-field: "ITEM= -> Ws-Item PIC X(40)"
+          description: "Component for MODE=WHEREUSED (missing -> return code 12)."
+        BOMREF:
+          type: "string"
+          maxLength: 30
+          x-sterp-length: 30
+          x-sterp-legacy-field: "BOMREF= -> Ws-Bom-Ref PIC X(30)"
+          description: "Bill reference for MODE=COMPARE."
+        FROMREV:
+          type: "string"
+          maxLength: 4
+          x-sterp-length: 4
+          x-sterp-legacy-field: "FROMREV= -> Ws-From-Rev PIC X(4)"
+          description: "From revision for MODE=COMPARE."
+        TOREV:
+          type: "string"
+          maxLength: 4
+          x-sterp-length: 4
+          x-sterp-legacy-field: "TOREV= -> Ws-To-Rev PIC X(4)"
+          description: "To revision for MODE=COMPARE."
+        DRAFT:
+          type: "string"
+          maxLength: 1
+          x-sterp-length: 1
+          x-sterp-legacy-field: "DRAFT= -> Ws-Draft PIC X"
+          description: "Y includes drafts (first character tested)."
+        reportCode:
+          type: "string"
+          enum:
+            - "BOMRP030"
+            - "BOMRP040"
+          default: "BOMRP030"
+          x-sterp-legacy-field: "core.ReportDef.ReportCode varchar(20)"
+          x-sterp-length: 20
+          description: "Catalogue row the run is launched from; its PermissionCode is checked (BOM.WHEREUSED.VIEW or BOM.VIEW)."
+    BomExplosionEngineArea:
+      type: "object"
+      properties:
+        calcType:
+          x-sterp-legacy-field: "BX-CALC-TYPE PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        calcRef:
+          x-sterp-legacy-field: "BX-CALC-REF PIC X(30)"
+          type: "string"
+          x-sterp-length: 30
+        parentItem:
+          x-sterp-legacy-field: "BX-PARENT-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        parentRev:
+          x-sterp-legacy-field: "BX-PARENT-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        purpose:
+          x-sterp-legacy-field: "BX-PURPOSE PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        jobRef:
+          x-sterp-legacy-field: "BX-JOB-REF PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        variant:
+          x-sterp-legacy-field: "BX-VARIANT PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        reqQty:
+          x-sterp-legacy-field: "BX-REQ-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        effDate:
+          x-sterp-legacy-field: "BX-EFF-DATE PIC 9(8)"
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        maxDepth:
+          x-sterp-legacy-field: "BX-MAX-DEPTH PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        consolidate:
+          x-sterp-legacy-field: "BX-CONSOLIDATE PIC X"
+          type: "string"
+          x-sterp-length: 1
+        expandPhantom:
+          x-sterp-legacy-field: "BX-EXPAND-PHANTOM PIC X"
+          type: "string"
+          x-sterp-length: 1
+        includeNotes:
+          x-sterp-legacy-field: "BX-INCLUDE-NOTES PIC X"
+          type: "string"
+          x-sterp-length: 1
+        includeByprod:
+          x-sterp-legacy-field: "BX-INCLUDE-BYPROD PIC X"
+          type: "string"
+          x-sterp-length: 1
+        costSet:
+          x-sterp-legacy-field: "BX-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        currency:
+          x-sterp-legacy-field: "BX-CURRENCY PIC X(3)"
+          type: "string"
+          x-sterp-length: 3
+        view:
+          x-sterp-legacy-field: "BX-VIEW PIC X(8)"
+          type: "string"
+          x-sterp-length: 8
+        splitCnt:
+          x-sterp-legacy-field: "BX-SPLIT-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        splits:
+          type: "array"
+          items:
+            type: "object"
+            x-sterp-legacy-field: "BX-SPLITS (group)"
+            properties:
+              splitQty:
+                x-sterp-legacy-field: "BX-SPLIT-QTY PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+          x-sterp-legacy-field: "BX-SPLITS OCCURS 10"
+          maxItems: 10
+        optCnt:
+          x-sterp-legacy-field: "BX-OPT-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        options:
+          type: "array"
+          items:
+            type: "object"
+            x-sterp-legacy-field: "BX-OPTIONS (group)"
+            properties:
+              oGroup:
+                x-sterp-legacy-field: "BX-O-GROUP PIC X(10)"
+                type: "string"
+                x-sterp-length: 10
+              oChoice:
+                x-sterp-legacy-field: "BX-O-CHOICE PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+          x-sterp-legacy-field: "BX-OPTIONS OCCURS 10"
+          maxItems: 10
+        bomId:
+          x-sterp-legacy-field: "BX-BOM-ID PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        bomRef:
+          x-sterp-legacy-field: "BX-BOM-REF PIC X(30)"
+          type: "string"
+          x-sterp-length: 30
+        bomRev:
+          x-sterp-legacy-field: "BX-BOM-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        nominalBasis:
+          x-sterp-legacy-field: "BX-NOMINAL-BASIS PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        yield:
+          x-sterp-legacy-field: "BX-YIELD PIC S9(5)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 11
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        quantum:
+          x-sterp-legacy-field: "BX-QUANTUM PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        batchSize:
+          x-sterp-legacy-field: "BX-BATCH-SIZE PIC S9(13)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        grossStarts:
+          x-sterp-legacy-field: "BX-GROSS-STARTS PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        runCount:
+          x-sterp-legacy-field: "BX-RUN-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        batchCount:
+          x-sterp-legacy-field: "BX-BATCH-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        excess:
+          x-sterp-legacy-field: "BX-EXCESS PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        occCount:
+          x-sterp-legacy-field: "BX-OCC-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        leafCount:
+          x-sterp-legacy-field: "BX-LEAF-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        depthReached:
+          x-sterp-legacy-field: "BX-DEPTH-REACHED PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        shortageCnt:
+          x-sterp-legacy-field: "BX-SHORTAGE-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        maxBuildable:
+          x-sterp-legacy-field: "BX-MAX-BUILDABLE PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        materialCost:
+          x-sterp-legacy-field: "BX-MATERIAL-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        conversionCost:
+          x-sterp-legacy-field: "BX-CONVERSION-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        recoveryCredit:
+          x-sterp-legacy-field: "BX-RECOVERY-CREDIT PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        totalCost:
+          x-sterp-legacy-field: "BX-TOTAL-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        unitCost:
+          x-sterp-legacy-field: "BX-UNIT-COST PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        unitDenom:
+          x-sterp-legacy-field: "BX-UNIT-DENOM PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        completeness:
+          x-sterp-legacy-field: "BX-COMPLETENESS PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        errorPath:
+          x-sterp-legacy-field: "BX-ERROR-PATH PIC X(200)"
+          type: "string"
+          x-sterp-length: 200
+        cyclePath:
+          x-sterp-legacy-field: "BX-CYCLE-PATH PIC X(200)"
+          type: "string"
+          x-sterp-length: 200
+        warningCnt:
+          x-sterp-legacy-field: "BX-WARNING-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        explosionId:
+          x-sterp-legacy-field: "BX-EXPLOSION-ID PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        keyItem:
+          x-sterp-legacy-field: "BX-KEY-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        keyTotal:
+          x-sterp-legacy-field: "BX-KEY-TOTAL PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        nodeSeq:
+          x-sterp-legacy-field: "BX-NODE-SEQ PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        nodeDepth:
+          x-sterp-legacy-field: "BX-NODE-DEPTH PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        nodePath:
+          x-sterp-legacy-field: "BX-NODE-PATH PIC X(160)"
+          type: "string"
+          x-sterp-length: 160
+        nodePhantom:
+          x-sterp-legacy-field: "BX-NODE-PHANTOM PIC X"
+          type: "string"
+          x-sterp-length: 1
+        nodeRuns:
+          x-sterp-legacy-field: "BX-NODE-RUNS PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        nodeBatches:
+          x-sterp-legacy-field: "BX-NODE-BATCHES PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        stockSource:
+          x-sterp-legacy-field: "BX-STOCK-SOURCE PIC X(8)"
+          type: "string"
+          x-sterp-length: 8
+        useInbound:
+          x-sterp-legacy-field: "BX-USE-INBOUND PIC X"
+          type: "string"
+          x-sterp-length: 1
+        fromLine:
+          x-sterp-legacy-field: "BX-FROM-LINE PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        winMax:
+          x-sterp-legacy-field: "BX-WIN-MAX PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        winCnt:
+          x-sterp-legacy-field: "BX-WIN-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        moreLines:
+          x-sterp-legacy-field: "BX-MORE-LINES PIC X"
+          type: "string"
+          x-sterp-length: 1
+        lines:
+          type: "array"
+          items:
+            type: "object"
+            x-sterp-legacy-field: "BX-LINES (group)"
+            properties:
+              lSeq:
+                x-sterp-legacy-field: "BX-L-SEQ PIC S9(9) COMP-5"
+                type: "integer"
+                format: "int32"
+                x-sterp-digits: 9
+                x-sterp-signed: true
+              lDepth:
+                x-sterp-legacy-field: "BX-L-DEPTH PIC S9(4)"
+                type: "integer"
+                format: "int32"
+                x-sterp-digits: 4
+                x-sterp-signed: true
+              lPath:
+                x-sterp-legacy-field: "BX-L-PATH PIC X(80)"
+                type: "string"
+                x-sterp-length: 80
+              lItem:
+                x-sterp-legacy-field: "BX-L-ITEM PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+              lRev:
+                x-sterp-legacy-field: "BX-L-REV PIC X(4)"
+                type: "string"
+                x-sterp-length: 4
+              lDesc:
+                x-sterp-legacy-field: "BX-L-DESC PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+              lNodeType:
+                x-sterp-legacy-field: "BX-L-NODE-TYPE PIC X(8)"
+                type: "string"
+                x-sterp-length: 8
+              lSupply:
+                x-sterp-legacy-field: "BX-L-SUPPLY PIC X(10)"
+                type: "string"
+                x-sterp-length: 10
+              lStop:
+                x-sterp-legacy-field: "BX-L-STOP PIC X(20)"
+                type: "string"
+                x-sterp-length: 20
+              lBasis:
+                x-sterp-legacy-field: "BX-L-BASIS PIC X(12)"
+                type: "string"
+                x-sterp-length: 12
+              lUom:
+                x-sterp-legacy-field: "BX-L-UOM PIC X(10)"
+                type: "string"
+                x-sterp-length: 10
+              lBomRev:
+                x-sterp-legacy-field: "BX-L-BOM-REV PIC X(4)"
+                type: "string"
+                x-sterp-length: 4
+              lUsage:
+                x-sterp-legacy-field: "BX-L-USAGE PIC S9(13)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lUnrounded:
+                x-sterp-legacy-field: "BX-L-UNROUNDED PIC S9(15)V9(9)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 24
+                x-sterp-scale: 9
+                x-sterp-signed: true
+              lRoundInc:
+                x-sterp-legacy-field: "BX-L-ROUND-INC PIC S9(13)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lReqQty:
+                x-sterp-legacy-field: "BX-L-REQ-QTY PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lGoodQty:
+                x-sterp-legacy-field: "BX-L-GOOD-QTY PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lGross:
+                x-sterp-legacy-field: "BX-L-GROSS PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lRuns:
+                x-sterp-legacy-field: "BX-L-RUNS PIC S9(9) COMP-5"
+                type: "integer"
+                format: "int32"
+                x-sterp-digits: 9
+                x-sterp-signed: true
+              lBatches:
+                x-sterp-legacy-field: "BX-L-BATCHES PIC S9(9) COMP-5"
+                type: "integer"
+                format: "int32"
+                x-sterp-digits: 9
+                x-sterp-signed: true
+              lStockUsed:
+                x-sterp-legacy-field: "BX-L-STOCK-USED PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lShortage:
+                x-sterp-legacy-field: "BX-L-SHORTAGE PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lPackQty:
+                x-sterp-legacy-field: "BX-L-PACK-QTY PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lExcess:
+                x-sterp-legacy-field: "BX-L-EXCESS PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lUnitCost:
+                x-sterp-legacy-field: "BX-L-UNIT-COST PIC S9(11)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 17
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lExtCost:
+                x-sterp-legacy-field: "BX-L-EXT-COST PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              lBranch:
+                x-sterp-legacy-field: "BX-L-BRANCH PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              lElement:
+                x-sterp-legacy-field: "BX-L-ELEMENT PIC X(10)"
+                type: "string"
+                x-sterp-length: 10
+              lWarning:
+                x-sterp-legacy-field: "BX-L-WARNING PIC X(60)"
+                type: "string"
+                x-sterp-length: 60
+          x-sterp-legacy-field: "BX-LINES OCCURS 25"
+          maxItems: 25
+      description: "In-process contract only, never exposed over HTTP: request and result fields of IBomExplosionEngine (legacy BOMEXPL, IC-BOM-BOMEXPL). Body of the legacy COMMAREA BOMEXPLCA (copybook STERP-App/cobol/copy/BOMEXPLCA.cpy, field prefix BX-), bytes 400+; generated from Agent 03 COBOL-DataDictionary.csv."
+      x-sterp-legacy-copybook: "BOMEXPLCA"
+    BomCostEngineArea:
+      type: "object"
+      properties:
+        parentItem:
+          x-sterp-legacy-field: "BC-PARENT-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        parentRev:
+          x-sterp-legacy-field: "BC-PARENT-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        purpose:
+          x-sterp-legacy-field: "BC-PURPOSE PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        variant:
+          x-sterp-legacy-field: "BC-VARIANT PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        reqQty:
+          x-sterp-legacy-field: "BC-REQ-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        effDate:
+          x-sterp-legacy-field: "BC-EFF-DATE PIC 9(8)"
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        maxDepth:
+          x-sterp-legacy-field: "BC-MAX-DEPTH PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        calcRef:
+          x-sterp-legacy-field: "BC-CALC-REF PIC X(30)"
+          type: "string"
+          x-sterp-length: 30
+        costSet:
+          x-sterp-legacy-field: "BC-COST-SET PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        currency:
+          x-sterp-legacy-field: "BC-CURRENCY PIC X(3)"
+          type: "string"
+          x-sterp-length: 3
+        costDate:
+          x-sterp-legacy-field: "BC-COST-DATE PIC 9(8)"
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        netted:
+          x-sterp-legacy-field: "BC-NETTED PIC X"
+          type: "string"
+          x-sterp-length: 1
+        grossStarts:
+          x-sterp-legacy-field: "BC-GROSS-STARTS PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        runCount:
+          x-sterp-legacy-field: "BC-RUN-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        batchCount:
+          x-sterp-legacy-field: "BC-BATCH-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        occCount:
+          x-sterp-legacy-field: "BC-OCC-COUNT PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        materialCost:
+          x-sterp-legacy-field: "BC-MATERIAL-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        conversionCost:
+          x-sterp-legacy-field: "BC-CONVERSION-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        setupCost:
+          x-sterp-legacy-field: "BC-SETUP-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        serviceCost:
+          x-sterp-legacy-field: "BC-SERVICE-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        recoveryCredit:
+          x-sterp-legacy-field: "BC-RECOVERY-CREDIT PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        totalCost:
+          x-sterp-legacy-field: "BC-TOTAL-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        unitCost:
+          x-sterp-legacy-field: "BC-UNIT-COST PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        unitDenom:
+          x-sterp-legacy-field: "BC-UNIT-DENOM PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        missingRates:
+          x-sterp-legacy-field: "BC-MISSING-RATES PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        completeness:
+          x-sterp-legacy-field: "BC-COMPLETENESS PIC X(12)"
+          type: "string"
+          x-sterp-length: 12
+        errorPath:
+          x-sterp-legacy-field: "BC-ERROR-PATH PIC X(200)"
+          type: "string"
+          x-sterp-length: 200
+        branchSeq:
+          x-sterp-legacy-field: "BC-BRANCH-SEQ PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        branchItem:
+          x-sterp-legacy-field: "BC-BRANCH-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        branchQty:
+          x-sterp-legacy-field: "BC-BRANCH-QTY PIC S9(15)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 21
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        branchCost:
+          x-sterp-legacy-field: "BC-BRANCH-COST PIC S9(13)V9(2)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 15
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        branchUnit:
+          x-sterp-legacy-field: "BC-BRANCH-UNIT PIC S9(11)V9(6)"
+          type: "number"
+          format: "decimal"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        fromLine:
+          x-sterp-legacy-field: "BC-FROM-LINE PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        winMax:
+          x-sterp-legacy-field: "BC-WIN-MAX PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        winCnt:
+          x-sterp-legacy-field: "BC-WIN-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        moreLines:
+          x-sterp-legacy-field: "BC-MORE-LINES PIC X"
+          type: "string"
+          x-sterp-length: 1
+        lines:
+          type: "array"
+          items:
+            type: "object"
+            x-sterp-legacy-field: "BC-LINES (group)"
+            properties:
+              lSeq:
+                x-sterp-legacy-field: "BC-L-SEQ PIC S9(9) COMP-5"
+                type: "integer"
+                format: "int32"
+                x-sterp-digits: 9
+                x-sterp-signed: true
+              lDepth:
+                x-sterp-legacy-field: "BC-L-DEPTH PIC S9(4)"
+                type: "integer"
+                format: "int32"
+                x-sterp-digits: 4
+                x-sterp-signed: true
+              lPath:
+                x-sterp-legacy-field: "BC-L-PATH PIC X(80)"
+                type: "string"
+                x-sterp-length: 80
+              lItem:
+                x-sterp-legacy-field: "BC-L-ITEM PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+              lRev:
+                x-sterp-legacy-field: "BC-L-REV PIC X(4)"
+                type: "string"
+                x-sterp-length: 4
+              lDesc:
+                x-sterp-legacy-field: "BC-L-DESC PIC X(40)"
+                type: "string"
+                x-sterp-length: 40
+              lUom:
+                x-sterp-legacy-field: "BC-L-UOM PIC X(10)"
+                type: "string"
+                x-sterp-length: 10
+              lNodeType:
+                x-sterp-legacy-field: "BC-L-NODE-TYPE PIC X(8)"
+                type: "string"
+                x-sterp-length: 8
+              lElement:
+                x-sterp-legacy-field: "BC-L-ELEMENT PIC X(10)"
+                type: "string"
+                x-sterp-length: 10
+              lSource:
+                x-sterp-legacy-field: "BC-L-SOURCE PIC X(12)"
+                type: "string"
+                x-sterp-length: 12
+              lReqQty:
+                x-sterp-legacy-field: "BC-L-REQ-QTY PIC S9(15)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 21
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lUnitCost:
+                x-sterp-legacy-field: "BC-L-UNIT-COST PIC S9(11)V9(6)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 17
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              lExtCost:
+                x-sterp-legacy-field: "BC-L-EXT-COST PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              lBranch:
+                x-sterp-legacy-field: "BC-L-BRANCH PIC S9(13)V9(2)"
+                type: "number"
+                format: "decimal"
+                x-sterp-digits: 15
+                x-sterp-scale: 2
+                x-sterp-signed: true
+              lFixed:
+                x-sterp-legacy-field: "BC-L-FIXED PIC X"
+                type: "string"
+                x-sterp-length: 1
+              lWarning:
+                x-sterp-legacy-field: "BC-L-WARNING PIC X(60)"
+                type: "string"
+                x-sterp-length: 60
+          x-sterp-legacy-field: "BC-LINES OCCURS 25"
+          maxItems: 25
+      description: "In-process contract only, never exposed over HTTP: request and result fields of IBomCostEngine (legacy BOMCOST, IC-BOM-BOMCOST). Body of the legacy COMMAREA BOMCOSTCA (copybook STERP-App/cobol/copy/BOMCOSTCA.cpy, field prefix BC-), bytes 400+; generated from Agent 03 COBOL-DataDictionary.csv."
+      x-sterp-legacy-copybook: "BOMCOSTCA"
+    BomCycleCheckArea:
+      type: "object"
+      properties:
+        rootItem:
+          x-sterp-legacy-field: "CC-ROOT-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        rootRev:
+          x-sterp-legacy-field: "CC-ROOT-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        childItem:
+          x-sterp-legacy-field: "CC-CHILD-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        childRev:
+          x-sterp-legacy-field: "CC-CHILD-REV PIC X(4)"
+          type: "string"
+          x-sterp-length: 4
+        purpose:
+          x-sterp-legacy-field: "CC-PURPOSE PIC X(10)"
+          type: "string"
+          x-sterp-length: 10
+        variant:
+          x-sterp-legacy-field: "CC-VARIANT PIC X(20)"
+          type: "string"
+          x-sterp-length: 20
+        effDate:
+          x-sterp-legacy-field: "CC-EFF-DATE PIC 9(8)"
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        maxDepth:
+          x-sterp-legacy-field: "CC-MAX-DEPTH PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        includeOpt:
+          x-sterp-legacy-field: "CC-INCLUDE-OPT PIC X"
+          type: "string"
+          x-sterp-length: 1
+        cycleFound:
+          x-sterp-legacy-field: "CC-CYCLE-FOUND PIC X"
+          type: "string"
+          x-sterp-length: 1
+        cycleItem:
+          x-sterp-legacy-field: "CC-CYCLE-ITEM PIC X(40)"
+          type: "string"
+          x-sterp-length: 40
+        cyclePath:
+          x-sterp-legacy-field: "CC-CYCLE-PATH PIC X(240)"
+          type: "string"
+          x-sterp-length: 240
+        cycleLine:
+          x-sterp-legacy-field: "CC-CYCLE-LINE PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        nodesVisited:
+          x-sterp-legacy-field: "CC-NODES-VISITED PIC S9(9) COMP-5"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        depthReached:
+          x-sterp-legacy-field: "CC-DEPTH-REACHED PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        sharedCnt:
+          x-sterp-legacy-field: "CC-SHARED-CNT PIC S9(4)"
+          type: "integer"
+          format: "int32"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        limitHit:
+          x-sterp-legacy-field: "CC-LIMIT-HIT PIC X"
+          type: "string"
+          x-sterp-length: 1
+      description: "In-process contract only, never exposed over HTTP: request and result fields of internal cycle check (legacy CYCLECHK). Body of the legacy COMMAREA CYCLECHKCA (copybook STERP-App/cobol/copy/CYCLECHKCA.cpy, field prefix CC-), bytes 400+; generated from Agent 03 COBOL-DataDictionary.csv."
+      x-sterp-legacy-copybook: "CYCLECHKCA"
+  responses:
+    BadRequest:
+      description: "Malformed request or context header (API0001, API0004)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: "Not authenticated (API0401)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Forbidden:
+      description: "No STERP user (API0010), company/site not permitted (API0002), run-as refused (API0003), or a legacy permission refusal."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    NotFound:
+      description: "Legacy RC 16 (NOT FOUND)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    BusinessRule:
+      description: "Legacy RC 08 or procedure THROW 'STERP-<s>-<code>: text' - no business effect."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Severe:
+      description: "Legacy RC 12 (SQL0001 and other severe errors) or SYS0001."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    NotImplemented:
+      description: "API0501 - the operation belongs to a slice not yet delivered, or a job stream step is in an undelivered slice."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"

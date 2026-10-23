@@ -1,0 +1,159 @@
+@inherits StListPage
+@* frmJobCost (page:cst/job-cost, FR-STERP-CST-033; frmJobCost.vb): the job worklist with sub-jobs under their parent and
+   counted once; Elements, Forecast and Work in progress ask JOBCOST and WIPCALC. Opened with the argument WIP (menu
+   "Work in Progress...") the window is titled "Work in Progress" and F10 runs the roll-forward. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Job:" Inline="true" Width="140" Field="JobRef" @bind-Value="_job" Id="@Uid("job")" />
+        <StSelectField Caption="&Status:" Inline="true" Width="130" Items="Statuses" Value="@_status" ValueChanged="StatusChangedAsync" Id="@Uid("status")" />
+        <StSelectField Caption="S&ub-jobs:" Inline="true" Width="130" Items="SubJobs" @bind-Value="_subs" Id="@Uid("subs")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Elements" Glyph="LIST" OnClick="ElementsAsync" />
+        <StToolButton Text="Forecast" Glyph="ENGINE" OnClick="ForecastAsync" />
+        <StToolButton Text="Work in progress" Glyph="RUN" OnClick="WipAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private const string ThisJobOnly = "THIS JOB ONLY";
+    private static readonly IReadOnlyList<(string Value, string Text)> Statuses = StSelectField.Of("ALL", "OPEN", "SUSPENDED", "COMPLETE", "CLOSED");
+    private static readonly IReadOnlyList<(string Value, string Text)> SubJobs = StSelectField.Of("INCLUDED", ThisJobOnly);
+    private string _job = "";
+    private string _status = "ALL";
+    private string _subs = "INCLUDED";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle(Wip() ? "Work in Progress" : "Job Cost Enquiry");
+    }
+
+    /// <summary>frmJobCost.LoadData: cst_listCostJobs for the job (and its sub-jobs) and the status.</summary>
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/cst/v1/cost-jobs" + Query.Build(("jobRef", _job.Trim().ToUpperInvariant()), ("status", _status == "ALL" ? "" : _status)));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        var data = GridData.FromItems(r.Json,
+            Fmt.Col("job", "Job"), Fmt.Col("parent", "Parent"), Fmt.Col("level", "Level"), Fmt.Col("description", "Description"),
+            Fmt.Col("customer", "Customer"), Fmt.Col("operational", "Operational"), Fmt.Col("financial", "Financial"),
+            Fmt.Col("budget", "Budget", "MONEY"), Fmt.Col("actual", "Actual", "MONEY"), Fmt.Col("committed", "Committed", "MONEY"),
+            Fmt.Col("variance", "Variance", "MONEY"), Fmt.Col("wip", "Wip", "MONEY"));
+        Populate(data);
+        SetStatus(data.Count + " job(s).  Sub-jobs are shown under their parent and counted once." +
+                  (Wip() ? "  Select a job and press F10 for the roll-forward." : ""), CueOk);
+    });
+
+    private async Task StatusChangedAsync(string value)
+    {
+        _status = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => Wip() ? WipAsync() : ElementsAsync();
+
+    /// <summary>Budget against actual by element (CST-016); the element lines are bound before the outcome.</summary>
+    private async Task ElementsAsync()
+    {
+        if (Chosen() == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/cst/v1/cost-jobs/" + Query.Path(Chosen()) + "/enquire", new JsonObject { ["includeSubJobs"] = Subs() });
+            Populate(GridData.FromItems(r.IsSuccess ? r.Data?["lines"] : null,
+                Fmt.Col("key", "Key"), Fmt.Col("description", "Description"), Fmt.Col("element", "Element"),
+                Fmt.Col("budget", "Budget", "MONEY"), Fmt.Col("actual", "Actual", "MONEY"), Fmt.Col("committed", "Committed", "MONEY"),
+                Fmt.Col("etc", "Etc", "MONEY"), Fmt.Col("eac", "Eac", "MONEY"), Fmt.Col("variance", "Variance", "MONEY"),
+                Fmt.Col("adverse", "Adverse")));
+            if (!await ShowResultAsync(r)) return;
+            var d = r.Data;
+            SetStatus(Chosen() + " " + Fmt.Text(d?["operStatus"]) + "/" + Fmt.Text(d?["finStatus"]) +
+                      " | budget " + Fmt.Money(d?["approvedBudget"]) +
+                      " | actual " + Fmt.Money(d?["actualGbp"]) +
+                      " | committed " + Fmt.Money(d?["committedGbp"]) +
+                      " | WIP " + Fmt.Money(d?["wipGbp"]) +
+                      " | " + Fmt.Num(d?["subjobCount"]) + " sub-job(s), " + Fmt.Num(d?["txnCount"]) + " transaction(s)" +
+                      Note(d), Cue(d));
+        });
+    }
+
+    /// <summary>Estimate at completion - budget, actual and commitment, not a straight line (CST-017).</summary>
+    private async Task ForecastAsync()
+    {
+        if (Chosen() == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/cst/v1/cost-jobs/" + Query.Path(Chosen()) + "/forecast", new JsonObject { ["includeSubJobs"] = Subs() });
+            if (!await ShowResultAsync(r)) return;
+            var d = r.Data;
+            var adverse = Fmt.Text(d?["fcstAdverse"]) == "Y";
+            SetStatus(Chosen() + " forecast: budget " + Fmt.Money(d?["approvedBudget"]) +
+                      " | actual " + Fmt.Money(d?["actualGbp"]) +
+                      " | committed " + Fmt.Money(d?["committedGbp"]) +
+                      " | still to come " + Fmt.Money(d?["etcGbp"]) +
+                      " | estimate at completion " + Fmt.Money(d?["eacGbp"]) +
+                      " | variance " + Fmt.Money(d?["fcstVarGbp"]) +
+                      (adverse ? " ADVERSE" : " favourable") + Note(d),
+                      adverse ? CueWarning : CueOk);
+        });
+    }
+
+    /// <summary>Opening + additions - deductions = closing for the session period, proved before anything posts (CST-018).</summary>
+    private async Task WipAsync()
+    {
+        if (Chosen() == "") return;
+        await GuardAsync(async () =>
+        {
+            var fiscalYear = Session.Period?.FiscalYear ?? 0;
+            var periodNo = Session.Period?.PeriodNo ?? 0;
+            var r = await Api.PostAsync("/api/cst/v1/cost-jobs/" + Query.Path(Chosen()) + "/wip/calc", new JsonObject
+            {
+                ["fiscalYear"] = fiscalYear,
+                ["periodNo"] = periodNo,
+                ["includeSubJobs"] = Subs(),
+            });
+            if (!await ShowResultAsync(r)) return;
+            var d = r.Data;
+            var balanced = Fmt.Text(d?["balanced"]) == "Y";
+            var residual = Fmt.Text(d?["hasResidual"]) == "Y";
+            var warning = Fmt.Text(d?["warning"]);
+            SetStatus(Chosen() + " WIP " + Fmt.Period(fiscalYear, periodNo) +
+                      ": opening " + Fmt.Money(d?["openingGbp"]) +
+                      " + additions " + Fmt.Money(d?["additionsGbp"]) +
+                      " - deductions " + Fmt.Money(d?["deductionsGbp"]) +
+                      " = closing " + Fmt.Money(d?["closingGbp"]) +
+                      (balanced ? " (balanced)" : " (DOES NOT BALANCE)") +
+                      (residual ? " | residual " + Fmt.Money(d?["residualGbp"]) + " must be cleared before closure" : "") +
+                      (warning != "" ? " | " + warning : ""),
+                      balanced && !residual ? CueOk : CueWarning);
+        });
+    }
+
+    /// <summary>frmJobCost.Note: " | disposition" and " | warning" when present.</summary>
+    private static string Note(JsonNode? d)
+    {
+        var w = Fmt.Text(d?["warning"]);
+        var disposition = Fmt.Text(d?["disposition"]);
+        return (disposition != "" ? " | " + disposition : "") + (w != "" ? " | " + w : "");
+    }
+
+    private static string Cue(JsonNode? d) => Fmt.Text(d?["warning"]) == "" ? CueOk : CueWarning;
+
+    /// <summary>
+    /// frmJobCost.Chosen: the selected row's Job while the job list is shown, else the Job filter upper-cased, else the
+    /// prompt (asked again where the legacy asked again - after the element lines are bound it answers from the filter).
+    /// </summary>
+    private string Chosen()
+    {
+        var j = Fmt.HasColumn(Data, "job") && Selected >= 0 ? Fmt.Text(Data.Value(Selected, "job")) : "";
+        if (j == "") j = _job.Trim().ToUpperInvariant();
+        if (j == "") SetStatus("Select a job first.", CueWarning);
+        return j;
+    }
+
+    /// <summary>frmJobCost.Subs: sub-jobs included unless THIS JOB ONLY is chosen (Y/N as the facade sends it).</summary>
+    private string Subs() => _subs == ThisJobOnly ? "N" : "Y";
+
+    private bool Wip() => string.Equals(FormArgument, "WIP", StringComparison.OrdinalIgnoreCase);
+}

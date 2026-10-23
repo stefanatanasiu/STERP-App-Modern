@@ -1,0 +1,5 @@
+# stk-valuation
+  ERROR in tests\stk-valuation.sql
+# stk-valuation
+Msg 457, Level 16, State 1, Server <isolated-server>, Procedure #sv_is, Line 11
+Implicit conversion of varchar value to varchar cannot be performed because the collation of the value is unresolved due to a collation conflict between "SQL_Latin1_General_CP1_CI_AS" and "Latin1_General_CI_AS" in add operator.

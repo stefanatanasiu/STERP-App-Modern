@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Platform</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Platform</AssemblyName>
+    <Description>STERP-PLATFORM GUI pages (STERP-PLATFORM.md section 7.2): sign-on, approvals, exceptions, audit, maintenance launcher, generic maintenance, lookup, report launcher, spool viewer, job monitor, service diagnostics and the operator console.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

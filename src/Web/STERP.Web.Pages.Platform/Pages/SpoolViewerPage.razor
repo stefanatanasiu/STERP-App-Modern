@@ -1,0 +1,172 @@
+@inherits StPage
+@* frmSpoolViewer (page:platform/spool-viewer, FR-STERP-PLATFORM-045): a 132-column listing paged at the form feeds of the
+   Report Writer, 'Page n of m'; Open, Prev, Next, Find (F2), Print, Save As, Close (F3); Ctrl+PgDn / Ctrl+PgUp. The argument
+   is the file path (core.JobRun.SpoolFile or LogFile); without one the Open list of run files is shown. *@
+<div class="st-page">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Open" Glyph="NEW" OnClick="OpenClickedAsync" />
+        <StToolButton Text="Prev" Glyph="REFRESH" OnClick="Prev" />
+        <StToolButton Text="Next" Glyph="RUN" OnClick="Next" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Find (F2)" Glyph="FIND" OnClick="FindAsync" />
+        <StToolButton Text="Print" Glyph="PRINT" OnClick="PrintAsync" />
+        <StToolButton Text="Save As" Glyph="SAVE" OnClick="SaveAsAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <div style="height:20px; padding:3px 8px 0">@_pageLabel</div>
+    @if (_choosing)
+    {
+        <div style="display:flex; flex-direction:column; flex:1 1 auto; min-height:0; padding:0 4px 4px">
+            <div style="padding:2px 4px 4px">Open a spool or log file: @_filesNote</div>
+            <StGrid Id="@Uid("files")" Data="_files" Selected="_fileSelected" SelectedChanged="i => _fileSelected = i" OnActivate="_ => OpenChosenAsync()" />
+            <div style="display:flex; justify-content:flex-end; gap:6px; padding-top:4px">
+                <button type="button" class="st-button" @onclick="OpenChosenAsync">Open file</button>
+                <button type="button" class="st-button" @onclick="() => _choosing = false">Cancel</button>
+            </div>
+        </div>
+    }
+    else
+    {
+        <pre class="st-pre st-sunken" id="@Uid("text")" tabindex="0" style="font-size:12px">@(_pages.Count > 0 ? _pages[_page] : "")</pre>
+    }
+</div>
+
+@code {
+    private readonly List<string> _pages = [];
+    private int _page;
+    private string _file = "";
+    private string _pageLabel = "Page 0 of 0";
+    private bool _choosing;
+    private string _filesNote = "";
+    private GridData _files = GridData.Empty;
+    private int _fileSelected = -1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Window.SetTitle("Spool File Viewer");
+        if (FormArgument.Trim().Length > 0)
+        {
+            await LoadFileAsync(FormArgument.Trim());
+        }
+        else
+        {
+            await OpenClickedAsync();
+        }
+    }
+
+    /// <summary>frmSpoolViewer.LoadFile: the file content (jobs_getSpoolFile) split at form feeds; title 'Spool - &lt;file name&gt;'.</summary>
+    public Task LoadFileAsync(string spoolFile) => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync(ApiHost.Jobs, "/api/jobs/v1/spool-files/content" + Query.Build(("path", spoolFile)));
+        if (r.Status == 404)
+        {
+            await ShowErrorAsync("Spool file " + spoolFile + " no longer exists.", "SPL0001");
+            return;
+        }
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        _file = spoolFile;
+        _pages.Clear();
+        foreach (var p in r.Text.Split('\f'))
+        {
+            if (p.Trim().Length > 0) _pages.Add(p.TrimStart('\n', '\r').Replace("\r\n", "\n", StringComparison.Ordinal));
+        }
+        if (_pages.Count == 0) _pages.Add("(the report produced no output)");
+        _page = 0;
+        _choosing = false;
+        Window.SetTitle("Spool - " + FileName(spoolFile));
+        ShowPage();
+    });
+
+    private void ShowPage()
+    {
+        _pageLabel = "Page " + (_page + 1) + " of " + _pages.Count;
+        SetStatus(_file, "");
+        StateHasChanged();
+    }
+
+    private static string FileName(string path) => path[(path.LastIndexOfAny(['\\', '/']) + 1)..];
+
+    /// <summary>frmSpoolViewer.OpenClicked: the run files of the spool folder (*.lst, *.log, *.*); like a file dialog it never fails.</summary>
+    private async Task OpenClickedAsync()
+    {
+        var r = await Api.GetAsync(ApiHost.Jobs, "/api/jobs/v1/spool-files" + Query.Build(("folder", "spool")));
+        _files = r.IsSuccess
+            ? GridData.FromItems(r.Json, new GridColumn("fileName"), new GridColumn("folder"), new GridColumn("root"),
+                new GridColumn("sizeBytes", kind: "INT"), new GridColumn("modifiedAt", kind: "STAMP"), new GridColumn("path"))
+            : GridData.Empty;
+        _filesNote = r.IsSuccess ? "" : "(the spool folder cannot be listed: " + r.Problem!.Detail + ")";
+        _fileSelected = _files.Count > 0 ? 0 : -1;
+        _choosing = true;
+        StateHasChanged();
+    }
+
+    private async Task OpenChosenAsync()
+    {
+        if (_fileSelected < 0) return;
+        await LoadFileAsync(_files.Text(_fileSelected, "path"));
+    }
+
+    private void Prev()
+    {
+        if (_page > 0)
+        {
+            _page--;
+            ShowPage();
+        }
+    }
+
+    private void Next()
+    {
+        if (_page < _pages.Count - 1)
+        {
+            _page++;
+            ShowPage();
+        }
+    }
+
+    protected override Task OnLookupAsync(KeyInfo key) => FindAsync();
+
+    /// <summary>frmSpoolViewer.FindClicked: case-insensitive search from the current page over every page.</summary>
+    private async Task FindAsync()
+    {
+        var text = await InputBoxAsync("Text to find (the search continues over every page):", "STERP - Find in spool file", "");
+        if (text.Trim().Length == 0) return;
+        for (var i = 0; i < _pages.Count; i++)
+        {
+            var p = (_page + i) % _pages.Count;
+            var at = _pages[p].IndexOf(text, StringComparison.OrdinalIgnoreCase);
+            if (at >= 0)
+            {
+                _page = p;
+                ShowPage();
+                await Task.Yield();
+                await Browser.HighlightAsync(Uid("text"), at, text.Length);
+                SetStatus("Found on page " + (p + 1) + ".", CueOk);
+                return;
+            }
+        }
+        SetStatus("'" + text + "' was not found in this spool file.", "!");
+    }
+
+    private async Task PrintAsync()
+    {
+        if (_pages.Count == 0) return;
+        await Browser.PrintAsync();
+    }
+
+    private async Task SaveAsAsync()
+    {
+        if (_file.Length == 0) return;
+        await Browser.DownloadAsync(FileName(_file), string.Join("\f", _pages));
+        SetStatus("Saved to " + FileName(_file), CueOk);
+    }
+
+    /// <summary>Ctrl+PgDn / Ctrl+PgUp page through the listing.</summary>
+    protected override Task? OnKey(KeyInfo key)
+    {
+        if (key.Ctrl && !key.Alt && key.Key == "PageDown") { Next(); return Task.CompletedTask; }
+        if (key.Ctrl && !key.Alt && key.Key == "PageUp") { Prev(); return Task.CompletedTask; }
+        return null;
+    }
+}

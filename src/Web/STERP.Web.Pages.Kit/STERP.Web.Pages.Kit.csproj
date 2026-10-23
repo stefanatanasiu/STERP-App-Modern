@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Kit</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Kit</AssemblyName>
+    <Description>STERP-KIT GUI pages (STERP-KIT.md section 7.2): Kit Maintenance, Kit Execution, Trial Kitting and Genealogy Enquiry.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

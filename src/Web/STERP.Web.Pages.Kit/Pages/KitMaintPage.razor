@@ -1,0 +1,167 @@
+@inherits StListPage
+@* frmKitMaint (page:kit/kit-maintenance, FR-STERP-KIT-050): the execution kit worklist and the KITCREAT lifecycle actions -
+   Lines, Review (F10), Release (confirmation), Kind check and Commercial sets (frmKitMaint.vb:12-139). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Kit:" Inline="true" Width="150" @bind-Value="_kit" Id="@Uid("kit")" />
+        <StTextField Caption="S&ite:" Inline="true" Width="60" @bind-Value="_site" Id="@Uid("site")" />
+        <StSelectField Caption="S&tatus:" Inline="true" Width="120" Items="Statuses" Value="@_status" ValueChanged="StatusChangedAsync" Id="@Uid("status")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Lines" Glyph="FIND" OnClick="LinesAsync" />
+        <StToolButton Text="Review (F10)" Glyph="ENGINE" OnClick="ReviewAsync" />
+        <StToolButton Text="Release" Glyph="RUN" OnClick="ReleaseAsync" />
+        <StToolButton Text="Kind check" Glyph="ENGINE" OnClick="KindAsync" />
+        <StToolButton Text="Commercial sets" Glyph="ENGINE" OnClick="SetsAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Statuses =
+        StSelectField.Of("ALL", "DRAFT", "RELEASED", "PARTISSUED", "COMPLETE", "CLOSED", "CANCELLED");
+
+    private string _kit = "";
+    private string _site = "";
+    private string _status = "ALL";
+
+    /// <summary>The COMMAREA the last KitService call left behind (KitFacade.Text/Num).</summary>
+    private JsonNode? _last;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Kit Maintenance");
+        _site = Session.SiteCode;
+        if (FormArgument != "") _kit = FormArgument;
+    }
+
+    /// <summary>LoadData: KitService.Worklist(site, status, kit) - the readiness procedure, "ALL" sent as no status.</summary>
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/kit/v1/kits" + Query.Build(("site", KitLegacy.Code(_site)), ("status", StatusFilter()), ("kitRef", KitLegacy.Code(_kit))));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(KitLegacy.ResultSet(KitLegacy.WorklistColumns, r.Json));
+    });
+
+    private async Task StatusChangedAsync(string value)
+    {
+        _status = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => ReviewAsync();
+
+    /// <summary>KITCREAT ENQUIRE plus the GETLINE window: requirements against actuals (KIT-003).</summary>
+    private async Task LinesAsync()
+    {
+        if (!Picked()) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/kit/v1/kits/" + Query.Path(KitRef()));
+            var data = KitLegacy.Payload(r);
+            _last = data;
+            Populate(KitLegacy.Table(KitLegacy.LineSpec, data?["lines"]));
+            // the line table has no KitRef column: the kit reported is the typed one (frmKitMaint.vb:52-53)
+            if (await ShowResultAsync(r)) Report("Kit " + KitRef());
+        });
+    }
+
+    private async Task ReviewAsync()
+    {
+        if (!Picked()) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/kit/v1/kits/" + Query.Path(KitRef()) + "/review", new JsonObject());
+            _last = r.IsSuccess ? r.Data : null;
+            if (await ShowResultAsync(r)) Report("Reviewed");
+        });
+    }
+
+    /// <summary>Release freezes the bill and item revisions for this kit (KIT-004).</summary>
+    private async Task ReleaseAsync()
+    {
+        if (!Picked()) return;
+        if (!await ConfirmAsync("Release " + KitRef() + "?  The revisions and assumptions are then fixed.")) return;
+        var instruction = Instruction.New();
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/kit/v1/kits/" + Query.Path(KitRef()) + "/release", new JsonObject(), instruction.Options());
+            _last = r.IsSuccess ? r.Data : null;
+            if (await ShowResultAsync(r))
+            {
+                Report("Released");
+                await LoadDataAsync();
+            }
+        });
+    }
+
+    /// <summary>A commercial kit parent can never be received as a stocked assembly (KIT-001).</summary>
+    private async Task KindAsync()
+    {
+        if (!Picked()) return;
+        await GuardAsync(async () =>
+        {
+            var kind = SelectedText("KitKind").TrimEnd();
+            var item = SelectedText("ParentItemCode").TrimEnd();
+            var r = await Api.PostAsync("/api/kit/v1/kits/" + Query.Path(KitRef()) + "/kind-check",
+                new JsonObject { ["kitKind"] = kind, ["parentItem"] = item });
+            _last = r.IsSuccess ? r.Data : null;
+            if (await ShowResultAsync(r))
+            {
+                var may = KitLegacy.Text(_last, "mayReceive") == "Y";
+                SetStatus("Kind " + kind + " - may be received into stock: " + (may ? "YES" : "NO"), may ? CueOk : CueWarning);
+            }
+        });
+    }
+
+    /// <summary>KITCOMM proves the delivered sets of a commercial kit (KIT-023).</summary>
+    private async Task SetsAsync()
+    {
+        if (!Picked()) return;
+        await GuardAsync(async () =>
+        {
+            var item = SelectedText("ParentItemCode").TrimEnd();
+            // KitExecutionService.Commercial("SETS", item, "", kit, 0, 1, 0, 0, 0): a blank item reaches KITCOMM as spaces
+            var path = "/api/kit/v1/commercial-kits/" + (item.Length > 0 ? Query.Path(item) : "%20") + "/sets"
+                       + Query.Build(("orderRef", KitRef()), ("orderLine", "0"), ("parentQty", "1"));
+            var r = await Api.GetAsync(path);
+            var data = KitLegacy.Payload(r);
+            Populate(KitLegacy.Table(KitLegacy.CommSpec, r.IsSuccess ? data?["lines"] : null));
+            if (await ShowResultAsync(r))
+            {
+                var despatch = KitLegacy.Text(data, "mayDespatch") == "Y";
+                SetStatus("Complete sets " + KitLegacy.Qty(KitLegacy.Num(data, "completeSets")) +
+                          " | limiting " + KitLegacy.Text(data, "limitItem") +
+                          " | despatchable: " + (despatch ? "YES" : "NO"), despatch ? CueOk : CueWarning);
+            }
+        });
+    }
+
+    private void Report(string what)
+    {
+        var shortages = KitLegacy.Num(_last, "shortageCnt");
+        var warning = KitLegacy.Text(_last, "warningText");
+        SetStatus(what + " - status " + KitLegacy.Text(_last, "status") + ", " + KitLegacy.Text(_last, "completeness") + ", " +
+                  KitLegacy.Count(_last, "shortageCnt") + " shortage(s), WIP " + KitLegacy.Money(KitLegacy.Num(_last, "wipValue")) +
+                  (warning != "" ? " | " + warning : ""),
+                  shortages == 0m ? CueOk : CueWarning);
+    }
+
+    /// <summary>The selected row's KitRef, else the typed kit (a table without a KitRef column gives the typed kit).</summary>
+    private string KitRef()
+    {
+        var sel = SelectedText("KitRef").TrimEnd();
+        return sel != "" ? sel : KitLegacy.Code(_kit);
+    }
+
+    private bool Picked()
+    {
+        if (KitRef() != "") return true;
+        SetStatus("Select a kit row, or type a kit reference.", CueWarning);
+        return false;
+    }
+
+    private string StatusFilter() => _status == "ALL" ? "" : _status;
+}

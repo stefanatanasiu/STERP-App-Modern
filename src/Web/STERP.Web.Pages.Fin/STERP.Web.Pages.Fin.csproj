@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Fin</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Fin</AssemblyName>
+    <Description>STERP-FIN pages (wave W5): Journal Entry, Journal Enquiry, Period Close Checklist, Bank Reconciliation and VAT Return - the legacy frmJournalEntry, frmJournalEnquiry, frmPeriodClose, frmBankRecon and frmVatReturn (STERP-FIN FR-040 to FR-044).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

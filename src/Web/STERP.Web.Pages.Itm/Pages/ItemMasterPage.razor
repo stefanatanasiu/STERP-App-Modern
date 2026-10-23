@@ -1,0 +1,136 @@
+@inherits StPage
+@* frmItemMaster (page:itm/item-master, FR-STERP-ITM-040): the governed identity of one item and nine read-only tabs; changes
+   go through the audited maintenance screens and the COBOL services, so nothing is edited here. F10 runs the ITEMVAL
+   activation review and lists what is still missing (frmItemMaster.vb:1-115). *@
+<div class="st-page">
+    <div class="st-canvas" style="width:820px; height:50px">
+        <label class="st-cap" for="@Uid("item")" style="left:8px; top:13px; width:64px"><StMnemonic Text="&Item code:" /></label>
+        <input id="@Uid("item")" class="st-input" style="left:76px; top:8px; width:240px" aria-label="Item code" data-maxlen="40" data-sterp-field="ITEM"
+               value="@_item" autocomplete="off" spellcheck="false" @oninput="e => _item = e.Value?.ToString() ?? string.Empty" />
+        <button type="button" class="st-button" style="position:absolute; left:322px; top:7px; width:76px; height:22px" @onclick="FindAsync"><StMnemonic Text="F&ind (F2)" /></button>
+        <div class="st-cap st-caption-line" style="left:8px; top:33px; width:790px">@_who</div>
+    </div>
+    <div style="display:flex; flex-direction:column; flex:1 1 auto; min-height:0; margin:0 8px 8px">
+        <StTabStrip Id="@Uid("tabs")" Captions="TabCaptions" Selected="_tab" SelectedChanged="TabChangedAsync" PanelId="@Uid("panel")" />
+        <div class="st-tabpanel" role="tabpanel" id="@Uid("panel")" aria-labelledby="@($"{Uid("tabs")}-t{_tab}")">
+            <StGrid Id="@Uid("grid-" + Tabs[_tab].Kind)" Data="_grids[Tabs[_tab].Kind]" Selected="_selected[Tabs[_tab].Kind]"
+                    SelectedChanged="i => _selected[Tabs[_tab].Kind] = i" Label="@UkFormat.StripMnemonic(Tabs[_tab].Caption)" />
+        </div>
+    </div>
+</div>
+
+@code {
+    private sealed record TabDef(string Caption, string Kind, string Path);
+
+    /// <summary>frmItemMaster._tabs with the ItemService.Part statement each tab reads (itm_listItem* operations).</summary>
+    private static readonly TabDef[] Tabs =
+    [
+        new("&Revisions", "REVISION", "revisions"), new("&Units", "UOM", "units"), new("&Supply rules", "SUPPLY", "supply-rules"),
+        new("&Partner refs", "PARTNER", "partner-refs"), new("&Lots / shelf life", "TRACE", "lots"), new("S&ubstitutes", "SUBST", "substitutes"),
+        new("&VAT", "VAT", "vat-liability"), new("&Customs", "CUSTOMS", "customs"), new("Pac&kaging", "PACKAGING", "packaging"),
+    ];
+
+    private static readonly IReadOnlyList<string> TabCaptions = Tabs.Select(t => t.Caption).ToList();
+
+    private readonly Dictionary<string, GridData> _grids = Tabs.ToDictionary(t => t.Kind, _ => GridData.Empty);
+    private readonly Dictionary<string, int> _selected = Tabs.ToDictionary(t => t.Kind, _ => -1);
+    private string _item = "";
+    private string _who = "No item selected.";
+    private int _tab;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Window.SetTitle("Item and Part Maintenance");
+        if (FormArgument != "") _item = FormArgument;
+        if (_item != "") await LoadDataAsync();
+        SetStatus("Enter an item code and press F5, or press F2 to search by code, description or partner part number.");
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadDataAsync();
+
+    protected override Task OnLookupAsync(KeyInfo key) => FindAsync();
+
+    /// <summary>frmItemMaster.OnConfirm: F10 runs the activation review, which lists what is still missing (ITM-010).</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        if (_item == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/itm/v1/items/{Query.Path(_item.Trim().ToUpperInvariant())}/activation-review", new JsonObject(),
+                Instruction.New().Options());
+            var result = LegacyResult.From(r);
+            if (result.Data?["faults"] is JsonArray faults && faults.Count > 0)
+            {
+                if (_tab != 0)
+                {
+                    _tab = 0;
+                    await LoadTabAsync();
+                }
+                _grids["REVISION"] = GridData.FromCommArea(faults, "IV-");
+                _selected["REVISION"] = 0;
+                StateHasChanged();
+            }
+            if (await ShowResultAsync(r)) SetStatus("Activation review complete - the item may be released.", CueOk);
+        });
+    }
+
+    /// <summary>frmItemMaster.FindClicked: the ITM.ITEM lookup (code, description or partner part number).</summary>
+    private async Task FindAsync()
+    {
+        var code = await Dialogs.LookupAsync("master", "ITM.ITEM", "Item");
+        if (code != "")
+        {
+            _item = code;
+            await LoadDataAsync();
+        }
+    }
+
+    private async Task TabChangedAsync(int index)
+    {
+        _tab = index;
+        await LoadTabAsync();
+    }
+
+    /// <summary>frmItemMaster.LoadData: the item header (itm_getItem), the caption line and the lifecycle status, then the tab.</summary>
+    private Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var item = _item.Trim().ToUpperInvariant();
+        _item = item;
+        JsonNode? h = null;
+        if (item != "")
+        {
+            var r = await Api.GetAsync($"/api/itm/v1/items/{Query.Path(item)}");
+            if (r.Status != 404 && !r.IsSuccess) throw new ApiFailure(r);
+            if (r.IsSuccess) h = r.Json;
+        }
+        if (h is null)
+        {
+            _who = "No item selected.";
+            SetStatus("Item " + item + " does not exist in " + Session.CompanyCode + ".", CueError);
+            return;
+        }
+        _who = S(h, "description") + "   |   " + S(h, "itemClass") + " / " + S(h, "category") + "   |   stock unit " +
+               S(h, "stockUomCode") + "   |   revision " + S(h, "currentRevision") + "   |   traceability " +
+               S(h, "traceabilityType") + "   |   cost method " + S(h, "costMethod");
+        SetStatus("Lifecycle status " + S(h, "lifecycleStatus") + ", steward " + S(h, "stewardUser") + ".",
+                  S(h, "lifecycleStatus") == "RELEASED" ? CueOk : CueWarning);
+        await LoadTabAsync();
+    });
+
+    /// <summary>frmItemMaster.LoadTab: only the selected tab is read (ItemService.Part).</summary>
+    private Task LoadTabAsync()
+    {
+        if (_item == "") return Task.CompletedTask;
+        var tab = Tabs[_tab];
+        return GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync($"/api/itm/v1/items/{Query.Path(_item.Trim())}/{tab.Path}");
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            _grids[tab.Kind] = GridData.FromItems(r.Json);
+            _selected[tab.Kind] = _grids[tab.Kind].Count > 0 ? 0 : -1;
+        });
+    }
+
+    /// <summary>Fmt.Str of a header column.</summary>
+    private static string S(JsonNode h, string name) => Json.Str(h[name]).TrimEnd();
+}

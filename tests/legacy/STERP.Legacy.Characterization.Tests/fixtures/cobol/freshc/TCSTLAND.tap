@@ -1,0 +1,46 @@
+# suite TCSTLAND landed cost, NRV and
+ok 1 - C4 the estimate is accepted
+ok 2 - C4 the whole 80.00 freight is attributed
+ok 3 - C4 the provisional unit cost is 10.80
+ok 4 - C4 nothing is sold yet so stock carries it all
+ok 5 - C4 a simulated estimate writes nothing
+ok 6 - C4 only the 20.00 difference is spread
+ok 7 - C4 8.00 of the increase follows the units sold
+ok 8 - C4 12.00 of the increase stays in stock
+ok 9 - C4 the line now carries the full 100.00
+ok 10 - C4 the final unit cost is 11.00
+ok 11 - C4 cost of sales ends at 440.00
+ok 12 - C4 inventory ends at 660.00
+ok 13 - C4 goods and charge together are 1,100.00
+ok 14 - Weight basis totals 7 kg
+ok 15 - 3 kg of 7 carries 42.86
+ok 16 - 4 kg of 7 carries 57.14
+ok 17 - The shares still add back to 100.00
+ok 18 - An unknown basis is refused, not substituted
+ok 19 - A zero basis total is reported, not divided by
+ok 20 - A charge is never actualised twice
+ok 21 - An unsupported function is rejected
+ok 22 - NRV per unit is 7.50
+ok 23 - The write-down is 250.00
+ok 24 - Carrying value falls to 750.00
+ok 25 - The quantity on hand is untouched
+ok 26 - The item is flagged as impaired
+ok 27 - No write-down when NRV is above cost
+ok 28 - The stock stays at cost, 1,000.00
+ok 29 - The status says it is held at cost
+ok 30 - The reversal is capped at 400.00
+ok 31 - Carrying value returns to cost, 1,000.00
+ok 32 - The cap is declared, not applied silently
+ok 33 - A reversal inside the write-down is allowed
+ok 34 - That reversal is not capped
+ok 35 - A reversal above the earlier write-down is refused
+ok 36 - An assessment needs a date
+ok 37 - A write-down needs selling price evidence
+ok 38 - An unsupported NRV function is rejected
+ok 39 - A comparison with no variant is refused
+ok 40 - A scenario never reports a side effect
+ok 41 - A scenario without an item is refused
+ok 42 - WHATIF will not save a cost set
+1..42
+# TCSTLAND landed cost, NRV and passed 00042 failed 00000
+# exit 0

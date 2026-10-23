@@ -1,0 +1,503 @@
+@inherits PoPage
+@* frmPurchaseOrder (page:po/purchase-order, FR-STERP-PO-020; frmPurchaseOrder.vb:15-279, PurchaseOrderService.vb): order
+   capture (POORDER CREATE / ADDLINE), the price explanation and break ladder (POPRICE), the budget verdict (BUDGCHK), the
+   supplier and payment-terms gates (POSUPCHK, PAYTERMC), approval of the exact order version (POAPPRV), amendment
+   (POORDER AMEND) and issue (POORDER ISSUE). The current order number, the last COMMAREA answers and the lines of this
+   sitting are page state (the PurchaseOrderService instance of the legacy form, contracts 6.9). Layout: the legacy
+   control positions. *@
+<div class="st-page" style="overflow:auto">
+    <div style="position:relative; flex:0 0 auto; height:336px; min-width:898px">
+        @* the group boxes first: the legacy form sends them behind the controls drawn over them *@
+        <PoBox Text="Line" X="470" Y="2" Width="420" Height="262" />
+        <PoBox Text="Amendment" X="8" Y="272" Width="882" Height="58" />
+        <PoPicker Caption="T&ype:" CaptionX="8" CaptionWidth="60" X="100" Y="6" Width="120" Items="Types" Value="@_type"
+                  ValueChanged="v => _type = v" Id="@Uid("type")" Field="TYPE" />
+        @for (var i = 0; i < Head.Length; i++)
+        {
+            var f = Head[i];
+            <PoEdit Caption="@f.Caption" CaptionX="8" CaptionWidth="90" X="100" Y="@(34 + i * 24)" Width="@f.Width" Value="@_edit[f.Key]"
+                    ValueChanged="v => _edit[f.Key] = v" Id="@Uid(f.Key.ToLowerInvariant())" Field="@f.Key" />
+        }
+        @for (var i = 0; i < Line.Length; i++)
+        {
+            var f = Line[i];
+            <PoEdit Caption="@f.Caption" CaptionX="480" CaptionWidth="100" X="584" Y="@(22 + i * 24)" Width="@f.Width" Value="@_edit[f.Key]"
+                    ValueChanged="v => _edit[f.Key] = v" Id="@Uid(f.Key.ToLowerInvariant())" Field="@f.Key" />
+        }
+        <PoButton Text="Ne&w order" X="100" Y="230" Width="96" OnClick="NewClickedAsync" />
+        <PoButton Text="Chec&k budget" X="202" Y="230" Width="100" OnClick="BudgetClickedAsync" />
+        <PoButton Text="Supplier c&hecks" X="308" Y="230" Width="110" OnClick="ChecksClickedAsync" />
+        <PoButton Text="Explain &price" X="480" Y="266" Width="110" OnClick="PriceClickedAsync" />
+        <PoButton Text="&Add line" X="596" Y="266" Width="90" OnClick="AddClickedAsync" />
+        <PoButton Text="Appro&val" X="692" Y="266" Width="90" OnClick="ApprovalClickedAsync" />
+        <PoPicker Caption="&Field:" CaptionX="18" CaptionWidth="46" X="66" Y="290" Width="120" Items="AmendFields" Value="@_amendField"
+                  ValueChanged="v => _amendField = v" Id="@Uid("amendfield")" Field="AMENDFIELD" />
+        <PoEdit Caption="Ne&w value:" CaptionX="196" CaptionWidth="70" X="270" Y="290" Width="110" Value="@_amendValue"
+                ValueChanged="v => _amendValue = v" Id="@Uid("amendvalue")" Field="AMENDVALUE" />
+        <PoEdit Caption="Rea&son:" CaptionX="390" CaptionWidth="50" X="442" Y="290" Width="300" Value="@_reason"
+                ValueChanged="v => _reason = v" Id="@Uid("reason")" Field="REASON" />
+        <PoButton Text="A&mend" X="752" Y="289" Width="90" OnClick="AmendClickedAsync" />
+    </div>
+    <StGrid Id="@Uid("grid")" Data="_grid" Selected="_selected" SelectedChanged="i => _selected = i" Style="margin:0 8px 8px 8px" />
+</div>
+
+@code {
+    /// <summary>Header boxes (frmPurchaseOrder.vb:18-22): captions at x 8, boxes at x 100, 24 pixels apart from y 34.</summary>
+    private static readonly (string Key, string Caption, int Width)[] Head =
+    [
+        ("ORDER", "&Order:", 150), ("SUPPLIER", "&Supplier:", 120), ("CCY", "C&urrency:", 50), ("TERMS", "Pa&yment terms:", 90),
+        ("INCO", "&Incoterms:", 50), ("PLACE", "Named p&lace:", 200), ("BUDGET", "&Budget code:", 110), ("SUPPREF", "Supplier re&f:", 150),
+    ];
+
+    /// <summary>Line box (frmPurchaseOrder.vb:24-29): captions at x 480, boxes at x 584, 24 pixels apart from y 22.</summary>
+    private static readonly (string Key, string Caption, int Width)[] Line =
+    [
+        ("ITEM", "I&tem:", 170), ("DESC", "Descri&ption:", 250), ("QTY", "&Quantity:", 90), ("UOM", "U&nit:", 60),
+        ("PRICE", "Unit pri&ce:", 90), ("DISCPCT", "Disc &%:", 60), ("DUE", "Due &date:", 90), ("ACCOUNT", "&Account:", 90),
+        ("CC", "Cost c&entre:", 90), ("DESTSITE", "To si&te:", 60),
+    ];
+
+    /// <summary>The order type picker (frmPurchaseOrder.vb:44): STANDARD first and selected.</summary>
+    private static readonly string[] Types = ["STANDARD", "BLANKET", "CALLOFF", "SERVICE", "SUBCONTRACT", "DROPSHIP"];
+
+    /// <summary>The amendment field picker (frmPurchaseOrder.vb:63): QUANTITY first and selected.</summary>
+    private static readonly string[] AmendFields = ["QUANTITY", "PRICE", "DATE", "SUPPLIER", "TERMS", "DESCRIPTION"];
+
+    private readonly Dictionary<string, string> _edit = Head.Concat(Line).ToDictionary(f => f.Key, _ => "");
+    private string _type = Types[0];
+    private string _amendField = AmendFields[0];
+    private string _amendValue = "";
+    private string _reason = "";
+    private GridData _grid = GridData.Empty;
+    private int _selected = -1;
+
+    // PurchaseOrderService instance state (PurchaseOrderService.vb:16-37, 268-270, 295)
+    private string _orderNumber = "";
+    private string _status = "";
+    private decimal _netAmount;
+    private decimal _grossAmount;
+    private decimal _commitmentGbp;
+    private int _lineNum;
+    private decimal _lineNetGbp;
+    private string _priceSource = "";
+    private bool _needsReapproval;
+    private string _approvalStatus = "";
+    private string _requiredPermission = "";
+    private decimal _amountGbp;
+
+    /// <summary>PurchaseOrderService.Lines: the lines captured in this sitting, with the price explanation beside each one.</summary>
+    private readonly List<JsonObject> _lines = [];
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        LegacySize(900, 600);
+    }
+
+    /// <summary>frmPurchaseOrder.OnLoad (frmPurchaseOrder.vb:93-101): defaults, start-up status, then F5.</summary>
+    protected override async Task OnInitializedAsync()
+    {
+        _edit["CCY"] = Session.Selected?.BaseCurrency ?? "";
+        _edit["DESTSITE"] = Session.SiteCode;
+        _edit["DUE"] = PoFmt.Date(Session.BusinessDate.AddDays(14));
+        if (FormArgument != "") _edit["ORDER"] = FormArgument;
+        SetStatus("F5 lists the open orders, F10 issues the order once it has been approved.");
+        await OnRefreshKeyAsync();
+    }
+
+    /// <summary>F2 on Item: the item lookup (frmLookup.Pick core.usp_UiLookup ITM.ITEM); elsewhere the BaseForm answer.</summary>
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        if (key.TargetField != "ITEM")
+        {
+            await base.OnLookupAsync(key);
+            return;
+        }
+        var c = await Dialogs.LookupAsync("master", "ITM.ITEM", "Item");
+        if (c != "") _edit["ITEM"] = c;
+        StateHasChanged();
+    }
+
+    private Dictionary<string, string> Values() => new(_edit);
+
+    /// <summary>frmPurchaseOrder.V: the box text trimmed and upper-cased.</summary>
+    private string V(string key) => PoFmt.S(_edit[key]);
+
+    /// <summary>F5 shows this order's own lines, or (none captured) the open orders of the supplier/order (frmPurchaseOrder.vb:113-120).</summary>
+    protected override Task OnRefreshKeyAsync() => GuardAsync(async () =>
+    {
+        if (_lines.Count > 0)
+        {
+            BindLines();
+            return;
+        }
+        var r = await Api.GetAsync("/api/po/v1/purchase-orders" +
+                                   Query.Build(("supplierCode", V("SUPPLIER")), ("orderNumber", V("ORDER")), ("includeClosed", "false")));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Bind(OpenOrders(r.Items));
+    });
+
+    /// <summary>New order (frmPurchaseOrder.vb:123-131).</summary>
+    private Task NewClickedAsync() => GuardAsync(async () =>
+    {
+        var v = Values();
+        v["TYPE"] = _type;
+        if (!await ShowResultAsync(await CreateAsync(v))) return;
+        _edit["ORDER"] = _orderNumber;
+        BindLines();
+        SetStatus("Order " + _orderNumber + " created (" + _status + ").", CueOk);
+    });
+
+    /// <summary>Add line (frmPurchaseOrder.vb:135-146): creates the order first when none is current.</summary>
+    private Task AddClickedAsync() => GuardAsync(async () =>
+    {
+        if (_orderNumber == "") await NewClickedAsync();
+        if (_orderNumber == "") return;
+        var r = await AddLineAsync(Values());
+        if (!await ShowResultAsync(r)) return;
+        _edit["ITEM"] = "";
+        _edit["DESC"] = "";
+        _edit["QTY"] = "";
+        _edit["PRICE"] = "";
+        BindLines();
+        SetStatus("Line " + _lineNum + " added, priced from " + _priceSource + ".  Order net " + PoFmt.Money(_netAmount) + ", gross " +
+                  PoFmt.Money(_grossAmount) + ", commitment " + PoFmt.Money(_commitmentGbp) + ".", CueOk);
+    });
+
+    /// <summary>Explain price (frmPurchaseOrder.vb:150-163): POPRICE PRICE fills the unit price, then the break ladder is listed.</summary>
+    private Task PriceClickedAsync() => GuardAsync(async () =>
+    {
+        var r = await LinkAsync(Api.GetAsync("/api/po/v1/purchase-prices/price" + Query.Build(("supplier", V("SUPPLIER")), ("itemCode", V("ITEM")),
+            ("quantity", PoFmt.Str(PoFmt.D(_edit["QTY"]))), ("uomCode", V("UOM")), ("currency", V("CCY")))));
+        var p = r.Data;
+        ReadPrice(p);
+        if (!await ShowResultAsync(r)) return;
+        _edit["PRICE"] = PoFmt.Str(PoFmt.Dec(PoFmt.Get(p, "unitPrice")));
+        var breaks = await LinkAsync(Api.GetAsync("/api/po/v1/purchase-prices/breaks" + Query.Build(("supplier", V("SUPPLIER")), ("itemCode", V("ITEM")))));
+        ReadPrice(breaks.Data);
+        Bind(BreakTable(breaks.Data));
+        var ccy = PoFmt.Text(p, "currency");
+        SetStatus(PoFmt.Text(p, "priceBasis") + ": " + PoFmt.Money(PoFmt.Dec(PoFmt.Get(p, "unitPrice")), ccy) + " per " +
+                  PoFmt.Str(PoFmt.Dec(PoFmt.Get(p, "pricePer"))) + ", break at " + PoFmt.Str(PoFmt.Dec(PoFmt.Get(p, "breakQtyUsed"))) +
+                  ", net " + PoFmt.Money(PoFmt.Dec(PoFmt.Get(p, "netValue")), ccy) + "  [" + PoFmt.Text(p, "sourceText") + "]", CueOk);
+    });
+
+    /// <summary>
+    /// Check budget (frmPurchaseOrder.vb:167-189): the verdict measured after this order (current net, else quantity x price);
+    /// the handler never calls ShowResult - BLOCK shows the hold dialog with the reason code for every return code.
+    /// </summary>
+    private Task BudgetClickedAsync() => GuardAsync(async () =>
+    {
+        var v = Values();
+        var net = _netAmount != 0m ? _netAmount : PoFmt.D(v["QTY"]) * PoFmt.D(v["PRICE"]);
+        var body = new JsonObject
+        {
+            ["budgetCode"] = PoFmt.S(v["BUDGET"]),
+            ["accountCode"] = PoFmt.S(v["ACCOUNT"]),
+            ["costCentre"] = PoFmt.S(v["CC"]),
+            ["project"] = "",
+            ["docType"] = "ORDER",
+            ["docRef"] = _orderNumber,
+            ["netGbp"] = PoFmt.D(PoFmt.Str(net)),
+            ["nonrecVatGbp"] = 0m,
+            ["chargeGbp"] = 0m,
+            ["overrideBy"] = "",
+            ["overrideReason"] = "",
+        };
+        var r = await LinkAsync(Api.PostAsync("/api/po/v1/budgets/check", body));
+        var b = r.Data;
+        var outcome = PoFmt.Text(b, "outcome");
+        var txt = outcome + " - " + PoFmt.Pct(PoFmt.Dec(PoFmt.Get(b, "usedAfterPct"))) + " of the budget is used after this order (warn at " +
+                  PoFmt.Pct(PoFmt.Dec(PoFmt.Get(b, "warnPct"))) + ", block at " + PoFmt.Pct(PoFmt.Dec(PoFmt.Get(b, "blockPct"))) + "), " +
+                  PoFmt.Money(PoFmt.Dec(PoFmt.Get(b, "availableGbp"))) + " available";
+        if (PoFmt.Int(PoFmt.Get(b, "relatedCnt")) > 0)
+        {
+            txt += ", including " + PoFmt.Int(PoFmt.Get(b, "relatedCnt")) + " related document(s) worth " + PoFmt.Money(PoFmt.Dec(PoFmt.Get(b, "relatedGbp")));
+        }
+        if (outcome == "BLOCK")
+        {
+            await ShowHoldAsync(txt, r.ReasonCode);
+            SetStatus(txt, CueHold);
+        }
+        else if (outcome == "WARN")
+        {
+            SetStatus(txt, CueWarning);
+        }
+        else
+        {
+            SetStatus(txt, CueOk);
+        }
+    });
+
+    /// <summary>Supplier checks (frmPurchaseOrder.vb:193-209): due diligence and payment terms against the policy.</summary>
+    private Task ChecksClickedAsync() => GuardAsync(async () =>
+    {
+        var supplier = V("SUPPLIER");
+        var dd = (await LinkAsync(Api.PostAsync($"/api/po/v1/suppliers/{Seg(supplier)}/diligence/check",
+            new JsonObject { ["orderValueGbp"] = _netAmount }))).Data;
+        var pt = (await LinkAsync(Api.PostAsync($"/api/po/v1/suppliers/{Seg(supplier)}/payment-terms/check",
+            new JsonObject { ["termsCode"] = V("TERMS"), ["valueGbp"] = _netAmount, ["orderNumber"] = _orderNumber }))).Data;
+        var txt = "Diligence " + PoFmt.Text(dd, "overall") + " (" + PoFmt.Int(PoFmt.Get(dd, "failCnt")) + " failed, " +
+                  PoFmt.Int(PoFmt.Get(dd, "missingCnt")) + " missing, " + PoFmt.Int(PoFmt.Get(dd, "expiredCnt")) + " expired)   Terms " +
+                  PoFmt.Int(PoFmt.Get(pt, "termsDays")) + " days against a limit of " + PoFmt.Int(PoFmt.Get(pt, "effectiveLimit")) +
+                  " (" + PoFmt.Text(pt, "limitSource") + ")";
+        if (PoFmt.Text(dd, "missingList") != "") txt += "   missing: " + PoFmt.Text(dd, "missingList");
+        var cue = CueOk;
+        if (PoFmt.Text(dd, "canOrder") != "Y") cue = CueHold;
+        if (PoFmt.Text(pt, "needsException") == "Y")
+        {
+            cue = CueWarning;
+            txt += "   terms exceed the policy by " + PoFmt.Int(PoFmt.Get(pt, "excessDays")) + " day(s) - an approved exception is needed";
+        }
+        SetStatus(txt, cue);
+    });
+
+    /// <summary>Approval (frmPurchaseOrder.vb:213-230): request it, or give it when it is pending.</summary>
+    private Task ApprovalClickedAsync() => GuardAsync(async () =>
+    {
+        var order = _orderNumber == "" ? V("ORDER") : _orderNumber;
+        var r = await ApprovalAsync("CHECK", order, "", "");
+        if (_approvalStatus != "PENDING" && _approvalStatus != "APPROVED")
+        {
+            r = await ApprovalAsync("REQUEST", order, "", PoFmt.T(_reason));
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Approval requested for " + order + " (" + PoFmt.Money(_amountGbp) + ", permission " + _requiredPermission + ").", CueOk);
+            return;
+        }
+        if (_approvalStatus == "PENDING")
+        {
+            if (!await ConfirmAsync("Approve order " + order + " for " + PoFmt.Money(_amountGbp) + "?")) return;
+            r = await ApprovalAsync("DECIDE", order, "APPROVE", PoFmt.T(_reason));
+            if (!await ShowResultAsync(r)) return;
+        }
+        SetStatus("Order " + order + " approval is " + _approvalStatus + ".", CueOk);
+    });
+
+    /// <summary>Amend (frmPurchaseOrder.vb:234-249): POORDER decides whether the change is material.</summary>
+    private Task AmendClickedAsync() => GuardAsync(async () =>
+    {
+        var order = _orderNumber == "" ? V("ORDER") : _orderNumber;
+        var line = _lineNum;
+        var body = new JsonObject
+        {
+            ["lineNum"] = line,
+            ["amendField"] = _amendField,
+            ["amendNew"] = PoFmt.T(_amendValue),
+            ["amendReason"] = PoFmt.T(_reason),
+        };
+        var r = await LinkAsync(Api.PostAsync($"/api/po/v1/purchase-orders/{Seg(order)}/amend", body, Instruction.New().Options()));
+        Read(r.Data ?? Sent(order));
+        if (!await ShowResultAsync(r)) return;
+        if (_needsReapproval)
+        {
+            SetStatus("Amendment " + _amendField + " recorded.  This is a material change: the approval has been invalidated and the " +
+                      "order must be approved again.", CueWarning);
+        }
+        else
+        {
+            SetStatus("Amendment recorded; the approval still stands.  Order status " + _status + ".", CueOk);
+        }
+    });
+
+    /// <summary>F10 issues the order to the supplier (frmPurchaseOrder.vb:253-265).</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        var order = _orderNumber == "" ? V("ORDER") : _orderNumber;
+        if (order == "")
+        {
+            SetStatus("There is no order to issue.", CueWarning);
+            return;
+        }
+        if (!await ConfirmAsync("Issue order " + order + " to the supplier?")) return;
+        await GuardAsync(async () =>
+        {
+            var v = Values();
+            var body = new JsonObject
+            {
+                ["copyFrom"] = "",
+                ["blanketNumber"] = "",
+                ["supplier"] = PoFmt.S(v["SUPPLIER"]),
+                ["schQty"] = PoFmt.D(v["QTY"]),
+                ["itemCode"] = PoFmt.S(v["ITEM"]),
+            };
+            if (PoFmt.T(v["DUE"]) != "") body["schReqDate"] = PoFmt.Iso(PoFmt.Dt(v["DUE"], Session.BusinessDate));
+            var r = await LinkAsync(Api.PostAsync($"/api/po/v1/purchase-orders/{Seg(order)}/issue", body, Instruction.New().Options()));
+            Read(r.Data ?? Sent(order));
+            if (!await ShowResultAsync(r)) return;
+            SetStatus("Order " + order + " is " + _status + ", committed " + PoFmt.Money(_commitmentGbp) + ".", CueOk);
+        });
+    }
+
+    private void Bind(GridData data)
+    {
+        _grid = data;
+        _selected = data.Count > 0 ? 0 : -1;
+        StateHasChanged();
+    }
+
+    /// <summary>GridHelper.Bind(_grid, _svc.Lines) (PurchaseOrderService.vb:39-41 column types).</summary>
+    private void BindLines() => Bind(new GridData(
+    [
+        PoFmt.Col("LineNum", "INT"), PoFmt.Col("ItemCode", "TEXT"), PoFmt.Col("Description", "TEXT"), PoFmt.Col("OrderedQty", "QTY"),
+        PoFmt.Col("UomCode", "TEXT"), PoFmt.Col("UnitPrice", "MONEY"), PoFmt.Col("PricePer", "MONEY"), PoFmt.Col("DiscountPct", "MONEY"),
+        PoFmt.Col("NetGBP", "MONEY"), PoFmt.Col("PriceSource", "TEXT"), PoFmt.Col("BudgetOutcome", "TEXT"), PoFmt.Col("DestSite", "TEXT"),
+    ], _lines));
+
+    /// <summary>
+    /// GridHelper.Bind of the po.usp_OpenOrders result set: the procedure columns (usp_PoEnquiry.sql:41-56) with the formats
+    /// of their SQL types; the API rows carry them under the contract's camelCase names.
+    /// </summary>
+    private static readonly (string Legacy, string Json, string Kind)[] OpenOrderColumns =
+    [
+        ("OrderNumber", "orderNumber", "TEXT"), ("OrderType", "orderType", "TEXT"), ("SiteCode", "siteCode", "TEXT"),
+        ("SupplierCode", "supplierCode", "TEXT"), ("BuyerUser", "buyerUser", "TEXT"), ("OrderDate", "orderDate", "DATE"),
+        ("CurrencyCode", "currencyCode", "TEXT"), ("Status", "status", "TEXT"), ("DeliveryStatus", "deliveryStatus", "TEXT"),
+        ("MatchStatus", "matchStatus", "TEXT"), ("TermsCode", "termsCode", "TEXT"), ("TermsSnapshot", "termsSnapshot", "TEXT"),
+        ("IncotermsRule", "incotermsRule", "TEXT"), ("NetAmount", "netAmount", "MONEY"), ("VatAmount", "vatAmount", "MONEY"),
+        ("GrossAmount", "grossAmount", "MONEY"), ("CommitmentGBP", "commitmentGbp", "MONEY"), ("ApprovedBy", "approvedBy", "TEXT"),
+        ("ApprovedAt", "approvedAt", "STAMP"), ("IssuedAt", "issuedAt", "STAMP"), ("AcknowledgedAt", "acknowledgedAt", "STAMP"),
+        ("BlanketOrderNumber", "blanketOrderNumber", "TEXT"), ("BudgetCode", "budgetCode", "TEXT"), ("LineCount", "lineCount", "INT"),
+        ("OutstandingQty", "outstandingQty", "QTY"), ("OutstandingGBP", "outstandingGbp", "MONEY"),
+        ("ReceivedNotInvoicedGBP", "receivedNotInvoicedGbp", "MONEY"), ("EarliestDueDate", "earliestDueDate", "DATE"),
+        ("LatestDueDate", "latestDueDate", "DATE"), ("OverdueLines", "overdueLines", "INT"), ("IsCommitment", "isCommitment", "BOOL"),
+    ];
+
+    private static GridData OpenOrders(JsonArray items) =>
+        new(OpenOrderColumns.Select(c => new GridColumn(c.Json, UkFormat.Humanise(c.Legacy), c.Kind, c.Legacy)), items.OfType<JsonObject>());
+
+    /// <summary>The PR-BREAK table of a POPRICE answer (CommArea.GetTable: copybook names, decimals as MONEY).</summary>
+    private static GridData BreakTable(JsonNode? ca)
+    {
+        var rows = new List<JsonObject>();
+        var n = PoFmt.Int(PoFmt.Get(ca, "breakCnt"));
+        foreach (var b in (PoFmt.Get(PoFmt.Get(ca, "breakTable"), "break") as JsonArray ?? []).Take(Math.Max(n, 0)))
+        {
+            rows.Add(new JsonObject
+            {
+                ["PR-B-FROM-QTY"] = PoFmt.Dec(PoFmt.Get(b, "bFromQty")),
+                ["PR-B-UNIT-PRICE"] = PoFmt.Dec(PoFmt.Get(b, "bUnitPrice")),
+                ["PR-B-DISC-PCT"] = PoFmt.Dec(PoFmt.Get(b, "bDiscPct")),
+            });
+        }
+        return new GridData([PoFmt.Col("PR-B-FROM-QTY", "MONEY"), PoFmt.Col("PR-B-UNIT-PRICE", "MONEY"), PoFmt.Col("PR-B-DISC-PCT", "MONEY")], rows);
+    }
+
+    // -------------------------------------------------------------------- PurchaseOrderService (the facade)
+
+    /// <summary>PurchaseOrderService.Read (PurchaseOrderService.vb:297-310); a failure carries no area, so the order number sent
+    /// is read back with blank outputs.</summary>
+    private void Read(JsonNode? ca)
+    {
+        var no = PoFmt.Text(ca, "orderNumber");
+        if (no != "") _orderNumber = no;
+        _status = PoFmt.Text(ca, "status");
+        _netAmount = PoFmt.Dec(PoFmt.Get(ca, "netAmount"));
+        _grossAmount = PoFmt.Dec(PoFmt.Get(ca, "grossAmount"));
+        _commitmentGbp = PoFmt.Dec(PoFmt.Get(ca, "commitmentGbp"));
+        _lineNum = PoFmt.Int(PoFmt.Get(ca, "lineNum"));
+        _lineNetGbp = PoFmt.Dec(PoFmt.Get(ca, "lineNetGbp"));
+        _priceSource = PoFmt.Text(ca, "priceSource");
+        _needsReapproval = PoFmt.Text(ca, "needsReappr") == "Y";
+    }
+
+    /// <summary>PurchaseOrderService.ReadPrice (PurchaseOrderService.vb:210-215): POPRICE always names its basis.</summary>
+    private void ReadPrice(JsonNode? ca)
+    {
+        _priceSource = PoFmt.Text(ca, "priceBasis").Trim();
+        if (_priceSource.Length == 0) _priceSource = "UNKNOWN";
+    }
+
+    private JsonObject Sent(string orderNumber) => new() { ["orderNumber"] = orderNumber };
+
+    /// <summary>PurchaseOrderService.Create (PurchaseOrderService.vb:65-84): POORDER CREATE with a new correlation id.</summary>
+    private async Task<PoResult> CreateAsync(Dictionary<string, string> v)
+    {
+        var type = PoFmt.S(v.GetValueOrDefault("TYPE"));
+        var ccy = PoFmt.S(v["CCY"]);
+        var body = new JsonObject
+        {
+            ["orderType"] = type == "" ? "STANDARD" : type,
+            ["supplier"] = PoFmt.S(v["SUPPLIER"]),
+            ["currency"] = ccy == "" ? Session.Selected?.BaseCurrency ?? "" : ccy,
+            ["termsCode"] = PoFmt.S(v["TERMS"]),
+            ["incoterms"] = PoFmt.S(v["INCO"]),
+            ["namedPlace"] = PoFmt.T(v["PLACE"]),
+            ["deliveryAddr"] = "",
+            ["supplierRef"] = PoFmt.T(v["SUPPREF"]),
+            ["budgetCode"] = PoFmt.S(v["BUDGET"]),
+            ["blanketNumber"] = "",
+            ["linkedSo"] = "",
+        };
+        var r = await LinkAsync(Api.PostAsync("/api/po/v1/purchase-orders", body, Instruction.New().Options()));
+        Read(r.Data ?? new JsonObject());
+        _lines.Clear();
+        return r;
+    }
+
+    /// <summary>PurchaseOrderService.AddLine (PurchaseOrderService.vb:87-118): an empty price lets POPRICE fill it in.</summary>
+    private async Task<PoResult> AddLineAsync(Dictionary<string, string> v)
+    {
+        var destSite = PoFmt.S(v["DESTSITE"]);
+        var body = new JsonObject
+        {
+            ["lineType"] = "STOCK",
+            ["itemCode"] = PoFmt.S(v["ITEM"]),
+            ["revision"] = "",
+            ["description"] = PoFmt.T(v["DESC"]),
+            ["orderedQty"] = PoFmt.D(v["QTY"]),
+            ["uomCode"] = PoFmt.S(v["UOM"]),
+            ["unitPrice"] = PoFmt.D(v["PRICE"]),
+            ["pricePer"] = 0m,
+            ["discountPct"] = PoFmt.D(v["DISCPCT"]),
+            ["chargeAmt"] = 0m,
+            ["vatCode"] = "",
+            ["accountCode"] = PoFmt.S(v["ACCOUNT"]),
+            ["costCentre"] = PoFmt.S(v["CC"]),
+            ["project"] = "",
+            ["destSite"] = destSite == "" ? Session.SiteCode : destSite,
+            ["destLocation"] = "",
+            ["reqNumber"] = "",
+            ["schReqDate"] = PoFmt.Iso(PoFmt.Dt(v["DUE"], Session.BusinessDate)),
+        };
+        var no = _orderNumber;
+        var r = await LinkAsync(Api.PostAsync($"/api/po/v1/purchase-orders/{Seg(no)}/lines", body));
+        var ca = r.Data ?? Sent(no);
+        Read(ca);
+        if (r.Succeeded)
+        {
+            _lines.Add(new JsonObject
+            {
+                ["LineNum"] = _lineNum,
+                ["ItemCode"] = PoFmt.S(v["ITEM"]),
+                ["Description"] = PoFmt.T(v["DESC"]),
+                ["OrderedQty"] = PoFmt.D(v["QTY"]),
+                ["UomCode"] = PoFmt.Text(ca, "uomCode"),
+                ["UnitPrice"] = PoFmt.Dec(PoFmt.Get(ca, "unitPrice")),
+                ["PricePer"] = PoFmt.Dec(PoFmt.Get(ca, "pricePer")),
+                ["DiscountPct"] = PoFmt.Dec(PoFmt.Get(ca, "discountPct")),
+                ["NetGBP"] = _lineNetGbp,
+                ["PriceSource"] = _priceSource,
+                ["BudgetOutcome"] = "",
+                ["DestSite"] = PoFmt.Text(ca, "destSite"),
+            });
+        }
+        return r;
+    }
+
+    /// <summary>PurchaseOrderService.Approval (PurchaseOrderService.vb:251-266): CHECK, REQUEST or DECIDE of the order version.</summary>
+    private async Task<PoResult> ApprovalAsync(string func, string order, string decision, string comment)
+    {
+        var path = $"/api/po/v1/purchase-orders/{Seg(order)}/approval/" + func.ToLowerInvariant();
+        var body = func switch
+        {
+            "REQUEST" => new JsonObject { ["comment"] = comment },
+            "DECIDE" => new JsonObject { ["decision"] = decision, ["comment"] = comment },
+            _ => new JsonObject(),
+        };
+        var r = await LinkAsync(Api.PostAsync(path, body, Instruction.New().Options()));
+        _approvalStatus = PoFmt.Text(r.Data, "approvalStatus");
+        _requiredPermission = PoFmt.Text(r.Data, "requiredPerm");
+        _amountGbp = PoFmt.Dec(PoFmt.Get(r.Data, "amountGbp"));
+        return r;
+    }
+}

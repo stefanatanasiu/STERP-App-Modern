@@ -1,0 +1,34 @@
+# suite TAPINVREG register and dups
+ok 1 - a coded invoice validates
+ok 2 - the calculated net is 250.00
+ok 3 - input VAT at 20 per cent is 50.00
+ok 4 - the gross agrees with the supplier
+ok 5 - nothing is left to explain on the net
+ok 6 - an unapproved non-PO category is held
+ok 7 - the non-PO exception is named
+ok 8 - the held line is reported on the line
+ok 9 - a 25.00 difference is not accepted
+ok 10 - the difference is quantified
+ok 11 - an impossible receipt date is refused
+ok 12 - the genuine invoice is registered
+ok 13 - registration completes without an error code
+ok 14 - it is given a register number
+ok 15 - it is not yet eligible for payment
+ok 16 - case and spacing do not make a new document
+ok 17 - the earlier registration is found
+ok 18 - the clerk is pointed at the earlier entry
+ok 19 - a duplicate is refused, not warned about
+ok 20 - the refusal quotes the duplicate rule
+ok 21 - registering it again is refused
+ok 22 - the attempt is marked as a duplicate
+ok 23 - no second register number is issued
+ok 24 - a different reference is not a duplicate
+ok 25 - the same amount and date are reported
+ok 26 - the similar document is only a warning
+ok 27 - the warning quotes the similar document rule
+ok 28 - the earlier register number is offered
+ok 29 - the reviewed document is registered
+ok 30 - it gets its own register number
+1..30
+# TAPINVREG register and dups passed 00030 failed 00000
+# exit 0

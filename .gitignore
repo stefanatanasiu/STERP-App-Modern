@@ -1,0 +1,25 @@
+# build outputs
+bin/
+obj/
+artifacts/
+TestResults/
+*.user
+.vs/
+.vscode/
+# target run folders (spool, logs, work ...) - outputs, never source (contracts 8.5)
+/run/
+# Playwright/browser caches
+.playwright/
+# binaries, database files and test results are never published (the README carries the summary)
+*.dll
+*.exe
+*.pdb
+*.bak
+*.mdf
+*.ldf
+*.trx
+*.coverage
+/out/
+/*.xml
+test-results/
+playwright-report/

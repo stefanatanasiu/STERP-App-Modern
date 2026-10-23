@@ -1,0 +1,17 @@
+# suite TKITDEMO kit demonstration dri
+ok 1 - GENEALOG refuses an unknown function
+ok 2 - A refused completion receipts nothing
+ok 3 - The demonstration kit received good output
+ok 4 - Every completion moved stock, it did not just say so
+ok 5 - The kit is no longer waiting to be built
+ok 6 - The completion carries a genealogy
+ok 7 - No genealogy line floats free of its completion
+ok 8 - Nothing was consumed in quantity zero
+ok 9 - GENEALOG reads the driver's kit back
+ok 10 - An unknown kit does not show other kits' dispositions
+ok 11 - An empty kit trace names the no-genealogy refusal
+ok 12 - Each completion carries its own correlation id
+ok 13 - The kit was issued before it was completed
+1..13
+# TKITDEMO kit demonstration dri passed 00013 failed 00000
+# exit 0

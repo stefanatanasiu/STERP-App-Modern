@@ -1,0 +1,10 @@
+# xmd-gaps
+ok 1 - the new standard rate takes effect on 1 December 2026 only: 20.0000 still applies at the May tax point and 22.0000 from December -- REQ: XMD-008 AC: AC-100
+ok 2 - the posted invoice still carries 20.0000 per cent and 12.500000 per unit after a 22 per cent rate and a 19.000000 price are made effective from December -- REQ: XMD-008 AC: AC-100
+ok 3 - the impact of the change names the one order still to be despatched and leaves the fulfilled order out -- REQ: XMD-008 AC: AC-100
+ok 4 - the open order moves to 19.000000 at 22 per cent from the effective date while the posted invoice stays at 12.500000 and 20 per cent -- REQ: XMD-008 AC: AC-100
+ok 5 - the same item code in two companies holds 40 units in Stellar Components and none in Caledon Assemblies -- REQ: XMD-011 AC: AC-105
+ok 6 - Stellar Components can reserve 5 of its 40 units while the identically coded Caledon demand is refused for want of free stock -- REQ: XMD-011 AC: AC-105
+ok 7 - an item code catalogued only in the other company is refused with "That item does not exist in this company" -- REQ: XMD-011 AC: AC-105
+ok 8 - the shared customer code owes 1000.00 in Stellar Components and is owed 1000.00 in Caledon Assemblies, held as two company-scoped accounts that are never netted to nil -- REQ: XMD-011 AC: AC-105
+ok 9 - a 2500.00 debtors posting in Caledon Assemblies moves only the Caledon control balance; the Stellar Components balance at the same cutoff is unchanged -- REQ: XMD-011 AC: AC-105

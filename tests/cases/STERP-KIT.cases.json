@@ -1,0 +1,4466 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-KIT",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-KIT-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-001-AC1",
+          "ac": 1,
+          "title": "Readiness drift check finds the 24 kit objects with repository definitions; v1 operations issue no DDL",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "health"
+          ],
+          "steps": [
+            {
+              "save": "ready",
+              "call": "api_getReadiness"
+            },
+            {
+              "save": "w",
+              "call": "kit_listKitWorklist",
+              "query": {
+                "site": "RDG"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ready",
+              "status": 200
+            },
+            {
+              "on": "ready",
+              "json": "$.driftDifferences",
+              "count": 0
+            },
+            {
+              "on": "w",
+              "status": 200
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.objects WHERE schema_id = SCHEMA_ID('kit') AND type IN ('U','P','V')",
+              "equals": 20
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.indexes i JOIN sys.objects o ON o.object_id = i.object_id WHERE o.schema_id = SCHEMA_ID('kit') AND i.name IN ('IX_KitGenealogy_Component','IX_KitPick_Line','IX_KitSupplyCommit_Line','IX_KitSupplyCommit_Supply')",
+              "equals": 4
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id WHERE c.object_id = OBJECT_ID('kit.ExecutionKit') AND c.name = 'Status' AND t.name = 'varchar' AND c.max_length = 14 AND c.is_nullable = 0",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.check_constraints WHERE name = 'CK_ExKit_St' AND parent_object_id = OBJECT_ID('kit.ExecutionKit')",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-001 object list (13 tables, 4 procedures, 3 views, 4 indexes; db/tables/90-kit/02-ExecutionKit.sql Status varchar(14) NOT NULL with CK_ExKit_St) and contracts 6.11; the unchanged object inventory after a v1 call is the runtime evidence of no DDL.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-001-AC2",
+          "ac": 2,
+          "title": "With kit.usp_KitReadiness absent the worklist is an empty list and readiness reports the drift",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "health",
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "absent",
+              "fault": {
+                "renameObject": "kit.usp_KitReadiness"
+              }
+            },
+            {
+              "save": "pre",
+              "sql": "SELECT OBJECT_ID('kit.usp_KitReadiness') AS oid"
+            },
+            {
+              "save": "w",
+              "call": "kit_listKitWorklist",
+              "query": {
+                "site": "RDG"
+              }
+            },
+            {
+              "save": "ready",
+              "call": "api_getReadiness"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "pre",
+              "json": "$[0].oid",
+              "isNull": true
+            },
+            {
+              "on": "w",
+              "status": 200
+            },
+            {
+              "on": "w",
+              "json": "$.count",
+              "equals": 0
+            },
+            {
+              "on": "w",
+              "json": "$.items",
+              "count": 0
+            },
+            {
+              "on": "ready",
+              "status": 503
+            },
+            {
+              "on": "ready",
+              "json": "$.driftDifferences[*]",
+              "contains": "kit.usp_KitReadiness"
+            }
+          ],
+          "derivation": "AC words with KitService.vb:36-40 (Worklist returns New DataTable() when Deployed('kit.usp_KitReadiness') is false), ServiceBase.vb:59-61 and SqlHelper.cs:148-156 (Deployed = SELECT OBJECT_ID(@n) is not NULL) at 00631916, and contracts 6.11 (a missing object of an implemented slice makes /health/ready Unhealthy with the difference listed); the procedure is made absent by the harness fault renameObject on the isolated database (OBJECT_ID returns NULL, as for a drop; renamed back and the dataset restored before the next scenario), and the first assertion documents that precondition. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-024: precondition arranged by the fault step instead of DDL; expectations unchanged]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-002-AC1",
+          "ac": 1,
+          "title": "Kits menu: WHSE rows equal usp_UiMenuLoad; Kit Execution, KIT.DEF maintenance, KITRP010 launcher and Ctrl+T routing",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "navigation",
+            "keys",
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "exec",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Kits",
+                    "Kit Execution..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "defs",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Kits",
+                    "Commercial Kit Definitions..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "ready",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Kits",
+                    "Kit Readiness..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "trial",
+              "gui": "/",
+              "actions": [
+                {
+                  "press": "Ctrl+T"
+                }
+              ]
+            },
+            {
+              "save": "mW",
+              "call": "platform_getMenu",
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "exec",
+              "text": "Enter a kit reference and press Refresh (F5)."
+            },
+            {
+              "on": "defs",
+              "text": "Commercial kit definitions"
+            },
+            {
+              "on": "ready",
+              "text": "KITRP010"
+            },
+            {
+              "on": "trial",
+              "text": "Enter a kit or a parent item and press Trial (F10).  Nothing is committed."
+            },
+            {
+              "on": "mW",
+              "json": "$.items[*].menuCode",
+              "contains": "KIT.EXEC"
+            },
+            {
+              "on": "mW",
+              "json": "$.items[*].caption",
+              "contains": "Kit &Execution..."
+            },
+            {
+              "on": "mW",
+              "json": "$.items[*].caption",
+              "contains": "&Genealogy Enquiry..."
+            },
+            {
+              "on": "mW",
+              "json": "$.items[*].caption",
+              "contains": "Kit &Readiness..."
+            },
+            {
+              "sql": "DECLARE @m TABLE (MenuCode varchar(40), ParentMenuCode varchar(40), Caption varchar(60), FormClass varchar(80), FormArgument varchar(60), PermissionCode varchar(60), SortOrder int, Shortcut varchar(20)); INSERT @m EXEC core.usp_UiMenuLoad @UserCode = 'WHSE', @CompanyCode = 'STC', @SiteCode = 'RDG'; SELECT COUNT(*) FROM @m WHERE MenuCode IN ('KIT.MAINT', 'KIT.DEFS', 'KIT.TRIAL', 'KIT.DISASSY')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words and db/seed/85-kit-menu.sql:17-35 (captions, KIT.DEF argument, KITRP010, Ctrl+T on KIT.TRIAL) with the WHSE grants of 03-core-roles-users.sql:49 (KIT.ISSUE.POST and KIT.ENQUIRY.VIEW only); WHSE cannot see Kit Maintenance, Commercial Kit Definitions or Trial Kitting, so the routing clauses run as SYSADM who holds every row.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-010-AC1",
+          "ac": 1,
+          "title": "Kit worklist at RDG in need-date order with readiness figures; FINCLOSED listed; COMPLETE empty; gate refusal",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "w1",
+              "call": "kit_listKitWorklist",
+              "query": {
+                "site": "RDG"
+              }
+            },
+            {
+              "save": "w2",
+              "call": "kit_listKitWorklist",
+              "query": {
+                "site": "RDG",
+                "status": "COMPLETE"
+              }
+            },
+            {
+              "save": "w3",
+              "call": "kit_listKitWorklist",
+              "query": {
+                "site": "RDG"
+              },
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "w1",
+              "status": 200
+            },
+            {
+              "on": "w1",
+              "json": "$.items[0].kitRef",
+              "equals": "KIT0001005"
+            },
+            {
+              "on": "w1",
+              "json": "$.items[*].kitRef",
+              "contains": "KIT0001003"
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].kitRef",
+              "equals": "KIT0001001"
+            },
+            {
+              "on": "w1",
+              "json": "$.items[4].kitRef",
+              "equals": "KIT0001002"
+            },
+            {
+              "on": "w1",
+              "json": "$.items[5].kitRef",
+              "equals": "KIT0001004"
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].lineCount",
+              "equals": 3
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].shortLines",
+              "equals": 0
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].readyPct",
+              "equals": 100.0
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].isReady",
+              "equals": true
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].issuedQty",
+              "equals": 121.0
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].returnedQty",
+              "equals": 4.0
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].scrappedQty",
+              "equals": 1.0
+            },
+            {
+              "on": "w1",
+              "json": "$.items[3].wipValueGBP",
+              "equals": 1842.5
+            },
+            {
+              "on": "w1",
+              "json": "$.items[4].shortLines",
+              "equals": 1
+            },
+            {
+              "on": "w1",
+              "json": "$.items[4].coveredLines",
+              "equals": 2
+            },
+            {
+              "on": "w1",
+              "json": "$.items[4].readyPct",
+              "equals": 66.7
+            },
+            {
+              "on": "w1",
+              "json": "$.items[4].isReady",
+              "equals": false
+            },
+            {
+              "on": "w1",
+              "json": "$.items[5].readyPct",
+              "equals": 0.0
+            },
+            {
+              "on": "w1",
+              "json": "$.items[0].status",
+              "equals": "FINCLOSED"
+            },
+            {
+              "on": "w2",
+              "status": 200
+            },
+            {
+              "on": "w2",
+              "json": "$.count",
+              "equals": 0
+            },
+            {
+              "on": "w3",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "WHSE does not hold KIT.EXEC.CREATE"
+              }
+            }
+          ],
+          "derivation": "AC words and usp_KitEnquiry.sql:16-60 over 95-kit-demo.sql:57-108 (need dates 21/09, 26/10, 05/11, 20/11, 05/12/2026; KIT-BOMDEMO-001 of 90-bom-demo.sql also needs 26/10/2026 and interleaves beside KIT0001003, so positions 0 and 3-5 are pinned); only SYSADM holds KIT.EXEC.CREATE in the seed, WHSE does not.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-011-AC1",
+          "ac": 1,
+          "title": "Kit enquiry KIT0001001 header and lines, 404 KIT0001 with empty lines, 21 lines give 22 rows, either gate code admits",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM core.Role WHERE RoleCode = 'ZZA07KEC') INSERT core.Role (RoleCode, Name, CreatedBy) VALUES ('ZZA07KEC', 'A07 kit maintenance only', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.RolePermission WHERE RoleCode = 'ZZA07KEC' AND PermissionCode = 'KIT.EXEC.CREATE') INSERT core.RolePermission (RoleCode, PermissionCode, CreatedBy) VALUES ('ZZA07KEC', 'KIT.EXEC.CREATE', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.AppUser WHERE UserCode = 'ZZA07KEC') INSERT core.AppUser (UserCode, DisplayName, DefaultCompanyCode, DefaultSiteCode, CreatedBy) VALUES ('ZZA07KEC', 'A07 kit maintenance only', 'STC', 'RDG', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.UserRole WHERE UserCode = 'ZZA07KEC' AND RoleCode = 'ZZA07KEC') INSERT core.UserRole (UserCode, RoleCode, CompanyCode, SiteCode, ValidFrom, CreatedBy) VALUES ('ZZA07KEC', 'ZZA07KEC', 'STC', '*', '2024-04-01', 'A07');"
+            },
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'ZZA07KIT21') BEGIN INSERT kit.ExecutionKit (CompanyCode, SiteCode, KitRef, ParentItemCode, SourceDemandType, SourceDemandRef, PlannedGoodQty, CompletedGoodQty, RejectedQty, GrossStarts, YieldFactor, RunCount, NeedDate, OwnerUser, Status, WipValueGBP, IsBackflush, CreatedBy) VALUES ('STC', 'RDG', 'ZZA07KIT21', 'DEMO-B3-PARENT', 'STOCK', 'ZZA07KIT21', 1, 0, 0, 1, 1, 1, '2026-12-31', 'PLANNER', 'DRAFT', 0, 0, 'A07'); DECLARE @k bigint = SCOPE_IDENTITY(); ;WITH n AS (SELECT TOP (21) ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS LineNum FROM sys.all_objects) INSERT kit.ExecutionKitLine (ExecutionKitId, LineNum, PathRef, ComponentItemCode, UsageBasis, OriginalRequirementQty, CurrentRequirementQty, UomCode, ConversionFactor, ScrapPct, ReservedQty, PickedQty, GrossIssuedQty, ReturnedQty, ScrappedQty, NetIssuedQty, RemainingQty, ExcessQty, NeedDate, PlannedUnitCostGBP, IssuedValueGBP, Status) SELECT @k, n.LineNum, CONVERT(varchar(20), n.LineNum), 'ADHESIVE-EP420-250ML', 'PROPORTION', 1, 1, 'EA', 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, '2026-12-31', 0.45, 0, 'OPEN' FROM n; END"
+            },
+            {
+              "save": "k1",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "as": "WHSE"
+            },
+            {
+              "save": "k2",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "as": "ZZA07KEC"
+            },
+            {
+              "save": "k3",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT9999999"
+              }
+            },
+            {
+              "save": "k4",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "ZZA07KIT21"
+              }
+            },
+            {
+              "save": "k5",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "as": "SALESREP"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "k1",
+              "status": 200
+            },
+            {
+              "on": "k1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "k1",
+              "json": "$.data.status",
+              "equals": "PARTCOMPLETE"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.plannedQty",
+              "equals": 10.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.completedQty",
+              "equals": 4.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.wipValue",
+              "equals": 1842.5
+            },
+            {
+              "on": "k1",
+              "json": "$.data.ownerUser",
+              "equals": "PLANNER"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.sourceType",
+              "equals": "STOCK"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.backflush",
+              "equals": "N"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.completeness",
+              "equals": ""
+            },
+            {
+              "on": "k1",
+              "json": "$.data.shortageCnt",
+              "equals": 0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines",
+              "count": 3
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].grossIssued",
+              "equals": 20.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].returned",
+              "equals": 4.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].netIssued",
+              "equals": 16.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].remaining",
+              "equals": 4.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].excess",
+              "equals": 0.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].status",
+              "equals": "PARTISSUED"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[2].basis",
+              "equals": "FIXEDRUN"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[2].scrapped",
+              "equals": 1.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[2].netIssued",
+              "equals": 1.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[2].remaining",
+              "equals": 0.0
+            },
+            {
+              "on": "k2",
+              "status": 200
+            },
+            {
+              "on": "k3",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "KIT0001"
+              }
+            },
+            {
+              "on": "k3",
+              "json": "$.data.lines",
+              "count": 0
+            },
+            {
+              "on": "k4",
+              "status": 200
+            },
+            {
+              "on": "k4",
+              "json": "$.data.lines",
+              "count": 22
+            },
+            {
+              "on": "k4",
+              "json": "$.data.lines[19].lineNum",
+              "equals": 20
+            },
+            {
+              "on": "k4",
+              "json": "$.data.lines[20].lineNum",
+              "equals": 20
+            },
+            {
+              "on": "k4",
+              "json": "$.data.lines[21].lineNum",
+              "equals": 21
+            },
+            {
+              "on": "k5",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold KIT."
+              }
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-011 (KITCREAT ENQUIRE/GETLINE window of 20 with the 1-based restart that repeats position 20, SME-644; KITQTY LINEQTY recomputation; problem data for refusals, D-KIT-08) over 95-kit-demo.sql seed rows; ZZA07KIT21 and ZZA07KEC (KIT.EXEC.CREATE only) are arranged, WHSE holds only KIT.ISSUE.POST.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-011-EDGE-TEXT-NORMALIZATION",
+          "ac": null,
+          "title": "Kit reference of 32 characters is right-truncated to KC-KIT-REF X(30) before the lookup",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "k1",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "ZZTRUNCATEDKITREFERENCE123456789"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "k1",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "KIT0001",
+                "detailContains": "Kit ZZTRUNCATEDKITREFERENCE1234567 is not known in this company."
+              }
+            }
+          ],
+          "derivation": "Contracts 4.4 alphanumeric rule (right truncation to the field length, CobolCodec.cs:37-43) for KC-KIT-REF PIC X(30) and the KITCREAT not-found text 'Kit <ref> is not known in this company.' (spec FR-STERP-KIT-011).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-012-AC1",
+          "ac": 1,
+          "title": "Review KIT0001004 DRAFT to REVIEWED with COMPLETE, two lines and one REVIEW audit row",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "audit"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE kit.ExecutionKit SET Status = 'DRAFT', ReleasedBy = NULL, ReleasedAt = NULL WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status <> 'DRAFT';"
+            },
+            {
+              "save": "r1",
+              "call": "kit_reviewKit",
+              "path": {
+                "kitRef": "KIT0001004"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "status": 200
+            },
+            {
+              "on": "r1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r1",
+              "json": "$.data.status",
+              "equals": "REVIEWED"
+            },
+            {
+              "on": "r1",
+              "json": "$.data.prevStatus",
+              "equals": "DRAFT"
+            },
+            {
+              "on": "r1",
+              "json": "$.data.completeness",
+              "equals": "COMPLETE"
+            },
+            {
+              "on": "r1",
+              "json": "$.data.lineTotal",
+              "equals": 2
+            },
+            {
+              "sql": "SELECT Status FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004'",
+              "equals": "REVIEWED"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'KIT.EXECUTIONKIT' AND EntityKey = 'KIT0001004' AND Action = 'REVIEW' AND FieldName = 'Status' AND OldValue = 'DRAFT' AND NewValue = 'REVIEWED'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-012 (KITCREAT.cob:503-570, AUDITLOG entity KIT.EXECUTIONKIT); KIT0001004 is DRAFT with two complete lines in 95-kit-demo.sql.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-012-AC2",
+          "ac": 2,
+          "title": "Review of RELEASED KIT0001002 is refused 422 KIT0005 with the legacy text and writes nothing",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r1",
+              "call": "kit_reviewKit",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0005",
+                "detailContains": "Only a draft kit may be reviewed; this kit is RELEASED."
+              }
+            },
+            {
+              "sql": "SELECT Status FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001002'",
+              "equals": "RELEASED"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'KIT.EXECUTIONKIT' AND EntityKey = 'KIT0001002' AND Action = 'REVIEW'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words and KITCREAT.cob:503-520 (status must be DRAFT, RC 8 KIT0005).",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-012-AC3",
+          "ac": 3,
+          "title": "Review of a DRAFT kit with a cancelled zero-requirement line is 422 KIT0004; WHSE refused 403 PRM0006",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'ZZA07KIT0C') BEGIN INSERT kit.ExecutionKit (CompanyCode, SiteCode, KitRef, ParentItemCode, SourceDemandType, SourceDemandRef, PlannedGoodQty, CompletedGoodQty, RejectedQty, GrossStarts, YieldFactor, RunCount, NeedDate, OwnerUser, Status, WipValueGBP, IsBackflush, CreatedBy) VALUES ('STC', 'RDG', 'ZZA07KIT0C', 'DEMO-B4-SUB', 'STOCK', 'ZZA07KIT0C', 1, 0, 0, 1, 1, 1, '2026-12-31', 'PLANNER', 'DRAFT', 0, 0, 'A07'); DECLARE @k bigint = SCOPE_IDENTITY(); INSERT kit.ExecutionKitLine (ExecutionKitId, LineNum, PathRef, ComponentItemCode, UsageBasis, OriginalRequirementQty, CurrentRequirementQty, UomCode, ConversionFactor, ScrapPct, ReservedQty, PickedQty, GrossIssuedQty, ReturnedQty, ScrappedQty, NetIssuedQty, RemainingQty, ExcessQty, NeedDate, PlannedUnitCostGBP, IssuedValueGBP, Status) VALUES (@k, 1, '1', 'ADHESIVE-EP420-250ML', 'PROPORTION', 10, 10, 'EA', 1, 0, 0, 0, 0, 0, 0, 0, 10, 0, '2026-12-31', 0.45, 0, 'OPEN'), (@k, 2, '2', 'BAR-AL6082-25MM', 'PROPORTION', 5, 0, 'M', 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, '2026-12-31', 3.25, 0, 'CANCELLED'); END"
+            },
+            {
+              "save": "r1",
+              "call": "kit_reviewKit",
+              "path": {
+                "kitRef": "ZZA07KIT0C"
+              },
+              "body": {}
+            },
+            {
+              "save": "r2",
+              "call": "kit_reviewKit",
+              "path": {
+                "kitRef": "KIT0001004"
+              },
+              "body": {},
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0004"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'ZZA07KIT0C'",
+              "equals": "DRAFT"
+            },
+            {
+              "on": "r2",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "WHSE does not hold KIT.EXEC.CREATE"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'KIT.EXECUTIONKIT' AND EntityKey = 'KIT0001004' AND Action = 'REVIEW'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-012 (the completeness gate covers CLOSED and CANCELLED lines, SME-1868); the DRAFT kit ZZA07KIT0C with a CANCELLED line of requirement 0 is arranged.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-012-EDGE-NO-LINES",
+          "ac": null,
+          "title": "Review of a DRAFT kit without material lines is refused 422 KIT0004 with the no-lines text",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'ZZA07KITNL') BEGIN INSERT kit.ExecutionKit (CompanyCode, SiteCode, KitRef, ParentItemCode, SourceDemandType, SourceDemandRef, PlannedGoodQty, CompletedGoodQty, RejectedQty, GrossStarts, YieldFactor, RunCount, NeedDate, OwnerUser, Status, WipValueGBP, IsBackflush, CreatedBy) VALUES ('STC', 'RDG', 'ZZA07KITNL', 'DEMO-B3-PARENT', 'STOCK', 'ZZA07KITNL', 1, 0, 0, 1, 1, 1, '2026-12-31', 'PLANNER', 'DRAFT', 0, 0, 'A07'); DECLARE @k bigint = SCOPE_IDENTITY(); SET @k = @k; END"
+            },
+            {
+              "save": "r1",
+              "call": "kit_reviewKit",
+              "path": {
+                "kitRef": "ZZA07KITNL"
+              },
+              "body": {}
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0004",
+                "detailContains": "This kit has no material requirement lines."
+              }
+            },
+            {
+              "sql": "SELECT Status FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'ZZA07KITNL'",
+              "equals": "DRAFT"
+            }
+          ],
+          "derivation": "Spec FR-STERP-KIT-012 and section 10 edge 'no lines' (KITCREAT REVIEW line-completeness gate, RC 8 KIT0004); the header-only DRAFT kit is arranged.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-013-AC1",
+          "ac": 1,
+          "title": "Release KIT0001004 without KIT.EXEC.RELEASE: 202 HOLD KIT0009 needsAuth Y and the kit is nevertheless released",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "audit"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE kit.ExecutionKit SET Status = 'DRAFT', ReleasedBy = NULL, ReleasedAt = NULL WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status <> 'DRAFT';"
+            },
+            {
+              "save": "r1",
+              "call": "kit_releaseKit",
+              "path": {
+                "kitRef": "KIT0001004"
+              },
+              "body": {},
+              "idempotencyKey": "A07-KIT013-REL-1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "status": 202
+            },
+            {
+              "on": "r1",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "KIT0009",
+                "messageContains": "KIT.EXEC.RELEASE"
+              }
+            },
+            {
+              "on": "r1",
+              "json": "$.data.needsAuth",
+              "equals": "Y"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status = 'RELEASED' AND ReleasedBy = 'SYSADM' AND SupplyChoiceNote LIKE 'Released from bill %'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'KIT.EXECUTIONKIT' AND EntityKey = 'KIT0001004' AND Action = 'RELEASE'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-013 (KITCREAT.cob:576-680, RC 6 is not CA-FAILED so the release continues, BR-KITCREAT-026/D-KIT-09); KIT.EXEC.RELEASE is not in the seeded permission catalogue, so SYSADM (holder of the gate code KIT.EXEC.CREATE) lacks it.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-013-AC2",
+          "ac": 2,
+          "title": "Release KIT0001004 by a holder of KIT.EXEC.RELEASE: 200 RC 0 RELEASED from DRAFT with freeze note and audit row",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "audit"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM core.Permission WHERE PermissionCode = 'KIT.EXEC.RELEASE') INSERT core.Permission (PermissionCode, Module, Name, IsSensitive, IsApproval, CreatedBy) VALUES ('KIT.EXEC.RELEASE', 'KIT', 'Release an execution kit', 0, 1, 'A07'); IF NOT EXISTS (SELECT 1 FROM core.Role WHERE RoleCode = 'ZZA07REL') INSERT core.Role (RoleCode, Name, CreatedBy) VALUES ('ZZA07REL', 'A07 kit release authority', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.RolePermission WHERE RoleCode = 'ZZA07REL' AND PermissionCode = 'KIT.EXEC.CREATE') INSERT core.RolePermission (RoleCode, PermissionCode, CreatedBy) VALUES ('ZZA07REL', 'KIT.EXEC.CREATE', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.RolePermission WHERE RoleCode = 'ZZA07REL' AND PermissionCode = 'KIT.EXEC.RELEASE') INSERT core.RolePermission (RoleCode, PermissionCode, CreatedBy) VALUES ('ZZA07REL', 'KIT.EXEC.RELEASE', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.AppUser WHERE UserCode = 'ZZA07REL') INSERT core.AppUser (UserCode, DisplayName, DefaultCompanyCode, DefaultSiteCode, CreatedBy) VALUES ('ZZA07REL', 'A07 kit release authority', 'STC', 'RDG', 'A07'); IF NOT EXISTS (SELECT 1 FROM core.UserRole WHERE UserCode = 'ZZA07REL' AND RoleCode = 'ZZA07REL') INSERT core.UserRole (UserCode, RoleCode, CompanyCode, SiteCode, ValidFrom, CreatedBy) VALUES ('ZZA07REL', 'ZZA07REL', 'STC', '*', '2024-04-01', 'A07');"
+            },
+            {
+              "sql": "SET NOCOUNT ON; UPDATE kit.ExecutionKit SET Status = 'DRAFT', ReleasedBy = NULL, ReleasedAt = NULL WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status <> 'DRAFT';"
+            },
+            {
+              "save": "r1",
+              "call": "kit_releaseKit",
+              "path": {
+                "kitRef": "KIT0001004"
+              },
+              "body": {},
+              "as": "ZZA07REL",
+              "idempotencyKey": "A07-KIT013-REL-2"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "status": 200
+            },
+            {
+              "on": "r1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "r1",
+              "json": "$.data.status",
+              "equals": "RELEASED"
+            },
+            {
+              "on": "r1",
+              "json": "$.data.prevStatus",
+              "equals": "DRAFT"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status = 'RELEASED' AND ReleasedBy = 'ZZA07REL' AND SupplyChoiceNote LIKE 'Released from bill %'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'KIT.EXECUTIONKIT' AND EntityKey = 'KIT0001004' AND Action = 'RELEASE' AND OldValue = 'DRAFT' AND NewValue = 'RELEASED'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-013 (HDRFRZ note 'Released from bill <rev> selected at <date>', HDRSTAT ReleasedBy); the release permission and user ZZA07REL are arranged because no seeded role holds KIT.EXEC.RELEASE.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-013-AC3",
+          "ac": 3,
+          "title": "Release of FINCLOSED KIT0001005 is 422 KIT0005; WHSE without KIT.EXEC.CREATE is refused 403 PRM0006",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r1",
+              "call": "kit_releaseKit",
+              "path": {
+                "kitRef": "KIT0001005"
+              },
+              "body": {}
+            },
+            {
+              "save": "r2",
+              "call": "kit_releaseKit",
+              "path": {
+                "kitRef": "KIT0001004"
+              },
+              "body": {},
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0005",
+                "detailContains": "A kit in status FINCLOSED cannot be released."
+              }
+            },
+            {
+              "sql": "SELECT Status FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001005'",
+              "equals": "FINCLOSED"
+            },
+            {
+              "on": "r2",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "WHSE does not hold KIT.EXEC.CREATE"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'KIT.EXECUTIONKIT' AND Action = 'RELEASE' AND EntityKey IN ('KIT0001004', 'KIT0001005')",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words and KITCREAT.cob:576-600 (status must be REVIEWED or DRAFT) with contracts 5.4 gate KIT.EXEC.CREATE.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-014-AC1",
+          "ac": 1,
+          "title": "Kind check: COMMERCIAL N with reason, blank parent KIT0003, unknown 404, stocked Y, non-stocked RC 4 KIT0006, gate",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "k1",
+              "call": "kit_checkKitKind",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "body": {
+                "kitKind": "COMMERCIAL",
+                "parentItem": "DEMO-B3-PARENT"
+              }
+            },
+            {
+              "save": "k2",
+              "call": "kit_checkKitKind",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "body": {
+                "kitKind": "",
+                "parentItem": ""
+              }
+            },
+            {
+              "save": "k3",
+              "call": "kit_checkKitKind",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "body": {
+                "kitKind": "",
+                "parentItem": "ZZ-NO-SUCH-ITEM"
+              }
+            },
+            {
+              "save": "k4",
+              "call": "kit_checkKitKind",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "body": {
+                "kitKind": "",
+                "parentItem": "DEMO-B3-PARENT"
+              }
+            },
+            {
+              "save": "k5",
+              "call": "kit_checkKitKind",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "body": {
+                "kitKind": "",
+                "parentItem": "DEMO-SERVICE"
+              }
+            },
+            {
+              "save": "k6",
+              "call": "kit_checkKitKind",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "body": {
+                "kitKind": "",
+                "parentItem": "DEMO-B3-PARENT"
+              },
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "k1",
+              "status": 200
+            },
+            {
+              "on": "k1",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "k1",
+              "json": "$.data.mayReceive",
+              "equals": "N"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.reasonText",
+              "equals": "A commercial kit parent is a commercial identity, not an item balance."
+            },
+            {
+              "on": "k2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0003"
+              }
+            },
+            {
+              "on": "k3",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "KIT0001"
+              }
+            },
+            {
+              "on": "k4",
+              "status": 200
+            },
+            {
+              "on": "k4",
+              "json": "$.data.mayReceive",
+              "equals": "Y"
+            },
+            {
+              "on": "k5",
+              "status": 200
+            },
+            {
+              "on": "k5",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "KIT0006"
+              }
+            },
+            {
+              "on": "k5",
+              "json": "$.data.mayReceive",
+              "equals": "N"
+            },
+            {
+              "on": "k6",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "WHSE does not hold KIT.EXEC.CREATE"
+              }
+            }
+          ],
+          "derivation": "AC words and KITCREAT.cob:119-175 (KINDCHK evaluation order); DEMO-B3-PARENT is MADE and stocked and DEMO-SERVICE is a non-stocked SERVICE item in 30-bom-items.sql; item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-020",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-020-AC1",
+          "ac": 1,
+          "title": "Trial kitting: KIT0003 for blank parent and zero quantity; feasible and short answers; repeat writes nothing; gate",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "permission",
+            "error-mapping",
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "save": "t1",
+              "call": "kit_runTrialKitting",
+              "body": {
+                "kitRef": "",
+                "parentItem": "",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 1,
+                "reqDate": "2026-10-12",
+                "useInbound": "N",
+                "useSubassy": "N"
+              }
+            },
+            {
+              "save": "t2",
+              "call": "kit_runTrialKitting",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-B3-PARENT",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 0,
+                "reqDate": "2026-10-12",
+                "useInbound": "N",
+                "useSubassy": "N"
+              }
+            },
+            {
+              "save": "t3",
+              "call": "kit_runTrialKitting",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-FRAME",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 1,
+                "reqDate": "2026-10-12",
+                "useInbound": "N",
+                "useSubassy": "N"
+              }
+            },
+            {
+              "save": "t4",
+              "call": "kit_runTrialKitting",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-FRAME",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 1,
+                "reqDate": "2026-10-12",
+                "useInbound": "N",
+                "useSubassy": "N"
+              }
+            },
+            {
+              "save": "t5",
+              "call": "kit_runTrialKitting",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-FRAME",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 100000,
+                "reqDate": "2026-10-12",
+                "useInbound": "N",
+                "useSubassy": "N"
+              }
+            },
+            {
+              "save": "t6",
+              "call": "kit_runTrialKitting",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-B3-PARENT",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 1,
+                "reqDate": "2026-10-12",
+                "useInbound": "N",
+                "useSubassy": "N"
+              },
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "t1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0003",
+                "detailContains": "A parent item is required for a trial."
+              }
+            },
+            {
+              "on": "t2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0003",
+                "detailContains": "The requested quantity must be greater than zero."
+              }
+            },
+            {
+              "on": "t3",
+              "status": 200
+            },
+            {
+              "on": "t3",
+              "json": "$.data.committed",
+              "equals": "N"
+            },
+            {
+              "on": "t4",
+              "status": 200
+            },
+            {
+              "on": "t4",
+              "json": "$.data.committed",
+              "equals": "N"
+            },
+            {
+              "on": "t5",
+              "status": 200
+            },
+            {
+              "on": "t5",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "KIT0010"
+              }
+            },
+            {
+              "on": "t5",
+              "json": "$.data.feasible",
+              "equals": "N"
+            },
+            {
+              "on": "t5",
+              "json": "$.data.actionHint",
+              "equals": "REDUCE, SUBSTITUTE OR ORDER"
+            },
+            {
+              "on": "t5",
+              "json": "$.data.limitingItem",
+              "matches": "\\S"
+            },
+            {
+              "sql": "SELECT (SELECT COUNT(*) FROM kit.TrialKit) + (SELECT COUNT(*) FROM kit.TrialKitLine)",
+              "equals": 0
+            },
+            {
+              "on": "t6",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "WHSE does not hold KIT.TRIAL.RUN"
+              }
+            }
+          ],
+          "derivation": "AC words and KITTRIAL.cob:116-210,286-605 (KIT0003 texts, feasible RC 0 'RELEASE OR RESERVE', shortage RC 4 KIT0010 'REDUCE, SUBSTITUTE OR ORDER', committed always N, nothing written); DEMO-FRAME's free stock (90-bom-demo.sql B2 balances) cannot be shown to cover a whole parent without the BOMEXPL/AVAILQ oracle, so the feasible answer of t3/t4 is pinned only to status and committed N, and the per-line 'allocated = netReq' is not exposed by the binding KitTrialResult schema.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-KIT-020-EDGE-NUMERIC-SCALE",
+          "ac": null,
+          "title": "Trial quantity 0.0000004 rounds to 0.000000 and is refused KIT0003; 0.0000005 rounds to 0.000001",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "t1",
+              "call": "kit_runTrialKitting",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-FRAME",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 0.0000004,
+                "reqDate": "2026-10-12",
+                "useInbound": "N",
+                "useSubassy": "N"
+              }
+            },
+            {
+              "save": "t2",
+              "call": "kit_runTrialKitting",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-FRAME",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 0.0000005,
+                "reqDate": "2026-10-12",
+                "useInbound": "N",
+                "useSubassy": "N"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "t1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0003",
+                "detailContains": "The requested quantity must be greater than zero."
+              }
+            },
+            {
+              "on": "t2",
+              "json": "$.data.requestedQty",
+              "equals": 0.000001
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-with-scale rule (round half away from zero to the field scale, CobolCodec.cs:24-29) for KT-REQUESTED-QTY PIC S9(13)V9(6) (x-sterp-scale 6); the trial summary is returned in the envelope or as problem data.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-021",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-021-AC1",
+          "ac": 1,
+          "title": "Maximum build: requestedQty 0 is KIT0003 before any explosion; a positive seed answers a whole maxBuildable; no row",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "m1",
+              "call": "kit_runMaxBuildTrial",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-B3-PARENT",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 0,
+                "reqDate": "2026-10-12",
+                "useInbound": "N"
+              }
+            },
+            {
+              "save": "m2",
+              "call": "kit_runMaxBuildTrial",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-FRAME",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 1,
+                "reqDate": "2026-10-12",
+                "useInbound": "N"
+              }
+            },
+            {
+              "save": "m3",
+              "call": "kit_runMaxBuildTrial",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-B3-PARENT",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 0,
+                "reqDate": "2026-10-12",
+                "useInbound": "N"
+              },
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "m1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0003",
+                "detailContains": "The requested quantity must be greater than zero."
+              }
+            },
+            {
+              "on": "m2",
+              "status": 200
+            },
+            {
+              "on": "m2",
+              "json": "$.data.maxBuildable",
+              "gte": 0
+            },
+            {
+              "on": "m2",
+              "json": "$.data.committed",
+              "equals": "N"
+            },
+            {
+              "sql": "SELECT (SELECT COUNT(*) FROM kit.TrialKit) + (SELECT COUNT(*) FROM kit.TrialKitLine)",
+              "equals": 0
+            },
+            {
+              "on": "m3",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "WHSE does not hold KIT.TRIAL.RUN"
+              }
+            }
+          ],
+          "derivation": "AC words and KITTRIAL.cob:143-156,218-282 (MAXBUILD refuses a non-positive seed, doubles then bisects on integers, SME-648); the seed has no linear bill whose limiting component supports exactly 7 parents, so the 7.000000 example would need an arranged bill and stock and only the whole-number answer is pinned.",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-KIT-021-EDGE-NUMERIC-MAGNITUDE",
+          "ac": null,
+          "title": "Max-build quantity 10000000000000 keeps the low-order 13 integer digits (0) and is refused KIT0003",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "numeric-magnitude"
+          ],
+          "steps": [
+            {
+              "save": "m1",
+              "call": "kit_runMaxBuildTrial",
+              "body": {
+                "kitRef": "",
+                "parentItem": "DEMO-FRAME",
+                "parentRev": "",
+                "site": "RDG",
+                "requestedQty": 10000000000000,
+                "reqDate": "2026-10-12",
+                "useInbound": "N"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "m1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0003",
+                "detailContains": "The requested quantity must be greater than zero."
+              }
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-too-large rule (high-order truncation, CobolCodec.cs:76-79) for KT-REQUESTED-QTY PIC S9(13)V9(6): 14 integer digits leave 0, which KITTRIAL MAXBUILD refuses before any search (KITTRIAL.cob:143-156).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-030",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-030-AC1",
+          "ac": 1,
+          "title": "Issue to DRAFT KIT0001004 is refused 422 KIT0005 with no movement",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE kit.ExecutionKit SET Status = 'DRAFT', ReleasedBy = NULL, ReleasedAt = NULL WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status <> 'DRAFT';"
+            },
+            {
+              "save": "i1",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001004"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 1,
+                "location": "",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-KIT030-DRAFT"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "i1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0005",
+                "detailContains": "Material cannot be issued to a kit in status DRAFT."
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitIssue WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CorrelationId LIKE 'A07-KIT030-DRAFT%'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words and KITISSUE.cob:148-217 (kit status must be RELEASED/PARTISSUED/ISSUED/PARTCOMPLETE); item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-030-AC2",
+          "ac": 2,
+          "title": "Issue check and issue on KIT0001002 line 1, KIT0003, KIT0008, overissue KIT0022, shortage KIT0010 exception, gate",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "permission",
+            "error-mapping",
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "save": "c1",
+              "call": "kit_checkComponentIssue",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 10,
+                "location": "CONSUM",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              }
+            },
+            {
+              "save": "x1",
+              "sql": "SELECT (SELECT COUNT(*) FROM kit.KitIssue WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001002') + (SELECT COUNT(*) FROM inv.StockMovement WHERE SourceDocRef = 'KIT0001002') AS n"
+            },
+            {
+              "save": "i1",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 10,
+                "location": "CONSUM",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-KIT030-ISS-01"
+            },
+            {
+              "save": "i2",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 0,
+                "location": "",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-KIT030-ISS-02"
+            },
+            {
+              "save": "i3",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 3,
+                "itemCode": "BAR-SS316-12MM",
+                "lotCode": "L26001-1612MM",
+                "serialNo": "",
+                "quantity": 2,
+                "location": "RAW01",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-KIT030-ISS-03"
+            },
+            {
+              "save": "i4",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 3,
+                "itemCode": "BAR-SS316-12MM",
+                "lotCode": "L26001-1612MM",
+                "serialNo": "",
+                "quantity": 2,
+                "location": "RAW01",
+                "reasonCode": "OVERISSUE",
+                "reasonText": "Bar damaged in machining",
+                "allowOver": "Y"
+              },
+              "idempotencyKey": "A07-KIT030-ISS-04"
+            },
+            {
+              "save": "c2",
+              "call": "kit_checkComponentIssue",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 2,
+                "itemCode": "BAR-AL6082-25MM",
+                "lotCode": "L26001-8225MM",
+                "serialNo": "",
+                "quantity": 500,
+                "location": "",
+                "reasonCode": "OVERISSUE",
+                "reasonText": "Shortage probe",
+                "allowOver": "Y"
+              }
+            },
+            {
+              "save": "x2",
+              "sql": "SELECT COUNT(*) AS n FROM core.ExceptionItem WHERE CompanyCode = 'STC' AND Module = 'KIT' AND Category = 'KIT MATERIAL SHORTAGE'"
+            },
+            {
+              "save": "i5",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 2,
+                "itemCode": "BAR-AL6082-25MM",
+                "lotCode": "L26001-8225MM",
+                "serialNo": "",
+                "quantity": 500,
+                "location": "",
+                "reasonCode": "OVERISSUE",
+                "reasonText": "Shortage probe",
+                "allowOver": "Y"
+              },
+              "idempotencyKey": "A07-KIT030-ISS-05"
+            },
+            {
+              "save": "c3",
+              "call": "kit_checkComponentIssue",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 10,
+                "location": "CONSUM",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "as": "SALESREP"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "c1",
+              "status": 200
+            },
+            {
+              "on": "c1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "c1",
+              "json": "$.data.impactText",
+              "equals": "Issue would be accepted."
+            },
+            {
+              "on": "x1",
+              "json": "$[0].n",
+              "equals": 0
+            },
+            {
+              "on": "i1",
+              "status": 200
+            },
+            {
+              "on": "i1",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "i1",
+              "json": "$.data.lineGross",
+              "equals": 10.0
+            },
+            {
+              "on": "i1",
+              "json": "$.data.lineStatus",
+              "equals": "PARTISSUED"
+            },
+            {
+              "on": "i1",
+              "json": "$.data.kitStatus",
+              "equals": "PARTISSUED"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CorrelationId = 'A07-KIT030-ISS-01-L0001' AND MovementType = 'ISSUE'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitIssue WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001002' AND LineNum = 1 AND IssueType = 'ISSUE' AND Quantity = 10",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.ExecutionKitLine l JOIN kit.ExecutionKit k ON k.ExecutionKitId = l.ExecutionKitId WHERE k.CompanyCode = 'STC' AND k.KitRef = 'KIT0001002' AND k.Status = 'PARTISSUED' AND l.LineNum = 1 AND l.GrossIssuedQty = 10 AND l.Status = 'PARTISSUED'",
+              "equals": 1
+            },
+            {
+              "on": "i2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0003"
+              }
+            },
+            {
+              "on": "i3",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0008"
+              }
+            },
+            {
+              "on": "i4",
+              "status": 200
+            },
+            {
+              "on": "i4",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "KIT0022"
+              }
+            },
+            {
+              "on": "c2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0010"
+              }
+            },
+            {
+              "on": "x2",
+              "json": "$[0].n",
+              "equals": 0
+            },
+            {
+              "on": "i5",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0010"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE CompanyCode = 'STC' AND Module = 'KIT' AND Category = 'KIT MATERIAL SHORTAGE'",
+              "equals": 1
+            },
+            {
+              "on": "c3",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold KIT.ISSUE.POST"
+              }
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-030 (KITISSUE.cob:221-672: check stops with 'Issue would be accepted.', STKMOVE correlation = first 30 characters of the key + '-L' + 4-digit line, overissue without reason KIT0008, with reason and allow-over RC 6 replaced by RC 4 KIT0022, eligible < quantity KIT0010 raising one KIT MATERIAL SHORTAGE exception outside CHECK); the seeded components are lot-traced, so the body carries the first accepted lot; item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula. The issue posts through STKMOVE with KS-LOCATION as SM-LOCATION (KITISSUE.cob:460; KitExecutionService.vb:63) and STKMOVE refuses a blank location with STK0002 (STKMOVE.cob:208-214), so the check, the issue and the gate probe on line 1 carry the lot's bin CONSUM and the overissue pair on line 3 the bin RAW01 (fresh balances); the legacy route (KITISSUECA built as KitExecutionService.Issue builds it, Idempotency-Key as correlation id) observed STK0002 for i1 and i4 with blank locations and, with the bins, every expectation above except the target-only gate (amendment evidence p4/runs/rg025-kit030-authored-legacy-route.txt, rg025-kit030-amended-legacy-route.txt). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-025: supply the stock location so the issue reaches STKMOVE ISSUE]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-031",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-031-AC1",
+          "ac": 1,
+          "title": "Backflush of KIT0001001 (IsBackflush 0) is refused 422 KIT0013 and writes nothing",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "b1",
+              "call": "kit_backflushKit",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "body": {
+                "goodQty": 1
+              },
+              "idempotencyKey": "A07-KIT031-BF-1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "b1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0013"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitIssue WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001001' AND IssueType = 'BACKFLUSH'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words and KITISSUE.cob:681-720 (kit not flagged RC 8 KIT0013); KIT0001001 IsBackflush 0 in 95-kit-demo.sql.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-031-AC2",
+          "ac": 2,
+          "title": "Backflush of KIT0001003 with good quantity 0 is refused 422 KIT0003 with the legacy text",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "b1",
+              "call": "kit_backflushKit",
+              "path": {
+                "kitRef": "KIT0001003"
+              },
+              "body": {
+                "goodQty": 0
+              },
+              "idempotencyKey": "A07-KIT031-BF-2"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "b1",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0003",
+                "detailContains": "A good parent quantity is required to backflush."
+              }
+            }
+          ],
+          "derivation": "AC words and KITISSUE.cob:681-730 (good quantity <= 0 RC 8 KIT0003); KIT0001003 is PARTISSUED with IsBackflush 1.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-031-AC3",
+          "ac": 3,
+          "title": "Backflush KIT0001003 good 1 issues 4 and 2 as BACKFLUSH rows; a short component refuses with no movement; gate",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE inv.Item SET TraceabilityType = 'NONE' WHERE CompanyCode = 'STC' AND ItemCode IN ('ADHESIVE-EP420-250ML', 'BAR-AL6082-25MM'); MERGE inv.StockBalance AS t USING (VALUES ('ADHESIVE-EP420-250ML', 100.000000), ('BAR-AL6082-25MM', 100.000000)) AS s (ItemCode, Qty) ON t.CompanyCode = 'STC' AND t.SiteCode = 'RDG' AND t.WarehouseCode = 'MAIN' AND t.LocationCode = 'RAW01' AND t.ItemCode = s.ItemCode AND t.LotCode = '' AND t.SerialNo = '' AND t.OwnerType = 'OWNED' AND t.QualityStatus = 'ACCEPTED' WHEN MATCHED THEN UPDATE SET QtyOnHand = s.Qty, QtyReserved = 0 WHEN NOT MATCHED THEN INSERT (CompanyCode, SiteCode, WarehouseCode, LocationCode, ItemCode, Revision, LotCode, SerialNo, OwnerType, OwnerCode, QualityStatus, QtyOnHand, QtyReserved, LastMovementAt) VALUES ('STC', 'RDG', 'MAIN', 'RAW01', s.ItemCode, ISNULL((SELECT CurrentRevision FROM inv.Item WHERE CompanyCode = 'STC' AND ItemCode = s.ItemCode), ''), '', '', 'OWNED', '', 'ACCEPTED', s.Qty, 0, SYSDATETIME());"
+            },
+            {
+              "save": "b1",
+              "call": "kit_backflushKit",
+              "path": {
+                "kitRef": "KIT0001003"
+              },
+              "body": {
+                "goodQty": 1
+              },
+              "idempotencyKey": "A07-KIT031-BF-3"
+            },
+            {
+              "sql": "SET NOCOUNT ON; UPDATE inv.StockBalance SET QtyOnHand = CASE WHEN WarehouseCode = 'MAIN' AND LocationCode = 'RAW01' AND LotCode = '' AND SerialNo = '' THEN 1 ELSE 0 END WHERE CompanyCode = 'STC' AND SiteCode = 'RDG' AND ItemCode = 'ADHESIVE-EP420-250ML';"
+            },
+            {
+              "save": "b2",
+              "call": "kit_backflushKit",
+              "path": {
+                "kitRef": "KIT0001003"
+              },
+              "body": {
+                "goodQty": 1
+              },
+              "idempotencyKey": "A07-KIT031-BF-4"
+            },
+            {
+              "save": "b3",
+              "call": "kit_backflushKit",
+              "path": {
+                "kitRef": "KIT0001003"
+              },
+              "body": {
+                "goodQty": 1
+              },
+              "as": "SALESREP",
+              "idempotencyKey": "A07-KIT031-BF-5"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "b1",
+              "status": 200
+            },
+            {
+              "on": "b1",
+              "json": "$.data.impactText",
+              "equals": "Backflush issued 0002 component line(s) once for the good output."
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitIssue WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001003' AND IssueType = 'BACKFLUSH' AND LineNum = 1 AND Quantity = 4",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitIssue WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001003' AND IssueType = 'BACKFLUSH' AND LineNum = 2 AND Quantity = 2",
+              "equals": 1
+            },
+            {
+              "on": "b2",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0010"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitIssue WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001003' AND IssueType = 'BACKFLUSH'",
+              "equals": 2
+            },
+            {
+              "on": "b3",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold KIT.ISSUE.POST"
+              }
+            }
+          ],
+          "derivation": "AC words and KITISSUE.cob:681-957 (PROPORTION quantity round6(round6(32/8) x 1) = 4 capped at 8 and round6(16/8) x 1 = 2 capped at 2, BACKFLUSH rows, pass-1 refusal 'Backflush refused...' without movement); the seeded components are lot-traced, so they are arranged untraced with untraced RAW01 stock, and the second run refuses on the remaining line 1 after its stock is cut to 1 untraced EA at RAW01 (4 still owed); item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula. With no adhesive stock at all AVAILQ answers RC 16 AVL0001 'No stock ... is recorded in that scope' (AVAILQ.cob:571-580), which BACKFLSH copies (KITISSUE.cob:820-826) and the API maps to 404, so the shortage needs some stock below the requirement; the legacy route (KITISSUE BACKFLSH built as KitExecutionService.Backflush builds it) observed b1 'Backflush issued 0002 component line(s) once for the good output.' with BACKFLUSH rows 4 and 2, and b2 RC 8 KIT0010 'Insufficient eligible stock: short by 3.000000. ...' with impactText 'Backflush refused: no material was issued and no parent was received. First failure on ADHESIVE-EP420-250ML.', no movement and no exception (amendment evidence p4/runs/rg026-kit031-authored-legacy-route.txt, rg026-kit031-amended-legacy-route.txt). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-026: leave 1 EA so the refusal is the KIT0010 shortage, not 404 AVL0001]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-032",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-032-AC1",
+          "ac": 1,
+          "title": "Kit cost position of KIT0001001 (planned 135.00 ... variance -13.00, reconciled Y); unknown kit 404; variance view; gate",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "c1",
+              "call": "kit_getKitCost",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "query": {
+                "costSet": "STANDARD"
+              }
+            },
+            {
+              "save": "c2",
+              "call": "kit_getKitCost",
+              "path": {
+                "kitRef": "KIT9999999"
+              },
+              "query": {
+                "costSet": "STANDARD"
+              }
+            },
+            {
+              "save": "c3",
+              "call": "kit_getKitCost",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "query": {
+                "costSet": "STANDARD",
+                "varianceOnly": "Y"
+              }
+            },
+            {
+              "save": "c4",
+              "call": "kit_getKitCost",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "query": {
+                "costSet": "STANDARD"
+              },
+              "as": "SALESREP"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "c1",
+              "status": 200
+            },
+            {
+              "on": "c1",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "c1",
+              "json": "$.data.plannedGbp",
+              "equals": 135.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.issuedGbp",
+              "equals": 135.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.returnedGbp",
+              "equals": 13.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.scrappedGbp",
+              "equals": 25.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.absorbedGbp",
+              "equals": 0.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.completedGbp",
+              "equals": 48.8
+            },
+            {
+              "on": "c1",
+              "json": "$.data.residualGbp",
+              "equals": 73.2
+            },
+            {
+              "on": "c1",
+              "json": "$.data.varianceGbp",
+              "equals": -13.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.reconciled",
+              "equals": "Y"
+            },
+            {
+              "on": "c2",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "KIT0001"
+              }
+            },
+            {
+              "on": "c2",
+              "json": "$.data.elements",
+              "count": 0
+            },
+            {
+              "on": "c3",
+              "status": 200
+            },
+            {
+              "on": "c3",
+              "json": "$.data.plannedGbp",
+              "equals": 135.0
+            },
+            {
+              "on": "c3",
+              "json": "$.data.issuedGbp",
+              "equals": 135.0
+            },
+            {
+              "on": "c3",
+              "json": "$.data.returnedGbp",
+              "equals": 13.0
+            },
+            {
+              "on": "c3",
+              "json": "$.data.scrappedGbp",
+              "equals": 25.0
+            },
+            {
+              "on": "c3",
+              "json": "$.data.absorbedGbp",
+              "equals": 0.0
+            },
+            {
+              "on": "c3",
+              "json": "$.data.completedGbp",
+              "equals": 48.8
+            },
+            {
+              "on": "c3",
+              "json": "$.data.residualGbp",
+              "equals": 73.2
+            },
+            {
+              "on": "c3",
+              "json": "$.data.varianceGbp",
+              "equals": -13.0
+            },
+            {
+              "on": "c4",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold KIT.ISSUE.POST"
+              }
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-032 (KITCOST.cob:90-579) over 95-kit-demo.sql:91-153: planned 45.00+65.00+25.00, ISSUE 135.00, RETURN 4 x 3.25, SCRAP 1 x 25.00, completed (135.00-13.00) x 4/10 = 48.80 without a COMPLETE row, residual 73.20, variance 122.00-135.00; seeded postings are dated 01/10/2026 and the business date is 12/10/2026.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-KIT-032-EDGE-DATE-BOUNDARY",
+          "ac": null,
+          "title": "Cost as at 30/09/2026, the day before the seeded postings, shows no actuals and variance -135.00",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-09-30",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "c1",
+              "call": "kit_getKitCost",
+              "path": {
+                "kitRef": "KIT0001001"
+              },
+              "query": {
+                "costSet": "STANDARD"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "c1",
+              "status": 200
+            },
+            {
+              "on": "c1",
+              "json": "$.data.plannedGbp",
+              "equals": 135.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.issuedGbp",
+              "equals": 0.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.returnedGbp",
+              "equals": 0.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.scrappedGbp",
+              "equals": 0.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.completedGbp",
+              "equals": 0.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.residualGbp",
+              "equals": 0.0
+            },
+            {
+              "on": "c1",
+              "json": "$.data.varianceGbp",
+              "equals": -135.0
+            }
+          ],
+          "derivation": "Spec FR-STERP-KIT-032 (actuals = kit.KitIssue with PostingDate <= as-at = business date) and contracts 4.4 date marshalling: the 95-kit-demo.sql movements are posted 01/10/2026, so as at 30/09/2026 only the planned 135.00 remains.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-033",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-033-AC1",
+          "ac": 1,
+          "title": "Commercial sets for an execution-kit parent without a definition: 404 KIT0001 with the legacy text",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "s1",
+              "call": "kit_checkCommercialKitSets",
+              "path": {
+                "kitItem": "DEMO-B3-PARENT"
+              },
+              "query": {
+                "kitVersion": "",
+                "orderRef": "KIT0001001",
+                "orderLine": 0,
+                "parentQty": 1
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "s1",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "KIT0001",
+                "detailContains": "No released commercial kit definition for DEMO-B3-PARENT is effective on this date."
+              }
+            },
+            {
+              "on": "s1",
+              "json": "$.data.lines",
+              "count": 0
+            }
+          ],
+          "derivation": "AC words and KITCOMM.cob:104-216 (no released definition effective at the as-at date RC 16 KIT0001); the seeded execution-kit parents are MADE items without kit.KitDefinition rows; item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-KIT-033-AC2",
+          "ac": 2,
+          "title": "Commercial sets of version A of KIT-BUILD-GRAVEL-M: three lines, parentStock N; gate refusal without KIT.EXEC.CREATE",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "s1",
+              "call": "kit_checkCommercialKitSets",
+              "path": {
+                "kitItem": "KIT-BUILD-GRAVEL-M"
+              },
+              "query": {
+                "kitVersion": "",
+                "orderRef": "KIT0001001",
+                "orderLine": 0,
+                "parentQty": 1
+              }
+            },
+            {
+              "save": "s2",
+              "call": "kit_checkCommercialKitSets",
+              "path": {
+                "kitItem": "KIT-BUILD-GRAVEL-M"
+              },
+              "query": {
+                "kitVersion": "",
+                "orderRef": "KIT0001001",
+                "orderLine": 0,
+                "parentQty": 1
+              },
+              "as": "WHSE"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "s1",
+              "json": "$.data.kitVersion",
+              "equals": "A"
+            },
+            {
+              "on": "s1",
+              "json": "$.data.parentStock",
+              "equals": "N"
+            },
+            {
+              "on": "s1",
+              "json": "$.data.lineCnt",
+              "equals": 3
+            },
+            {
+              "on": "s1",
+              "json": "$.data.lines[0].qtyPer",
+              "equals": 10
+            },
+            {
+              "on": "s1",
+              "json": "$.data.lines[1].qtyPer",
+              "equals": 4
+            },
+            {
+              "on": "s1",
+              "json": "$.data.lines[2].qtyPer",
+              "equals": 1
+            },
+            {
+              "on": "s2",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "WHSE does not hold KIT.EXEC.CREATE"
+              }
+            }
+          ],
+          "derivation": "AC words and 95-kit-demo.sql:211-252 (version A of the first KIT-class STC item, quantities per set 10, 4, 1); completeSets = min INTEGER(free / quantity per) and the mayDespatch/KIT0020 branch depend on AVAILQ free stock of the lot-traced components, which cannot be derived as literals, so the sets figure and outcome are not pinned.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-034",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-034-AC1",
+          "ac": 1,
+          "title": "Genealogy: FORWARD from LOT-FRM-2609 shows the substitute, BACKWARD from LOT-SUB-2610, KIT0012, 404 KIT0026, WHEREUSD",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "QUALITY"
+          },
+          "covers": [
+            "permission",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "t1",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "FORWARD",
+                "itemCode": "DEMO-B3-PARENT",
+                "lotCode": "LOT-FRM-2609",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              }
+            },
+            {
+              "save": "t2",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "BACKWARD",
+                "itemCode": "WIRE-TIG-4043-5KG",
+                "lotCode": "LOT-SUB-2610",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              }
+            },
+            {
+              "save": "t3",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "FORWARD",
+                "itemCode": "",
+                "lotCode": "",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              }
+            },
+            {
+              "save": "t4",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "FORWARD",
+                "itemCode": "ZZ-NO-GENEALOGY",
+                "lotCode": "",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              }
+            },
+            {
+              "save": "t5",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "xyz",
+                "itemCode": "DEMO-B3-PARENT",
+                "lotCode": "LOT-FRM-2609",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              }
+            },
+            {
+              "save": "t6",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "WHEREUSD",
+                "itemCode": "BAR-AL6082-25MM",
+                "lotCode": "",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              }
+            },
+            {
+              "save": "t7",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "FORWARD",
+                "itemCode": "DEMO-B3-PARENT",
+                "lotCode": "LOT-FRM-2609",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              },
+              "as": "SALESREP"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "t1",
+              "status": 200
+            },
+            {
+              "on": "t1",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "t1",
+              "json": "$.data.lines[*].event",
+              "contains": "CONSUMED"
+            },
+            {
+              "on": "t1",
+              "json": "$.data.lines[*].item",
+              "contains": "WIRE-TIG-4043-5KG"
+            },
+            {
+              "on": "t1",
+              "json": "$.data.lines[*].lot",
+              "contains": "LOT-SUB-2610"
+            },
+            {
+              "on": "t1",
+              "json": "$.data.lines[*].note",
+              "contains": "Substituted for BAR-AL6082-25MM"
+            },
+            {
+              "on": "t1",
+              "json": "$.data.substituteCnt",
+              "equals": 1
+            },
+            {
+              "on": "t2",
+              "status": 200
+            },
+            {
+              "on": "t2",
+              "json": "$.data.lines[*].kitRef",
+              "contains": "KIT0001001"
+            },
+            {
+              "on": "t2",
+              "json": "$.data.lines[*].parentLot",
+              "contains": "LOT-FRM-2609"
+            },
+            {
+              "on": "t3",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "KIT0012"
+              }
+            },
+            {
+              "on": "t4",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "KIT0026"
+              }
+            },
+            {
+              "on": "t4",
+              "json": "$.data.lines",
+              "count": 0
+            },
+            {
+              "on": "t5",
+              "status": 200
+            },
+            {
+              "on": "t5",
+              "json": "$.data.direction",
+              "equals": "FORWARD"
+            },
+            {
+              "on": "t6",
+              "status": 200
+            },
+            {
+              "on": "t6",
+              "json": "$.data.lines[*].kitRef",
+              "contains": "KIT0001002"
+            },
+            {
+              "on": "t7",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold KIT.ENQUIRY.VIEW"
+              }
+            }
+          ],
+          "derivation": "AC words and GENEALOG.cob:113-800 over the seeded completion of KIT0001001 (95-kit-demo.sql:155-209: parent lot LOT-FRM-2609, substitute lot LOT-SUB-2610 of 2.000000 planned as the line 2 item); item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-KIT-034-EDGE-WINDOWS-1252",
+          "ac": null,
+          "title": "Genealogy item with a character outside Windows-1252 is sent as '?' and reported in the KIT0026 text",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "QUALITY"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "t1",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "FORWARD",
+                "itemCode": "DEMO-Ω",
+                "lotCode": "",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "t1",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "KIT0026",
+                "detailContains": "DEMO-?"
+              }
+            }
+          ],
+          "derivation": "Contracts 4.4 alphanumeric rule (Windows-1252 encoding, unrepresentable characters become '?', CobolCodec.cs:15) for GN-ITEM-CODE PIC X(40) and the GENEALOG text 'No genealogy is recorded for <item> <lot><serial>.'.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-035",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-035-AC1",
+          "ac": 1,
+          "title": "Recall list from LOT-SUB-2610: depth-1 KIT0001001 row with 2.000000, substitute flag and planned item; depth 20 as 5",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "QUALITY"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "r1",
+              "call": "kit_listRecallTrace",
+              "query": {
+                "itemCode": "WIRE-TIG-4043-5KG",
+                "lotCode": "LOT-SUB-2610"
+              }
+            },
+            {
+              "save": "r2",
+              "call": "kit_listRecallTrace",
+              "query": {
+                "itemCode": "WIRE-TIG-4043-5KG",
+                "lotCode": "LOT-SUB-2610",
+                "maxDepth": 20
+              }
+            },
+            {
+              "save": "r3",
+              "call": "kit_listRecallTrace",
+              "query": {
+                "itemCode": "WIRE-TIG-4043-5KG",
+                "lotCode": "LOT-SUB-2610"
+              },
+              "as": "SALESREP"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r1",
+              "status": 200
+            },
+            {
+              "on": "r1",
+              "json": "$.items[0].depth",
+              "equals": 1
+            },
+            {
+              "on": "r1",
+              "json": "$.items[0].kitRef",
+              "equals": "KIT0001001"
+            },
+            {
+              "on": "r1",
+              "json": "$.items[0].componentLotCode",
+              "equals": "LOT-SUB-2610"
+            },
+            {
+              "on": "r1",
+              "json": "$.items[0].consumedQty",
+              "equals": 2.0
+            },
+            {
+              "on": "r1",
+              "json": "$.items[0].wasSubstitute",
+              "equals": true
+            },
+            {
+              "on": "r1",
+              "json": "$.items[0].plannedItemCode",
+              "equals": "BAR-AL6082-25MM"
+            },
+            {
+              "on": "r2",
+              "status": 200
+            },
+            {
+              "on": "r2",
+              "json": "$.items[0].kitRef",
+              "equals": "KIT0001001"
+            },
+            {
+              "on": "r2",
+              "json": "$.items[0].depth",
+              "equals": 1
+            },
+            {
+              "on": "r3",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold KIT.ENQUIRY.VIEW"
+              }
+            }
+          ],
+          "derivation": "AC words and usp_KitEnquiry.sql:140-188 (rows ordered by depth, kit, genealogy id; depth outside 1..12 becomes 5) over the substitute genealogy row of 95-kit-demo.sql; item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-040",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-040-AC1",
+          "ac": 1,
+          "title": "KITRDY READY/SHORT/XYZ listings, ready % 66.7/100.0/6.3, program JobRun rows left RUNNING, gate refusal registers no run",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "report",
+            "permission"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'ZZA07KIT16') BEGIN INSERT kit.ExecutionKit (CompanyCode, SiteCode, KitRef, ParentItemCode, SourceDemandType, SourceDemandRef, PlannedGoodQty, CompletedGoodQty, RejectedQty, GrossStarts, YieldFactor, RunCount, NeedDate, OwnerUser, Status, WipValueGBP, IsBackflush, CreatedBy) VALUES ('STC', 'RDG', 'ZZA07KIT16', 'DEMO-B3-PARENT', 'STOCK', 'ZZA07KIT16', 1, 0, 0, 1, 1, 1, '2026-12-31', 'PLANNER', 'DRAFT', 0, 0, 'A07'); DECLARE @k bigint = SCOPE_IDENTITY(); ;WITH n AS (SELECT TOP (16) ROW_NUMBER() OVER (ORDER BY (SELECT 1)) AS LineNum FROM sys.all_objects) INSERT kit.ExecutionKitLine (ExecutionKitId, LineNum, PathRef, ComponentItemCode, UsageBasis, OriginalRequirementQty, CurrentRequirementQty, UomCode, ConversionFactor, ScrapPct, ReservedQty, PickedQty, GrossIssuedQty, ReturnedQty, ScrappedQty, NetIssuedQty, RemainingQty, ExcessQty, NeedDate, PlannedUnitCostGBP, IssuedValueGBP, Status) SELECT @k, n.LineNum, CONVERT(varchar(20), n.LineNum), 'ADHESIVE-EP420-250ML', 'PROPORTION', 1, 1, 'EA', 1, 0, CASE WHEN n.LineNum = 1 THEN 1 ELSE 0 END, 0, 0, 0, 0, 0, 1, 0, '2026-12-31', 0.45, 0, 'OPEN' FROM n; END"
+            },
+            {
+              "save": "j1",
+              "job": "kit_submitKitReadinessRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "READY"
+              }
+            },
+            {
+              "save": "j2",
+              "job": "kit_submitKitReadinessRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "SHORT"
+              }
+            },
+            {
+              "save": "j3",
+              "job": "kit_submitKitReadinessRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "XYZ"
+              }
+            },
+            {
+              "save": "c4",
+              "call": "kit_submitKitReadinessRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "READY"
+              },
+              "as": "SALESREP"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "j1",
+              "json": "$.spool",
+              "matches": "(?s)KIT0001003.*KIT0001001.*KIT0001002.*KIT0001004"
+            },
+            {
+              "on": "j1",
+              "json": "$.spool",
+              "matches": "^(?![\\s\\S]*KIT0001005)"
+            },
+            {
+              "on": "j1",
+              "json": "$.spool",
+              "matches": "KIT0001002[^\\n]* 1 +66\\.7 +NO"
+            },
+            {
+              "on": "j1",
+              "json": "$.spool",
+              "matches": "KIT0001001[^\\n]* 0 +100\\.0 +YES"
+            },
+            {
+              "on": "j1",
+              "json": "$.spool",
+              "matches": "ZZA07KIT16[^\\n]* 16 +15 +6\\.3 +NO"
+            },
+            {
+              "on": "j2",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "j2",
+              "json": "$.spool",
+              "matches": "KIT0001002[^\\n]* 250\\.000 +250\\.000 +60\\.000"
+            },
+            {
+              "on": "j2",
+              "json": "$.spool",
+              "matches": "^(?![\\s\\S]*KIT0001002[\\s\\S]*KIT0001002)"
+            },
+            {
+              "on": "j2",
+              "json": "$.spool",
+              "matches": "^(?![\\s\\S]*KIT0001001)"
+            },
+            {
+              "on": "j2",
+              "json": "$.spool",
+              "matches": "^(?![\\s\\S]*KIT0001003)"
+            },
+            {
+              "on": "j2",
+              "json": "$.spool",
+              "matches": "^(?![\\s\\S]*KIT0001004)"
+            },
+            {
+              "on": "j3",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "j3",
+              "spoolContains": "Readiness to pick (RPT-013)"
+            },
+            {
+              "on": "j3",
+              "json": "$.spool",
+              "matches": "KIT0001001[^\\n]* 0 +100\\.0 +YES"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'KITRDY' AND Status = 'RUNNING'",
+              "equals": 3
+            },
+            {
+              "on": "c4",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold KIT.ENQUIRY.VIEW"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'KITRDY' AND SubmittedBy = 'SALESREP'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-040 (KITRDY.cob:110-585: DT-KIT lines/short/ready % PIC ZZ9.9 ROUNDED/Ready flag for the seven open statuses ordered by NeedDate, KitRef; SHORT = RemainingQty > ReservedQty of RELEASED..PARTCOMPLETE kits; any other MODE prints READY; JOBLOG END rejected so each run's program row stays RUNNING, SME-009/SME-010) over 95-kit-demo.sql:57-108; the 16-line DRAFT kit with 15 short lines (6.25 -> 6.3, SME-012) is arranged.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-041",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-041-AC1",
+          "ac": 1,
+          "title": "KITDOCP original of KIT0001002 (3 lines, 301.000), reprint copy line, KIT1010 rc 12, KIT1014 rc 8, FINCLOSED, gate",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "report",
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "j1",
+              "job": "kit_submitKitPickingDocumentRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "KIT": "KIT0001002"
+              }
+            },
+            {
+              "save": "j2",
+              "job": "kit_submitKitPickingDocumentRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "KIT": "KIT0001002",
+                "MODE": "REPRINT",
+                "COPY": "3",
+                "REASON": "Lost"
+              }
+            },
+            {
+              "save": "j3",
+              "job": "kit_submitKitPickingDocumentRun",
+              "path": {},
+              "body": {
+                "CO": "STC"
+              }
+            },
+            {
+              "save": "j4",
+              "job": "kit_submitKitPickingDocumentRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "KIT": "NOPE"
+              }
+            },
+            {
+              "save": "j5",
+              "job": "kit_submitKitPickingDocumentRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "KIT": "KIT0001005"
+              }
+            },
+            {
+              "save": "c6",
+              "call": "kit_submitKitPickingDocumentRun",
+              "path": {},
+              "body": {
+                "CO": "STC",
+                "KIT": "KIT0001002"
+              },
+              "as": "SALESREP"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "j1",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "j1",
+              "spoolContains": "ORIGINAL PICKING LIST"
+            },
+            {
+              "on": "j1",
+              "json": "$.spool",
+              "matches": "(?s)250\\.000.*50\\.000.*1\\.000"
+            },
+            {
+              "on": "j1",
+              "json": "$.spool",
+              "matches": "Material lines printed +3\\b"
+            },
+            {
+              "on": "j1",
+              "json": "$.spool",
+              "matches": "Outstanding qty +301\\.000"
+            },
+            {
+              "on": "j2",
+              "spoolContains": "*** REPRINT copy 0003 - reason: Lost ***"
+            },
+            {
+              "on": "j3",
+              "run": {
+                "status": "FAILED",
+                "returnCode": 12
+              }
+            },
+            {
+              "on": "j3",
+              "json": "$.sysout",
+              "contains": "KIT1010"
+            },
+            {
+              "on": "j3",
+              "json": "$.sysout",
+              "matches": "^(?![\\s\\S]*KIT1011)"
+            },
+            {
+              "on": "j3",
+              "json": "$.run.spoolFile",
+              "isNull": true
+            },
+            {
+              "on": "j4",
+              "run": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "j4",
+              "json": "$.sysout",
+              "contains": "KIT1014"
+            },
+            {
+              "on": "j5",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "j5",
+              "spoolContains": "KIT0001005"
+            },
+            {
+              "on": "c6",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "SALESREP does not hold KIT.ISSUE.POST"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'KITDOCP' AND SubmittedBy = 'SALESREP'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC words and spec FR-STERP-KIT-041 (KITDOCP.cob:130-311,450-457: ORIGINAL/REPRINT document kind, copy line '*** REPRINT copy <Ws-Copy-No> - reason: <reason> ***', KIT absent rc 12 KIT1010 before the spool is opened, unknown kit rc 8 KIT1014, any status prints, footing 'Material lines printed' and 'Outstanding qty') over the KIT0001002 lines of 95-kit-demo.sql (outstanding 250, 50, 1); the four-digit copy rendering is inferred (SME-1164).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-050",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-050-AC1",
+          "ac": 1,
+          "title": "Kit Maintenance page: 6 record(s), F10 review of KIT0001004, Lines on KIT0001002 (3 rows), status COMPLETE 0 record(s)",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE kit.ExecutionKit SET Status = 'DRAFT', ReleasedBy = NULL, ReleasedAt = NULL WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status <> 'DRAFT';"
+            },
+            {
+              "save": "load",
+              "gui": "/kit/kit-maint",
+              "actions": []
+            },
+            {
+              "save": "rev",
+              "gui": "/kit/kit-maint",
+              "actions": [
+                {
+                  "click": "KIT0001004"
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "lines",
+              "gui": "/kit/kit-maint",
+              "actions": [
+                {
+                  "click": "KIT0001002"
+                },
+                {
+                  "click": "Lines"
+                }
+              ]
+            },
+            {
+              "save": "comp",
+              "gui": "/kit/kit-maint",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Status",
+                    "value": "COMPLETE"
+                  }
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "load",
+              "text": "6 record(s)"
+            },
+            {
+              "on": "rev",
+              "text": "Reviewed - status REVIEWED, COMPLETE, 0 shortage(s), WIP 0.00"
+            },
+            {
+              "on": "rev",
+              "text": "OK"
+            },
+            {
+              "on": "lines",
+              "text": "Kit KIT0001002 - status RELEASED, , 0 shortage(s), WIP 0.00"
+            },
+            {
+              "on": "lines",
+              "text": "ADHESIVE-EP420-250ML"
+            },
+            {
+              "on": "lines",
+              "text": "BAR-AL6082-25MM"
+            },
+            {
+              "on": "lines",
+              "text": "BAR-SS316-12MM"
+            },
+            {
+              "on": "comp",
+              "text": "0 record(s)"
+            }
+          ],
+          "derivation": "AC words and frmKitMaint.vb:25-139 (worklist kit.usp_KitReadiness for the session site, Review on F10, Report status text and cue, Lines populates the KITCREAT lines) over the six STC/RDG kits of 95-kit-demo.sql and 90-bom-demo.sql; the AC names WHSE, but the seed grants KIT.EXEC.CREATE (menu row and screen gate of this page, contracts 5.4) to no demo role except SYSADM, so WHSE would be refused 403 PRM0006 and the page behaviour is pinned as SYSADM.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-051",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-051-AC1",
+          "ac": 1,
+          "title": "Kit Execution page (workflow 2 step 6): statuses of the five kits, WIP 1,842.50, cost element grid, issue to DRAFT KIT0005",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "keys",
+            "journey"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE kit.ExecutionKit SET Status = 'DRAFT', ReleasedBy = NULL, ReleasedAt = NULL WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status <> 'DRAFT';"
+            },
+            {
+              "save": "k4",
+              "gui": "/kit/kit-execution",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Kit",
+                    "value": "KIT0001004"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "k2",
+              "gui": "/kit/kit-execution",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Kit",
+                    "value": "KIT0001002"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "k3",
+              "gui": "/kit/kit-execution",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Kit",
+                    "value": "KIT0001003"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "k1",
+              "gui": "/kit/kit-execution",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Kit",
+                    "value": "KIT0001001"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "k5",
+              "gui": "/kit/kit-execution",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Kit",
+                    "value": "KIT0001005"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "cost",
+              "gui": "/kit/kit-execution",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Kit",
+                    "value": "KIT0001001"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Cost"
+                }
+              ]
+            },
+            {
+              "save": "iss",
+              "gui": "/kit/kit-execution",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Kit",
+                    "value": "KIT0001004"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "ADHESIVE-EP420-250ML"
+                },
+                {
+                  "fill": {
+                    "label": "Qty",
+                    "value": "1"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "k4",
+              "text": "Kit KIT0001004 - DRAFT"
+            },
+            {
+              "on": "k2",
+              "text": "Kit KIT0001002 - RELEASED"
+            },
+            {
+              "on": "k3",
+              "text": "Kit KIT0001003 - PARTISSUED"
+            },
+            {
+              "on": "k1",
+              "text": "Kit KIT0001001 - PARTCOMPLETE"
+            },
+            {
+              "on": "k1",
+              "text": "WIP 1,842.50"
+            },
+            {
+              "on": "k5",
+              "text": "Kit KIT0001005 - FINCLOSED"
+            },
+            {
+              "on": "cost",
+              "text": "Element"
+            },
+            {
+              "on": "cost",
+              "text": "Variance"
+            },
+            {
+              "on": "iss",
+              "text": "Reason code: KIT0005"
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 2 step 6 and frmKitExecution.vb:23-156 (F5 status 'Kit <ref> - <status>, ..., WIP <money>', Cost grid of KitExecutionService.CostSpec Element/Description/Planned/Actual/Variance, Issue (F10) confirmation then the error dialog 'Reason code:' of contracts 9.3) over 95-kit-demo.sql; WHSE holds KIT.ISSUE.POST, the page's gate; item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-KIT-051-EDGE-DEMO-JOURNEY",
+          "ac": null,
+          "title": "Demo workflow 2 steps 6-7: WHSE walks the five kit states, QUALITY traces the completed kit forward and backward",
+          "layer": "e2e",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE kit.ExecutionKit SET Status = 'DRAFT', ReleasedBy = NULL, ReleasedAt = NULL WHERE CompanyCode = 'STC' AND KitRef = 'KIT0001004' AND Status <> 'DRAFT';"
+            },
+            {
+              "save": "k4",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001004"
+              }
+            },
+            {
+              "save": "k2",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001002"
+              }
+            },
+            {
+              "save": "k3",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001003"
+              }
+            },
+            {
+              "save": "k1",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001001"
+              }
+            },
+            {
+              "save": "k5",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001005"
+              }
+            },
+            {
+              "save": "tf",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "FORWARD",
+                "itemCode": "DEMO-B3-PARENT",
+                "lotCode": "LOT-FRM-2609",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              },
+              "as": "QUALITY"
+            },
+            {
+              "save": "tb",
+              "call": "kit_traceGenealogy",
+              "query": {
+                "direction": "BACKWARD",
+                "itemCode": "WIRE-TIG-4043-5KG",
+                "lotCode": "LOT-SUB-2610",
+                "serialNo": "",
+                "kitRef": "",
+                "maxDepth": 10
+              },
+              "as": "QUALITY"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "k4",
+              "json": "$.data.status",
+              "equals": "DRAFT"
+            },
+            {
+              "on": "k2",
+              "json": "$.data.status",
+              "equals": "RELEASED"
+            },
+            {
+              "on": "k3",
+              "json": "$.data.status",
+              "equals": "PARTISSUED"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.status",
+              "equals": "PARTCOMPLETE"
+            },
+            {
+              "on": "k1",
+              "json": "$.data.completedQty",
+              "equals": 4.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.plannedQty",
+              "equals": 10.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.wipValue",
+              "equals": 1842.5
+            },
+            {
+              "on": "k5",
+              "json": "$.data.status",
+              "equals": "FINCLOSED"
+            },
+            {
+              "on": "tf",
+              "status": 200
+            },
+            {
+              "on": "tf",
+              "json": "$.data.lines[*].note",
+              "contains": "Substituted for BAR-AL6082-25MM"
+            },
+            {
+              "on": "tf",
+              "json": "$.data.lines[*].event",
+              "contains": "CONSUMED"
+            },
+            {
+              "on": "tb",
+              "status": 200
+            },
+            {
+              "on": "tb",
+              "json": "$.data.lines[*].kitRef",
+              "contains": "KIT0001001"
+            },
+            {
+              "on": "tb",
+              "json": "$.data.lines[*].parentLot",
+              "contains": "LOT-FRM-2609"
+            }
+          ],
+          "derivation": "Binding spec section 10 (rows 050-053: DEMO-WORKFLOWS workflow 2 steps 6-7) with docs/DEMO-WORKFLOWS.md (KIT0001004 draft, KIT0001002 released, KIT0001003 part-issued, KIT0001001 part-complete 4 of 10 with WIP 1,842.50, KIT0001005 financially closed; forward and backward trace of the completed kit, here the seeded completion LOT-FRM-2609); item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-052",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-052-AC1",
+          "ac": 1,
+          "title": "Trial Kitting page: F10 with nothing keyed warns, kit without parent and Max build show the KIT0003 error dialog",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "blank",
+              "gui": "/kit/kit-trial",
+              "actions": [
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "kit",
+              "gui": "/kit/kit-trial",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Kit",
+                    "value": "KIT0001001"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "max",
+              "gui": "/kit/kit-trial",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Parent",
+                    "value": "DEMO-B3-PARENT"
+                  }
+                },
+                {
+                  "click": "Max build"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "blank",
+              "text": "Enter a kit reference or a parent item first."
+            },
+            {
+              "on": "kit",
+              "text": "Reason code: KIT0003"
+            },
+            {
+              "on": "max",
+              "text": "Reason code: KIT0003"
+            }
+          ],
+          "derivation": "AC words and frmKitTrial.vb:22-110 (Asked() warning, Trial on F10, Max build sends no quantity so KITTRIAL MAXBUILD refuses the zero seed, SME-648; a trial with a blank parent is refused by KITTRIAL with KIT0003); ENGINEER holds KIT.TRIAL.RUN.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-053",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-053-AC1",
+          "ac": 1,
+          "title": "Genealogy page (workflow 2 step 7): FORWARD marks the substitute, BACKWARD shows the parent, recall needs an item",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "QUALITY"
+          },
+          "covers": [
+            "keys",
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "fwd",
+              "gui": "/kit/kit-genealogy",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Direction",
+                    "value": "FORWARD"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "DEMO-B3-PARENT"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Lot",
+                    "value": "LOT-FRM-2609"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "bwd",
+              "gui": "/kit/kit-genealogy",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Direction",
+                    "value": "BACKWARD"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "WIRE-TIG-4043-5KG"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Lot",
+                    "value": "LOT-SUB-2610"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "rec",
+              "gui": "/kit/kit-genealogy",
+              "actions": [
+                {
+                  "click": "Recall list"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "fwd",
+              "text": "FORWARD:"
+            },
+            {
+              "on": "fwd",
+              "text": "Substituted for BAR-AL6082-25MM"
+            },
+            {
+              "on": "fwd",
+              "text": "LOT-SUB-2610"
+            },
+            {
+              "on": "bwd",
+              "text": "BACKWARD:"
+            },
+            {
+              "on": "bwd",
+              "text": "KIT0001001"
+            },
+            {
+              "on": "bwd",
+              "text": "LOT-FRM-2609"
+            },
+            {
+              "on": "rec",
+              "text": "A recall list needs an item code."
+            }
+          ],
+          "derivation": "AC words, DEMO-WORKFLOWS workflow 2 step 7 and frmKitGenealogy.vb:24-90 (Trace on F10 fills the GeneaSpec grid with Note and the '<direction>: n kit(s)...' status, Recall list warning) over the seeded completion of KIT0001001 (95-kit-demo.sql:155-209); item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-054",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-054-AC1",
+          "ac": 1,
+          "title": "KIT.DEF and KIT.DISASSY generic maintenance definitions with seeded captions/read-only flags; save via usp_UiMaintSave",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "audit"
+          ],
+          "steps": [
+            {
+              "save": "d1",
+              "call": "platform_getMaintenanceDefinition",
+              "path": {
+                "maintCode": "KIT.DEF"
+              }
+            },
+            {
+              "save": "d2",
+              "call": "platform_getMaintenanceDefinition",
+              "path": {
+                "maintCode": "KIT.DISASSY"
+              },
+              "as": "INVMGR"
+            },
+            {
+              "save": "s1",
+              "call": "platform_saveMaintenanceRow",
+              "path": {
+                "maintCode": "KIT.DEF"
+              },
+              "body": {
+                "mode": "ADD",
+                "values": {
+                  "CompanyCode": "STC",
+                  "KitItemCode": "KIT-BUILD-ROAD-52",
+                  "KitVersion": "A",
+                  "Name": "A07 road build pack",
+                  "SupplyKind": "SINGLE",
+                  "AllowPartialDespatch": "0",
+                  "EffectiveFrom": "2026-11-01",
+                  "Status": "DRAFT"
+                }
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "d1",
+              "status": 200
+            },
+            {
+              "on": "d1",
+              "json": "$.columns",
+              "count": 14
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[0].caption",
+              "equals": "Company"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[1].caption",
+              "equals": "Kit item"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[1].width",
+              "equals": 160
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[3].isReadOnly",
+              "equals": false
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[6].caption",
+              "equals": "Partial despatch"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[10].caption",
+              "equals": "VAT decision by"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[10].isReadOnly",
+              "equals": true
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[12].caption",
+              "equals": "Approved by"
+            },
+            {
+              "on": "d1",
+              "json": "$.columns[12].isReadOnly",
+              "equals": true
+            },
+            {
+              "on": "d2",
+              "status": 200
+            },
+            {
+              "on": "d2",
+              "json": "$.columns",
+              "count": 18
+            },
+            {
+              "on": "d2",
+              "json": "$.columns[11].caption",
+              "equals": "Parent value"
+            },
+            {
+              "on": "d2",
+              "json": "$.columns[11].isReadOnly",
+              "equals": true
+            },
+            {
+              "on": "d2",
+              "json": "$.columns[13].caption",
+              "equals": "Recovered"
+            },
+            {
+              "on": "d2",
+              "json": "$.columns[13].isReadOnly",
+              "equals": true
+            },
+            {
+              "on": "d2",
+              "json": "$.columns[14].caption",
+              "equals": "Loss"
+            },
+            {
+              "on": "d2",
+              "json": "$.columns[14].isReadOnly",
+              "equals": true
+            },
+            {
+              "on": "d2",
+              "json": "$.columns[17].caption",
+              "equals": "Approved by"
+            },
+            {
+              "on": "d2",
+              "json": "$.columns[17].isReadOnly",
+              "equals": true
+            },
+            {
+              "on": "s1",
+              "status": 200
+            },
+            {
+              "on": "s1",
+              "json": "$.rowsAffected",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitDefinition WHERE CompanyCode = 'STC' AND KitItemCode = 'KIT-BUILD-ROAD-52' AND KitVersion = 'A' AND Status = 'DRAFT' AND CreatedBy = 'ENGINEER'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'KIT.DEF' AND UserCode = 'ENGINEER' AND Action = 'ADD'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words and db/seed/86-kit-maintdef.sql:12-88 (14 KIT.DEF and 18 KIT.DISASSY columns in SortOrder with read-only VAT/approval, Parent value, Recovered, Loss and Approved by) with core.usp_UiMaintSave.sql:59-115 (ADD sets CreatedBy, one core.AuditLog row with EntityType = MaintCode and Action = mode); KIT-BUILD-ROAD-52 is a KIT-class item without a definition (21-itm-items-b.sql:49); ENGINEER holds KIT.DEF.MAINT and INVMGR holds KIT.DISASSEMBLE.POST.",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-060",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-060-AC1",
+          "ac": 1,
+          "title": "KITDB: NULL need date as null; LINSAVE absolute quantities clear deviation; PCKUSE oldest pick first; site cost row first",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'ZZA07KITND') BEGIN INSERT kit.ExecutionKit (CompanyCode, SiteCode, KitRef, ParentItemCode, SourceDemandType, SourceDemandRef, PlannedGoodQty, CompletedGoodQty, RejectedQty, GrossStarts, YieldFactor, RunCount, NeedDate, OwnerUser, Status, WipValueGBP, IsBackflush, CreatedBy) VALUES ('STC', 'RDG', 'ZZA07KITND', 'DEMO-B3-PARENT', 'STOCK', 'ZZA07KITND', 1, 0, 0, 1, 1, 1, NULL, 'PLANNER', 'DRAFT', 0, 0, 'A07'); DECLARE @k bigint = SCOPE_IDENTITY(); INSERT kit.ExecutionKitLine (ExecutionKitId, LineNum, PathRef, ComponentItemCode, UsageBasis, OriginalRequirementQty, CurrentRequirementQty, UomCode, ConversionFactor, ScrapPct, ReservedQty, PickedQty, GrossIssuedQty, ReturnedQty, ScrappedQty, NetIssuedQty, RemainingQty, ExcessQty, NeedDate, PlannedUnitCostGBP, IssuedValueGBP, Status) VALUES (@k, 1, '1', 'ADHESIVE-EP420-250ML', 'PROPORTION', 1, 1, 'EA', 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, NULL, 0.45, 0, 'OPEN'); END"
+            },
+            {
+              "sql": "SET NOCOUNT ON; DECLARE @line bigint = (SELECT l.KitLineId FROM kit.ExecutionKitLine l JOIN kit.ExecutionKit k ON k.ExecutionKitId = l.ExecutionKitId WHERE k.CompanyCode = 'STC' AND k.KitRef = 'KIT0001002' AND l.LineNum = 1); UPDATE kit.ExecutionKitLine SET DeviationReason = 'A07 deviation to clear', DeviationApprovedBy = 'QUALITY' WHERE KitLineId = @line; IF NOT EXISTS (SELECT 1 FROM kit.KitPick WHERE KitRef = 'KIT0001002' AND Reason LIKE 'A07 %') BEGIN INSERT kit.KitPick (CompanyCode, KitRef, KitLineId, LineNum, ComponentItemCode, PickType, PickedQty, UomCode, WarehouseCode, LocationCode, LotCode, SerialNo, PickDate, ConsumedQty, Reason, PickedBy) VALUES ('STC', 'KIT0001002', @line, 1, 'ADHESIVE-EP420-250ML', 'PICK', 5, 'EA', 'MAIN', '', 'L26001-0250ML', '', '2026-10-10', 0, 'A07 oldest pick', 'WHSE'); INSERT kit.KitPick (CompanyCode, KitRef, KitLineId, LineNum, ComponentItemCode, PickType, PickedQty, UomCode, WarehouseCode, LocationCode, LotCode, SerialNo, PickDate, ConsumedQty, Reason, PickedBy) VALUES ('STC', 'KIT0001002', @line, 1, 'ADHESIVE-EP420-250ML', 'PICK', 5, 'EA', 'MAIN', '', 'L26001-0250ML', '', '2026-10-11', 0, 'A07 newer pick', 'WHSE'); END; DECLARE @rev varchar(4) = (SELECT ISNULL(CurrentRevision, '') FROM inv.Item WHERE CompanyCode = 'STC' AND ItemCode = 'ADHESIVE-EP420-250ML'); MERGE cst.ItemCost AS t USING (VALUES ('RDG', 2.500000), ('*', 9.000000)) AS s (SiteCode, UnitCost) ON t.CompanyCode = 'STC' AND t.ItemCode = 'ADHESIVE-EP420-250ML' AND t.Revision = @rev AND t.SiteCode = s.SiteCode WHEN MATCHED THEN UPDATE SET AverageUnitCost = s.UnitCost, StandardUnitCost = s.UnitCost WHEN NOT MATCHED THEN INSERT (CompanyCode, ItemCode, Revision, SiteCode, CostMethod, QtyOnHand, CarryingValueGBP, AverageUnitCost, StandardUnitCost, LastUpdatedAt, LastUpdatedBy) VALUES ('STC', 'ADHESIVE-EP420-250ML', @rev, s.SiteCode, 'MWA', 0, 0, s.UnitCost, s.UnitCost, SYSDATETIME(), 'A07');"
+            },
+            {
+              "save": "k1",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "ZZA07KITND"
+              }
+            },
+            {
+              "save": "i1",
+              "call": "kit_issueComponent",
+              "path": {
+                "kitRef": "KIT0001002"
+              },
+              "body": {
+                "lineNum": 1,
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "lotCode": "L26001-0250ML",
+                "serialNo": "",
+                "quantity": 5,
+                "location": "CONSUM",
+                "reasonCode": "",
+                "reasonText": "",
+                "allowOver": "N"
+              },
+              "idempotencyKey": "A07-KIT060-ISS-1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "k1",
+              "status": 200
+            },
+            {
+              "on": "k1",
+              "json": "$.data.needDate",
+              "isNull": true
+            },
+            {
+              "on": "i1",
+              "status": 200
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.ExecutionKitLine l JOIN kit.ExecutionKit k ON k.ExecutionKitId = l.ExecutionKitId WHERE k.CompanyCode = 'STC' AND k.KitRef = 'KIT0001002' AND l.LineNum = 1 AND l.GrossIssuedQty = 5 AND l.NetIssuedQty = 5 AND l.RemainingQty = 245 AND l.DeviationReason IS NULL AND l.DeviationApprovedBy IS NULL",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitPick WHERE KitRef = 'KIT0001002' AND Reason = 'A07 oldest pick' AND ConsumedQty = 5",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitPick WHERE KitRef = 'KIT0001002' AND Reason = 'A07 newer pick' AND ConsumedQty = 0",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM kit.KitIssue WHERE KitRef = 'KIT0001002' AND IssueType = 'ISSUE' AND Quantity = 5 AND UnitCostGBP = 2.500000",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC words and KITDB.cob:119-1136 (HDRGET NULL dates -> 0 -> null, LINSAVE writes absolute values from the initialised record clearing DeviationReason/DeviationApprovedBy, PCKUSE FIFO by KitPickId, ITEMGET caller's site cost row before '*'); a forced driver error (500 SQL0001 with the driver text) cannot be arranged without DDL or fault injection, so that clause is not pinned; item codes resolved from the 95-kit-demo.sql slot binding (P1/P2 = first MADE, C1-C3 = first BOUGHT STC items by code, substitute = last BOUGHT item) and lot codes from the 65-itm-partners-stock.sql lot formula. The issue carries the lot's bin CONSUM because STKMOVE refuses a blank location with STK0002 (STKMOVE.cob:208-214; KITISSUE.cob:460); the legacy route observed STK0002 without it and, with it, RC 0, line gross/net 5, remaining 245, deviation columns NULL, the oldest pick consumed 5, the newer 0 and the ISSUE row at the RDG cost 2.500000 (amendment evidence p4/runs/rg025-kit060-authored-legacy-route.txt, rg025-kit060-amended-legacy-route.txt). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-025: supply the stock location so the issue reaches STKMOVE ISSUE]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-KIT-061",
+      "scenarios": [
+        {
+          "id": "FR-STERP-KIT-061-AC1",
+          "ac": 1,
+          "title": "KITQTY LINEQTY: 20/4/20 gives 16/4/0, scrap not deducted, returned above gross refused so the enquiry shows zeros",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-12"
+          },
+          "covers": [
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM kit.ExecutionKit WHERE CompanyCode = 'STC' AND KitRef = 'ZZA07KITRT') BEGIN INSERT kit.ExecutionKit (CompanyCode, SiteCode, KitRef, ParentItemCode, SourceDemandType, SourceDemandRef, PlannedGoodQty, CompletedGoodQty, RejectedQty, GrossStarts, YieldFactor, RunCount, NeedDate, OwnerUser, Status, WipValueGBP, IsBackflush, CreatedBy) VALUES ('STC', 'RDG', 'ZZA07KITRT', 'DEMO-B3-PARENT', 'STOCK', 'ZZA07KITRT', 1, 0, 0, 1, 1, 1, '2026-12-31', 'PLANNER', 'RELEASED', 0, 0, 'A07'); DECLARE @k bigint = SCOPE_IDENTITY(); INSERT kit.ExecutionKitLine (ExecutionKitId, LineNum, PathRef, ComponentItemCode, UsageBasis, OriginalRequirementQty, CurrentRequirementQty, UomCode, ConversionFactor, ScrapPct, ReservedQty, PickedQty, GrossIssuedQty, ReturnedQty, ScrappedQty, NetIssuedQty, RemainingQty, ExcessQty, NeedDate, PlannedUnitCostGBP, IssuedValueGBP, Status) VALUES (@k, 1, '1', 'ADHESIVE-EP420-250ML', 'PROPORTION', 10, 10, 'EA', 1, 0, 0, 0, 4, 5, 0, 7, 3, 2, '2026-12-31', 0.45, 0, 'PARTISSUED'); END"
+            },
+            {
+              "save": "k1",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "KIT0001001"
+              }
+            },
+            {
+              "save": "k2",
+              "call": "kit_getKit",
+              "path": {
+                "kitRef": "ZZA07KITRT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "k1",
+              "status": 200
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].netIssued",
+              "equals": 16.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].remaining",
+              "equals": 4.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[1].excess",
+              "equals": 0.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[2].grossIssued",
+              "equals": 1.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[2].scrapped",
+              "equals": 1.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[2].netIssued",
+              "equals": 1.0
+            },
+            {
+              "on": "k1",
+              "json": "$.data.lines[2].remaining",
+              "equals": 0.0
+            },
+            {
+              "on": "k2",
+              "status": 200
+            },
+            {
+              "on": "k2",
+              "json": "$.data.lines[0].grossIssued",
+              "equals": 4.0
+            },
+            {
+              "on": "k2",
+              "json": "$.data.lines[0].returned",
+              "equals": 5.0
+            },
+            {
+              "on": "k2",
+              "json": "$.data.lines[0].netIssued",
+              "equals": 0.0
+            },
+            {
+              "on": "k2",
+              "json": "$.data.lines[0].remaining",
+              "equals": 0.0
+            },
+            {
+              "on": "k2",
+              "json": "$.data.lines[0].excess",
+              "equals": 0.0
+            }
+          ],
+          "derivation": "AC words and KITQTY.cob:96-149 (net = max(0, gross - returned) without scrap, remaining and excess, returned above gross RC 8 KIT0011 ignored by KITCREAT.cob:826-843 so the initialised zeros show) over 95-kit-demo.sql KIT0001001 lines and the arranged line ZZA07KITRT whose stored derived columns (7/3/2) differ from the recomputation.",
+          "confidence": "observed"
+        }
+      ]
+    }
+  ]
+}

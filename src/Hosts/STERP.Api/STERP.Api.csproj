@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Api</RootNamespace>
+    <AssemblyName>STERP.Api</AssemblyName>
+    <Description>STERP-API: the single online web service (ASP.NET Core 10 minimal APIs) composing the slice libraries.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Modules\STERP.Modules.Composition\STERP.Modules.Composition.csproj" />
+  </ItemGroup>
+</Project>

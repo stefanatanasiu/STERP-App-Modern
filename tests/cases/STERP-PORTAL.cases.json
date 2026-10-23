@@ -1,0 +1,512 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-PORTAL",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-PORTAL-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PORTAL-001-AC1",
+          "ac": 1,
+          "title": "Opening the portal catalogue opens no database session from STERP.ApiPortal",
+          "layer": "contract",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "cat",
+              "gui": "/",
+              "actions": []
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cat",
+              "text": "STERP-PLATFORM"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM sys.dm_exec_sessions WHERE program_name LIKE 'STERP.ApiPortal%'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC 'no SQL client reference in STERP.ApiPortal' and STERP-PORTAL.md FR-STERP-PORTAL-001 (documents only, never connects to the database); the portal catalogue is https://localhost:7103/ (portal host, no STERP-WEB route applies, hence route '/'); the assembly-reference check is a build check outside the DSL, so the scenario pins its runtime consequence (no session with an STERP.ApiPortal application name, contracts 5.6 naming).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PORTAL-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PORTAL-002-AC1",
+          "ac": 1,
+          "title": "Portal catalogue lists the thirteen binding OpenAPI documents and marks undelivered slices planned",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "cat",
+              "gui": "/",
+              "actions": []
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cat",
+              "text": "STERP-PLATFORM"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-ITM"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-AR"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-SO"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-XMD"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-FIN"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-PO"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-AP"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-BOM"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-KIT"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-CST"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-API"
+            },
+            {
+              "on": "cat",
+              "text": "STERP-JOBS"
+            },
+            {
+              "on": "cat",
+              "text": "planned"
+            },
+            {
+              "on": "cat",
+              "text": "delivered"
+            }
+          ],
+          "derivation": "AC 'thirteen documents listed; undelivered slices marked planned' with STERP-PORTAL.md FR-STERP-PORTAL-002 (delivered = served by a host, planned = binding document only); the thirteen are the binding documents of memory/STERP-App/agent-06/application-specs (eleven slices plus STERP-API and STERP-JOBS); page = portal landing https://localhost:7103/ (route '/').",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PORTAL-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PORTAL-010-AC1",
+          "ac": 1,
+          "title": "API Console shows so_acceptSalesOrder with its x-sterp-legacy chain, FR ids, permission and unit-of-work text",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "op",
+              "gui": "/",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Select a definition",
+                    "value": "STERP-SO"
+                  }
+                },
+                {
+                  "click": "so_acceptSalesOrder"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "op",
+              "text": "x-sterp-legacy"
+            },
+            {
+              "on": "op",
+              "text": "SOACCEPT ACCEPT"
+            },
+            {
+              "on": "op",
+              "text": "x-sterp-requirements"
+            },
+            {
+              "on": "op",
+              "text": "FR-STERP-SO-017"
+            },
+            {
+              "on": "op",
+              "text": "x-sterp-permission"
+            },
+            {
+              "on": "op",
+              "text": "SO.ORDER.ENTER"
+            },
+            {
+              "on": "op",
+              "text": "x-sterp-uow"
+            },
+            {
+              "on": "op",
+              "text": "Three separate commits"
+            }
+          ],
+          "derivation": "AC 'so accept operation shows x-sterp-legacy, requirements, permissions, uow' with the binding STERP-SO.openapi.yaml values of so_acceptSalesOrder (x-sterp-requirements FR-STERP-SO-017/020, x-sterp-permission SO.ORDER.ENTER, x-sterp-legacy 'SOACCEPT ACCEPT', x-sterp-uow 'Three separate commits...'); page = portal API Console https://localhost:7103/ (route '/', document selector STERP-SO).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PORTAL-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PORTAL-011-AC1",
+          "ac": 1,
+          "title": "Try it out returns the caller's own PLATFORM session context and shows the 501 API0501 body of an undelivered slice",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "own",
+              "gui": "/",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Select a definition",
+                    "value": "STERP-PLATFORM"
+                  }
+                },
+                {
+                  "click": "platform_getSession"
+                },
+                {
+                  "click": "Try it out"
+                },
+                {
+                  "click": "Execute"
+                }
+              ]
+            },
+            {
+              "save": "undelivered",
+              "gui": "/",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Select a definition",
+                    "value": "STERP-SO"
+                  }
+                },
+                {
+                  "click": "so_listSalesOrders"
+                },
+                {
+                  "click": "Try it out"
+                },
+                {
+                  "click": "Execute"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "own",
+              "text": "200"
+            },
+            {
+              "on": "own",
+              "text": "\"userCode\": \"SYSADM\""
+            },
+            {
+              "on": "own",
+              "text": "\"isSysAdm\": true"
+            },
+            {
+              "on": "undelivered",
+              "text": "501"
+            },
+            {
+              "on": "undelivered",
+              "text": "API0501"
+            }
+          ],
+          "derivation": "AC 'PLATFORM session call returns own user context; undelivered slice shows 501 API0501 body' with STERP-PORTAL.md FR-STERP-PORTAL-011 (credentials include, prefilled context headers), platform_getSession (core.usp_GetUserContext of the signed-on login, mapped to SYSADM) and contracts 5.10 API0501; precondition: STERP-SO not delivered; page = API Console https://localhost:7103/ (route '/').",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PORTAL-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PORTAL-012-AC1",
+          "ac": 1,
+          "title": "Portal shows Windows curl and PowerShell commands for an executed GET whose direct call returns the same body",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "cmd",
+              "gui": "/",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Select a definition",
+                    "value": "STERP-PLATFORM"
+                  }
+                },
+                {
+                  "click": "platform_getSession"
+                },
+                {
+                  "click": "Try it out"
+                },
+                {
+                  "click": "Execute"
+                }
+              ]
+            },
+            {
+              "save": "direct",
+              "call": "platform_getSession"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cmd",
+              "text": "curl.exe --negotiate -u :"
+            },
+            {
+              "on": "cmd",
+              "text": "-UseDefaultCredentials"
+            },
+            {
+              "on": "cmd",
+              "text": "X-STERP-Company"
+            },
+            {
+              "on": "direct",
+              "status": 200
+            },
+            {
+              "on": "direct",
+              "json": "$.user.userCode",
+              "equals": "SYSADM"
+            },
+            {
+              "on": "direct",
+              "json": "$.selected.companyCode",
+              "equals": "STC"
+            }
+          ],
+          "derivation": "AC 'pasted Windows curl command returns same body as Try it out' with STERP-PORTAL.md FR-STERP-PORTAL-012 (curl --negotiate -u :, curl.exe, Invoke-RestMethod -UseDefaultCredentials with context headers); executing a pasted command line is outside the DSL, so the same GET is issued directly and its body pinned to the values Try it out shows; page = API Console https://localhost:7103/ (route '/').",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PORTAL-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PORTAL-013-AC1",
+          "ac": 1,
+          "title": "'How to call the STERP APIs' page lists the target-only reason codes API0001-API0501 and the legacy RC mapping",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation"
+          ],
+          "steps": [
+            {
+              "save": "guide",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "How to call the STERP APIs"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "guide",
+              "text": "API0001"
+            },
+            {
+              "on": "guide",
+              "text": "API0002"
+            },
+            {
+              "on": "guide",
+              "text": "API0003"
+            },
+            {
+              "on": "guide",
+              "text": "API0004"
+            },
+            {
+              "on": "guide",
+              "text": "API0010"
+            },
+            {
+              "on": "guide",
+              "text": "API0401"
+            },
+            {
+              "on": "guide",
+              "text": "API0501"
+            },
+            {
+              "on": "guide",
+              "text": "CA-RETURN-CODE"
+            },
+            {
+              "on": "guide",
+              "text": "HOLD"
+            },
+            {
+              "on": "guide",
+              "text": "422"
+            }
+          ],
+          "derivation": "AC 'page lists API0001-API0501 and the RC mapping' with contracts 5.10 (API0001, API0002, API0003, API0004, API0010, API0401, API0501) and the 4.6 RC mapping table (CA-RETURN-CODE 04 WARNING 200, 06 HOLD 202, 08 -> 422 ...) that FR-STERP-PORTAL-013 renders; page = portal reference page under https://localhost:7103/ (route '/').",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-PORTAL-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-PORTAL-014-AC1",
+          "ac": 1,
+          "title": "Portal pages open for an unmapped Windows user and an API call shows 403 API0010",
+          "layer": "contract",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "<unmapped>",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "call",
+              "gui": "/",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Select a definition",
+                    "value": "STERP-PLATFORM"
+                  }
+                },
+                {
+                  "click": "platform_getSession"
+                },
+                {
+                  "click": "Try it out"
+                },
+                {
+                  "click": "Execute"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "call",
+              "text": "403"
+            },
+            {
+              "on": "call",
+              "text": "API0010"
+            },
+            {
+              "on": "call",
+              "text": "No STERP user is mapped to"
+            }
+          ],
+          "derivation": "AC 'API call without mapped user shows 403 API0010' with contracts 5.2 (legacy text 'No STERP user is mapped to <login>.', LoginService.vb:43-45) and FR-STERP-PORTAL-014 (anonymous pages, API authenticates); page = API Console https://localhost:7103/ (route '/').",
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ]
+}

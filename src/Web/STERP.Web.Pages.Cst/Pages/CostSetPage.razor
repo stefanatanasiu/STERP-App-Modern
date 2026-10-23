@@ -1,0 +1,147 @@
+@inherits StListPage
+@* frmCostSet (page:cst/cost-sets, FR-STERP-CST-031; frmCostSet.vb): the cost set worklist with preparer and approver side by
+   side; Review, Approve (F10), Activate | Impact, Compare between Refresh (F5) and Close (F3). The chosen set is the
+   selected row's CostSet, else the set remembered from the last comparison. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StSelectField Caption="&Status:" Inline="true" Width="120" Items="Statuses" Value="@_status" ValueChanged="StatusChangedAsync" Id="@Uid("status")" />
+        <StTextField Caption="Compare &with:" Inline="true" Width="150" Field="CompareWith" @bind-Value="_compare" Id="@Uid("compare")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Review" Glyph="CHECK" OnClick="ReviewAsync" />
+        <StToolButton Text="Approve (F10)" Glyph="POST" OnClick="ApproveAsync" />
+        <StToolButton Text="Activate" Glyph="RUN" OnClick="ActivateAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Impact" Glyph="ENGINE" OnClick="ImpactAsync" />
+        <StToolButton Text="Compare" Glyph="LIST" OnClick="CompareAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Statuses = StSelectField.Of("ALL", "DRAFT", "REVIEW", "APPROVED", "ACTIVE");
+    private string _status = "ALL";
+    private string _compare = "";
+    private string _comparisonSet = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Cost Sets");
+    }
+
+    /// <summary>frmCostSet.LoadData: cst_listCostSets, the remembered comparison set forgotten, self-approved rows counted.</summary>
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/cst/v1/cost-sets" + Query.Build(("status", _status == "ALL" ? "" : _status)));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        var data = GridData.FromItems(r.Json,
+            Fmt.Col("costSet", "CostSet"), Fmt.Col("name", "Name"), Fmt.Col("purpose", "Purpose"), Fmt.Col("status", "Status"),
+            Fmt.Col("currency", "Currency"), Fmt.Col("fiscalYear", "FiscalYear"), Fmt.Col("effectiveFrom", "EffectiveFrom", "DATE"),
+            Fmt.Col("comparedTo", "ComparedTo"), Fmt.Col("preparedBy", "PreparedBy"), Fmt.Col("approvedBy", "ApprovedBy"),
+            Fmt.Col("approvedAt", "ApprovedAt", "STAMP"), Fmt.Col("activatedAt", "ActivatedAt", "STAMP"), Fmt.Col("items", "Items", "INT"),
+            Fmt.Col("selfApproved", "SelfApproved"));
+        _comparisonSet = "";
+        Populate(data);
+        var self = data.Rows.Count(row => Fmt.Text(row["selfApproved"]) == "YES");
+        SetStatus(data.Count + " cost set(s)." + (self > 0 ? "  " + self + " approved by their own preparer - activation will be refused." : ""),
+            self > 0 ? CueWarning : CueOk);
+    });
+
+    private async Task StatusChangedAsync(string value)
+    {
+        _status = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => ApproveAsync();
+
+    private Task ReviewAsync() => ActAsync("Review", "review", true);
+
+    /// <summary>Approval of a reviewed set - never self approval (CST-007).</summary>
+    private async Task ApproveAsync()
+    {
+        var code = Chosen();
+        if (code == "") return;
+        if (!await ConfirmAsync("Approve cost set " + code + " as " + Session.UserCode + "?")) return;
+        await ActAsync("Approve", "approve", true);
+    }
+
+    /// <summary>Activation (the legacy wording is kept although activation revalues nothing, SME-743).</summary>
+    private async Task ActivateAsync()
+    {
+        var code = Chosen();
+        if (code == "") return;
+        if (!await ConfirmAsync("Activate " + code + "?  This revalues stock and posts the revaluation variance.")) return;
+        await ActAsync("Activate", "activate", true);
+    }
+
+    /// <summary>What activation would do.  Changes nothing (CST-012).</summary>
+    private Task ImpactAsync() => ActAsync("Impact", "impact", false);
+
+    /// <summary>Line by line against another set; an item in only one of them is kept (CST-012).</summary>
+    private async Task CompareAsync()
+    {
+        var code = Chosen();
+        if (code == "") return;
+        if (_compare.Trim() == "")
+        {
+            SetStatus("Enter the set to compare with first.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var other = _compare.Trim().ToUpperInvariant();
+            var r = await Api.PostAsync("/api/cst/v1/cost-sets/" + Query.Path(code) + "/compare", new JsonObject { ["compareTo"] = other });
+            if (!await ShowResultAsync(r)) return;
+            var d = r.Data;
+            Populate(GridData.FromItems(d?["lines"],
+                Fmt.Col("item", "Item"), Fmt.Col("revision", "Revision"), Fmt.Col("oldCost", "OldCost", "MONEY"),
+                Fmt.Col("newCost", "NewCost", "MONEY"), Fmt.Col("difference", "Difference", "MONEY"),
+                Fmt.Col("differencePct", "DiffPct", "MONEY"), Fmt.Col("qtyHeld", "QtyHeld", "QTY"),
+                Fmt.Col("revaluation", "Revaluation", "MONEY"), Fmt.Col("note", "Note")));
+            _comparisonSet = code;
+            SetStatus("Compared " + code + " with " + other + ": " + Fmt.Num(d?["itemCount"]) + " item(s), revaluation " +
+                      Fmt.Money(d?["revalGbp"]) + ".  Press F5 for the set list.", CueOk);
+        });
+    }
+
+    /// <summary>frmCostSet.Act: the STDCOST action, then the list reloaded with the set reselected and the outcome line.</summary>
+    private async Task ActAsync(string what, string action, bool instruction)
+    {
+        var code = Chosen();
+        if (code == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync("/api/cst/v1/cost-sets/" + Query.Path(code) + "/" + action, new JsonObject(),
+                instruction ? Instruction.New().Options() : null);
+            if (!await ShowResultAsync(r)) return;
+            await LoadDataAsync();
+            for (var i = 0; i < Data.Count; i++)
+            {
+                if (Fmt.Text(Data.Value(i, "costSet")) == code)
+                {
+                    Selected = i;
+                    break;
+                }
+            }
+            var d = r.Data;
+            var approvedBy = Fmt.Text(d?["approvedBy"]);
+            var warning = Fmt.Text(d?["warning"]);
+            SetStatus(what + " " + code + ": status " + Fmt.Text(d?["status"]) + ", prepared by " + Fmt.Text(d?["preparedBy"]) +
+                      ", approved by " + (approvedBy == "" ? "-" : approvedBy) + ", " + Fmt.Num(d?["itemCount"]) + " item(s), revaluation " +
+                      Fmt.Money(d?["revalGbp"]) + (warning != "" ? "  | " + warning : ""),
+                      warning != "" ? CueWarning : CueOk);
+        });
+    }
+
+    /// <summary>frmCostSet.Chosen: the selected row's CostSet, else the set of the last comparison, else a prompt.</summary>
+    private string Chosen()
+    {
+        var c = Fmt.HasColumn(Data, "costSet") && Selected >= 0 ? Fmt.Text(Data.Value(Selected, "costSet")) : "";
+        if (c == "") c = _comparisonSet;
+        if (c == "") SetStatus("Select a cost set first.", CueWarning);
+        return c;
+    }
+}

@@ -1,0 +1,17 @@
+@* A caption with a read-only value box (Label with BorderStyle.Fixed3D, e.g. frmLogin lblUserValue). *@
+<div class="st-field">
+    <span style="@(LabelWidth > 0 ? $"width:{LabelWidth}px;display:inline-block" : null)" id="@($"{Id}-l")"><StMnemonic Text="@Caption" /></span>
+    <span class="st-value" id="@Id" style="width:@(Width)px">@Value</span>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Caption { get; set; } = "";
+
+    [Parameter] public string? Value { get; set; }
+
+    [Parameter] public string Id { get; set; } = "v-" + Guid.NewGuid().ToString("N")[..8];
+
+    [Parameter] public int Width { get; set; } = 290;
+
+    [Parameter] public int LabelWidth { get; set; }
+}

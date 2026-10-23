@@ -1,0 +1,38 @@
+# suite TAPVAT6 six month input VAT
+ok 1 - the later date is the 31 January due date
+ok 2 - six months later is 31 July 2027
+ok 3 - the invoice is repayable on that very day
+ok 4 - it is nought days past the six month date
+ok 5 - the return covering 31 July 2027 is 2027Q3
+ok 6 - 30 July 2027 is one day too early
+ok 7 - nothing is repaid before the six month date
+ok 8 - the shortfall is one day
+ok 9 - the later of the two dates is the supply date
+ok 10 - the clock runs from the supply date
+ok 11 - a due date with no supply date still works
+ok 12 - 31 August 2026 becomes 28 February 2027
+ok 13 - 31 August 2023 becomes 29 February 2024
+ok 14 - the year rolls over with the months
+ok 15 - 31 May 2026 becomes 30 November 2026
+ok 16 - the whole input VAT claim is repaid
+ok 17 - the invoice is 100 per cent unpaid
+ok 18 - the adjustment is clean
+ok 19 - a quarter outstanding repays a quarter of the VAT
+ok 20 - the unpaid proportion is 25 per cent
+ok 21 - 33.336666 rounds up to 33.34
+ok 22 - an invoice already repaid is not repaid again
+ok 23 - the second pass is a warning, not an error
+ok 24 - and it is no longer flagged as repayable
+ok 25 - the whole repayment is reclaimed on payment
+ok 26 - the reclaim falls in the 2027Q3 return
+ok 27 - the reclaim is clean
+ok 28 - a part payment reclaims the paid proportion
+ok 29 - an invoice never repaid reclaims nothing
+ok 30 - and says so with a warning
+ok 31 - January 2027 is the first quarter
+ok 32 - December 2027 is the fourth quarter
+ok 33 - an invoice with no dates is rejected
+ok 34 - an unknown function is rejected
+1..34
+# TAPVAT6 six month input VAT passed 00034 failed 00000
+# exit 0

@@ -1,0 +1,388 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-JOBS",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-JOBS-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-JOBS-001-AC1",
+          "ac": 1,
+          "title": "Job host /health/ready reports the schema drift check (no differences on the isolated copy)",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "health"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "jobs_getReadiness"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.status",
+              "equals": "Healthy"
+            },
+            {
+              "on": "r",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "r",
+              "json": "$.driftDifferences",
+              "count": 0
+            }
+          ],
+          "derivation": "AC 'drift check reported on /health/ready' read with the STERP-JOBS.openapi.yaml jobs_getReadiness 200 example (checks database and schema-drift Healthy, driftDifferences []) and contracts 6.11 on the unmodified isolated database deployed from STERP-App/db (db/00-create-database.sql:5-12).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-JOBS-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-JOBS-002-AC1",
+          "ac": 1,
+          "title": "MONTHEND submitted while STERP-CST (W10) is undelivered returns 501 API0501 naming STERP-CST / CSTINVAL",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "fin_submitMonthendStreamRun",
+              "body": {
+                "CO": "STC",
+                "YEAR": "2026",
+                "PERIOD": "7",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "problem": {
+                "status": 501,
+                "type": "not-implemented",
+                "reasonCode": "API0501",
+                "detailContains": "STERP-CST"
+              }
+            },
+            {
+              "on": "r",
+              "bodyContains": "CSTINVAL"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'MONTHEND'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC 'MONTHEND before W10 returns 501 naming CST (CSTINVAL)' with STERP-FIN.md FR-STERP-FIN-060 acceptance (501 API0501 \"STERP-CST\") and PLATFORM D-PLAT-07 (nothing registered), legacy jobs/MONTHEND.cmd STEP030 CSTINVAL; precondition: STERP-FIN delivered and STERP-CST not yet delivered.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-JOBS-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-JOBS-010-AC1",
+          "ac": 1,
+          "title": "TBRPT submission returns 202 RUNNING, is registered in core.JobRun and ends OK with return code 0 and a spool",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "acc",
+              "call": "fin_submitTbrptRun",
+              "body": {
+                "CO": "STC",
+                "FY": "2026",
+                "FROM": "7",
+                "TO": "7",
+                "ZERO": "N"
+              }
+            },
+            {
+              "save": "run",
+              "job": "fin_submitTbrptRun",
+              "body": {
+                "CO": "STC",
+                "FY": "2026",
+                "FROM": "7",
+                "TO": "7",
+                "ZERO": "N"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "acc",
+              "status": 202
+            },
+            {
+              "on": "acc",
+              "json": "$.status",
+              "equals": "RUNNING"
+            },
+            {
+              "on": "acc",
+              "json": "$.jobName",
+              "equals": "TBRPT"
+            },
+            {
+              "on": "acc",
+              "json": "$.jobRunId",
+              "exists": true,
+              "normalize": "generated-id"
+            },
+            {
+              "on": "run",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "run",
+              "spoolContains": "Trial balance total"
+            },
+            {
+              "sql": "SELECT TOP (1) CASE WHEN Status = 'OK' AND ReturnCode = 0 AND SpoolFile IS NOT NULL THEN 1 ELSE 0 END FROM core.JobRun WHERE JobName = 'TBRPT' ORDER BY JobRunId DESC",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC 'TBRPT run 202, RUNNING in legacy Job Monitor, ends OK RC0 with spool'; JobRunAccepted status RUNNING (STERP-JOBS.openapi.yaml), core.usp_JobRunStart/End registration read by the legacy monitor through core.JobRun (contracts 6.10, 8.3), JOBLOG COMPLETE->OK (cobol/online/common/JOBLOG.cob:189-190) and the TBRPT footing text 'Trial balance total' (cobol/batch/fin/TBRPT.cob:130); ReportService.vb:98-170.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-JOBS-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-JOBS-011-AC1",
+          "ac": 1,
+          "title": "Spool of a target RECONCTL run and the legacy RECONCTL spool are both offered by the target spool viewer",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "report",
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "file": {
+                "root": "legacy-run",
+                "name": "spool\\RECONCTL-STC-20261021230858.lst",
+                "fixture": "legacy-run/spool/RECONCTL-STC-20261021230858.lst",
+                "sha256": "77ee30382ecf6b1e306a4bc15388531e509afe24540d85c1ac84a782b665db78"
+              }
+            },
+            {
+              "save": "run",
+              "job": "xmd_submitReconctlRun",
+              "body": {
+                "CO": "STC",
+                "ASAT": "20261031",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "files",
+              "call": "jobs_listSpoolFiles",
+              "query": {
+                "filter": "lst",
+                "folder": "spool"
+              }
+            },
+            {
+              "save": "legacy",
+              "call": "jobs_getSpoolFile",
+              "query": {
+                "path": "${legacyRunRoot}\\spool\\RECONCTL-STC-20261021230858.lst"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "spoolContains": "INVENTORY"
+            },
+            {
+              "on": "files",
+              "json": "$.items[*].root",
+              "equals": "target"
+            },
+            {
+              "on": "files",
+              "json": "$.items[*].root",
+              "equals": "legacy"
+            },
+            {
+              "on": "files",
+              "json": "$.items[*].fileName",
+              "matches": "^RECONCTL"
+            },
+            {
+              "on": "legacy",
+              "status": 200
+            },
+            {
+              "on": "legacy",
+              "bodyContains": "INVENTORY  Inventory control"
+            }
+          ],
+          "derivation": "AC 'target and legacy spool of same report both open in target viewer' with contracts 8.5 (legacy run root served read only) and jobs_listSpoolFiles / jobs_getSpoolFile (root target/legacy); the legacy spool is the listing of an attributable legacy run of RECONCTL.exe CO=STC ASAT=20261031 MODE=PREVIEW (00631916) on democ (evidence p1 legacy-run-RECONCTL-democ-console.txt; it holds the INVENTORY family line), kept as the hashed fixture fixtures/legacy-run/spool/RECONCTL-STC-20261021230858.lst and placed by the file step in the hosts' configured legacy run root (STERP_TARGET_LEGACY_RUN_ROOT, the isolated stand-in for C:\\SourceCode\\STERP-App\\run; the democ RECONCTL row points at a removed Agent 07 runtime path), which ${legacyRunRoot} names for opening it. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-035: legacy spool staged from a legacy-run fixture; the legacy file is now also opened]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-JOBS-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-JOBS-012-AC1",
+          "ac": 1,
+          "title": "A TBRPT submission without USER registers and prints the signed-on STERP user (FINCTRL), not the program default GLCLERK",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "FINCTRL",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "run",
+              "job": "fin_submitTbrptRun",
+              "body": {
+                "CO": "STC",
+                "FY": "2026",
+                "FROM": "7",
+                "TO": "7"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "run",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "sql": "SELECT TOP (1) SubmittedBy FROM core.JobRun WHERE JobName = 'TBRPT' ORDER BY JobRunId DESC",
+              "equals": "FINCTRL"
+            },
+            {
+              "on": "run",
+              "spoolContains": "FINCTRL"
+            }
+          ],
+          "derivation": "AC 'USER parameter defaults to the signed-on STERP user' with contracts 8.2 and the legacy launcher passing the signed-on user (dotnet/STERP.Desktop/Forms/System/frmReportLauncher.vb:94-96); the program default would be GLCLERK (cobol/copy/FINBATPR.cpy 9500-STD-ARGS) and JOBLOG START registers CA-USER as SubmittedBy (JOBLOG.cob:136) and the heading prints RPT-USER (FINBATPR.cpy 9250).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-JOBS-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-JOBS-013-AC1",
+          "ac": 1,
+          "title": "Job host readiness reports the job queue depth and the output folder state",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG"
+          },
+          "covers": [
+            "health",
+            "observability"
+          ],
+          "steps": [
+            {
+              "save": "r",
+              "call": "jobs_getReadiness"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "r",
+              "status": 200
+            },
+            {
+              "on": "r",
+              "json": "$.status",
+              "equals": "Healthy"
+            },
+            {
+              "on": "r",
+              "json": "$.checks[*].name",
+              "matches": "(?i)queue"
+            },
+            {
+              "on": "r",
+              "json": "$.checks[*].name",
+              "matches": "(?i)folder"
+            }
+          ],
+          "derivation": "AC 'readiness reports queue depth and folder state' with STERP-JOBS.md FR-STERP-JOBS-013 (database probe, drift check, output folders writable, queue depth) and contracts 10; the binding Health schema fixes only checks[name,status,description,data], so the check names for the queue and the folders are not determined.",
+          "confidence": "unknown"
+        }
+      ]
+    }
+  ]
+}

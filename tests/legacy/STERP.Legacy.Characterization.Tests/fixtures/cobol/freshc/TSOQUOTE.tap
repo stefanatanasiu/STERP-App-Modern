@@ -1,0 +1,20 @@
+# suite TSOQUOTE quote to order
+ok 1 - CREATE numbers the quote and leaves it DRAFT
+ok 2 - ISSUE sends version 1 to the customer
+ok 3 - ACCEPT without evidence is refused (SOQ0001)
+ok 4 - ACCEPT records how the customer accepted
+ok 5 - CONVERT raises an order from the accepted quote
+ok 6 - CONVERT defaults the invoiced party
+ok 7 - CONVERT defaults the delivery address
+ok 8 - CONVERT defaults the payment terms
+ok 9 - CONVERT records the trading terms in issue
+ok 10 - CONVERT states the VAT treatment basis
+ok 11 - the order keeps the quotation provenance
+ok 12 - the converted order has no acceptance blockers
+ok 13 - a repeated CONVERT returns the first order
+ok 14 - the second attempt made no second demand
+ok 15 - an expired version cannot be accepted (SOQ0006)
+ok 16 - a stated delivery address is not overwritten
+1..16
+# TSOQUOTE quote to order passed 00016 failed 00000
+# exit 0

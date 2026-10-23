@@ -1,0 +1,1 @@
+ok - ap demo GUI: native utility recognition is idempotent and funds a new independently approved Bacs run # SKIP writing tests require a dedicated STERP_QA_AP_ database, not production/shared GUI QA

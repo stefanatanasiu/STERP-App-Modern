@@ -1,0 +1,8 @@
+ok - maint: add, change and retire round trip through core.usp_UiMaintSave  # REQ: COM-013,COM-016
+ok - maint: the column whitelist rejects a column that is not registered  # REQ: COM-002
+ok - menu: core.usp_UiMenuLoad returns the shell menus  # REQ: COM-002,COM-024
+ok - prefs: a user preference survives a round trip  # REQ: COM-024
+ok - security: core.usp_GetUserContext maps the Windows login to a STERP user  # REQ: COM-002
+ok - security: the RESTRICT user is refused company CAL  # REQ: COM-002 AC: AC-006
+ok - sql: SqlHelper runs a core stored procedure and returns a DataTable  # REQ: COM-011
+ok - sql: a THROWn 'STERP-E-nnnn: text' becomes a BusinessRuleException  # REQ: COM-017

@@ -1,0 +1,4677 @@
+openapi: "3.1.0"
+info:
+  title: "STERP Kits (kitting and assembly) API (STERP-KIT)"
+  version: "1.0.0+a06-20261020T112437Z-034eff00"
+  description: "Online and batch API of the Kits slice (target application STERP-KIT, wave W9, API segment kit) of the modernized STERP ERP. Online operations run in STERP.Api (https://localhost:7101) and replace the WinForms kit screens (frmKitMaint, frmKitExecution, frmKitTrial, frmKitGenealogy), the VB facades KitService/KitExecutionService and the online COBOL programs KITCREAT, KITTRIAL, KITISSUE, KITCOST, KITCOMM, GENEALOG (with the internal callees KITDB and KITQTY) and the procedures kit.usp_KitReadiness and kit.usp_KitGenealogy. Job submissions run in STERP.Jobs (https://localhost:7102) and replace the batch programs KITRDY (catalogue KITRP010/020/030) and KITDOCP (KITRP040); run status, SYSOUT, spool and result are the platform resources /api/jobs/v1/runs/{jobRunId}... (STERP-PLATFORM). The legacy behaviour is the contract: return/reason codes, message texts, data effects, units of work and quirks are reproduced as specified in application-specs/STERP-KIT.md and 01-shared-platform-contracts.md (outcome envelope 4.6, problem details 4.7, input normalization 4.4). Item codes in examples are illustrative (the demo seed binds kit parents and components to the first MADE/BOUGHT items of the company, db/seed/95-kit-demo.sql:39-53); kit references, statuses and quantities are the seeded demo values. Deferred legacy routes (create, amend, reserve/pick, complete, return, scrap, close, multi-trial, disassembly) are not exposed in v1 (STERP-KIT-dispositions.csv)."
+servers:
+  - url: "https://localhost:7101"
+    description: "STERP.Api (online)"
+security:
+  - windows: []
+tags:
+  - name: "Kit Maintenance"
+    description: "Legacy screen frmKitMaint (menu KIT.MAINT 'Kit Maintenance...'): worklist, lines, review, release, kind check, commercial sets."
+  - name: "Kit Execution"
+    description: "Legacy screen frmKitExecution (menu KIT.EXEC 'Kit Execution...'): enquiry, issue check, issue, backflush, cost."
+  - name: "Trial Kitting"
+    description: "Legacy screen frmKitTrial (menu KIT.TRIAL 'Trial Kitting...'): non-committing trial and maximum build."
+  - name: "Genealogy Enquiry"
+    description: "Legacy screen frmKitGenealogy (menu KIT.GENEALOGY 'Genealogy Enquiry...'): trace and recall list."
+  - name: "Kit Reports"
+    description: "Legacy report catalogue rows KITRP010, KITRP020, KITRP030 (KITRDY) and KITRP040 (KITDOCP)."
+paths:
+  "/api/kit/v1/kits":
+    get:
+      operationId: "kit_listKitWorklist"
+      summary: "Kit worklist with readiness to pick"
+      description: "Returns the complete result of kit.usp_KitReadiness for the caller's company, optionally filtered by site, status and kit reference (blank or absent = NULL = all; KitArea.Opt). One row per kit with line count, short lines (RemainingQty > ReservedQty), covered lines, readiness % (decimal(5,1)), ready flag and summed issued/returned/scrapped quantities over non-cancelled lines; every kit status is listed (unlike the KITRDY batch listing, SME-1156); ordered by NeedDate (NULL first) then KitRef. Legacy chain: frmKitMaint.LoadData (frmKitMaint.vb:45-47) -> KitService.Worklist (KitService.vb:36-40) -> kit.usp_KitReadiness (db/procs/kit/usp_KitEnquiry.sql:16-60). When the procedure is not deployed the legacy returns an empty table; the target returns an empty list. The Kit Maintenance page sends site = its Site filter (default session site) and status blank for ALL."
+      tags:
+        - "Kit Maintenance"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+        - name: "site"
+          in: "query"
+          required: false
+          description: "@SiteCode; blank = all sites."
+          schema:
+            type: "string"
+            maxLength: 10
+            x-sterp-legacy-field: "@SiteCode varchar(10)"
+            x-sterp-length: 10
+          example: "RDG"
+        - name: "status"
+          in: "query"
+          required: false
+          description: "@Status; blank = all statuses. The page offers ALL, DRAFT, RELEASED, PARTISSUED, COMPLETE, CLOSED, CANCELLED (COMPLETE and CLOSED match no kit status)."
+          schema:
+            type: "string"
+            maxLength: 14
+            x-sterp-legacy-field: "@Status varchar(14)"
+            x-sterp-length: 14
+          example: "RELEASED"
+        - name: "kitRef"
+          in: "query"
+          required: false
+          description: "@KitRef; blank = all kits."
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "@KitRef varchar(30)"
+            x-sterp-length: 30
+          example: "KIT0001002"
+      responses:
+        "200":
+          description: "Complete worklist in legacy order."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitWorklistList"
+              example:
+                items:
+                  - kitRef: "KIT0001001"
+                    siteCode: "RDG"
+                    parentItemCode: "FG-BIKE-COMMUTE-M"
+                    status: "PARTCOMPLETE"
+                    plannedGoodQty: 10.0
+                    completedGoodQty: 4.0
+                    needDate: "2026-11-05"
+                    wipValueGBP: 1842.5
+                    lineCount: 3
+                    shortLines: 0
+                    coveredLines: 3
+                    readyPct: 100.0
+                    isReady: true
+                    issuedQty: 121.0
+                    returnedQty: 4.0
+                    scrappedQty: 1.0
+                  - kitRef: "KIT0001002"
+                    siteCode: "RDG"
+                    parentItemCode: "FG-BIKE-COMMUTE-M"
+                    status: "RELEASED"
+                    plannedGoodQty: 25.0
+                    completedGoodQty: 0.0
+                    needDate: "2026-11-20"
+                    wipValueGBP: 0.0
+                    lineCount: 3
+                    shortLines: 1
+                    coveredLines: 2
+                    readyPct: 66.7
+                    isReady: false
+                    issuedQty: 0.0
+                    returnedQty: 0.0
+                    scrappedQty: 0.0
+                count: 2
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-010"
+        - "FR-STERP-KIT-050"
+      x-sterp-legacy:
+        forms:
+          - "frmKitMaint.LoadData (dotnet/STERP.Desktop/Forms/Kits/frmKitMaint.vb:45-47)"
+        facade:
+          - "KitService.Worklist (dotnet/STERP.Business/Kits/KitService.vb:36-40)"
+          - "KitArea.Opt (KitArea.vb:84-87)"
+        sql:
+          - "kit.usp_KitReadiness (db/procs/kit/usp_KitEnquiry.sql:16-60)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One autocommit procedure call on a short connection (legacy SqlHelper, STERP.Data/SqlHelper.cs:56-120); kit.usp_KitReadiness makes no persistent write (Agent 03 SQL-Programmability.csv). No transaction."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.EXEC.CREATE"
+        sources:
+          - "menu:KIT.MAINT=KIT.EXEC.CREATE"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/kits/{kitRef}":
+    get:
+      operationId: "kit_getKit"
+      summary: "Kit enquiry: header and every requirement line"
+      description: "Reproduces KitService.Enquire (KitService.vb:76-83): KITCREAT ENQUIRE (KC-SITE = X-STERP-Site, FROM-LINE 0, WIN-MAX 20) then GETLINE while KC-MORE-LINES = Y with FROM-LINE = rows already returned (KitArea.Page, KitArea.vb:66-81), inside one request. Blank reference -> 422 KIT0003 'A kit reference is required.'; unknown kit -> 404 KIT0001 'Kit <ref> is not known in this company.'; driver failure -> 500 SQL0001. Lines come in LineNum order including CLOSED and CANCELLED, with net issued, remaining and excess recomputed by KITQTY LINEQTY (return code ignored) and a blank description (KITCREAT.cob:752-843). Parity: because the pager passes a count as a 1-based start, the line at position 20 is returned twice when the kit has more than 20 lines (SME-644; BC-KIT-05). completeness and shortageCnt are returned as ENQUIRE leaves them (blank, 0). The kit id KITCREAT retains between calls is replaced by the explicit kitRef (decision D-KIT-01; BC-KIT-01, SME-029). Refusals (404/422/500) carry the problem data member (contracts 4.7): a KitExecutionKit with the header as the program left it and the lines already collected (none when the first call fails), because frmKitMaint/frmKitExecution populate the grid from the facade table before the error dialog (decision D-KIT-08)."
+      tags:
+        - "Kit Maintenance"
+        - "Kit Execution"
+      parameters:
+        - "$ref": "#/components/parameters/KitKitRefPath"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: "RC 0 (or 4) - kit header and all lines."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitExecutionKitEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-002"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  kitRef: "KIT0001001"
+                  execKitId: 1
+                  site: "RDG"
+                  parentItem: "FG-BIKE-COMMUTE-M"
+                  parentRev: ""
+                  bomId: 0
+                  bomRev: ""
+                  sourceType: "STOCK"
+                  sourceRef: "KIT0001001"
+                  jobRef: ""
+                  parentKitRef: ""
+                  plannedQty: 10.0
+                  completedQty: 4.0
+                  rejectedQty: 0.0
+                  grossStarts: 10.0
+                  yield: 1.0
+                  quantum: 0.0
+                  batchSize: 0.0
+                  runCount: 1
+                  batchCount: 0
+                  needDate: "2026-11-05"
+                  startDate: "2026-10-26"
+                  completeDate: "2026-11-05"
+                  selectionDate: "2026-10-06"
+                  ownerUser: "PLANNER"
+                  status: "PARTCOMPLETE"
+                  backflush: "N"
+                  wipValue: 1842.5
+                  approvalId: 0
+                  completeness: ""
+                  shortageCnt: 0
+                  warningText: ""
+                  lines:
+                    - lineNum: 2
+                      path: "2"
+                      item: "BOLT-M5X16-SS"
+                      revision: ""
+                      description: ""
+                      basis: "PROPORTION"
+                      uom: "EA"
+                      factor: 1.0
+                      originalRequirement: 20.0
+                      currentRequirement: 20.0
+                      scrapPct: 0.0
+                      reserved: 20.0
+                      picked: 20.0
+                      grossIssued: 20.0
+                      returned: 4.0
+                      scrapped: 0.0
+                      netIssued: 16.0
+                      remaining: 4.0
+                      excess: 0.0
+                      substitute: ""
+                      needDate: "2026-11-05"
+                      location: ""
+                      unitCost: 3.25
+                      status: "PARTISSUED"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-011"
+        - "FR-STERP-KIT-050"
+        - "FR-STERP-KIT-051"
+        - "FR-STERP-KIT-060"
+        - "FR-STERP-KIT-061"
+      x-sterp-legacy:
+        forms:
+          - "frmKitMaint.LinesClicked (frmKitMaint.vb:50-56)"
+          - "frmKitExecution.LoadData (frmKitExecution.vb:43-56)"
+        facade:
+          - "KitService.Enquire (KitService.vb:76-83)"
+          - "KitArea.Page (KitArea.vb:66-81)"
+        cobol:
+          - "KITCREAT ENQUIRE/GETLINE (cobol/online/kit/KITCREAT.cob:683-843)"
+          - "KITDB HDRGET/LINOPEN/LINNEXT/LINCLOS (KITDB.cob:169-307,513-660)"
+          - "KITQTY LINEQTY (KITQTY.cob:99-149)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read only. KITCREAT ENQUIRE/GETLINE issue no BEGN; the reads run in autocommit on the request connection; no write, no transaction."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.EXEC.CREATE"
+          - "KIT.ISSUE.POST"
+        sources:
+          - "menu:KIT.EXEC=KIT.ISSUE.POST"
+          - "menu:KIT.MAINT=KIT.EXEC.CREATE"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/kits/{kitRef}/review":
+    post:
+      operationId: "kit_reviewKit"
+      summary: "Review a DRAFT kit (DRAFT to REVIEWED)"
+      description: "Reproduces KitService.Review (KitService.vb:64-66) -> KITCREAT REVIEW (KITCREAT.cob:503-570). Status must be DRAFT, else 422 KIT0005 'Only a draft kit may be reviewed; this kit is <status>.'. Line-completeness gate over every line, CLOSED and CANCELLED included: no line -> 422 KIT0004 'This kit has no material requirement lines.'; a line without UoM or with requirement <= 0 -> 422 KIT0004 'One or more material lines have no unit or no requirement quantity.'. Then KITDB HDRSTAT sets REVIEWED (no from-status predicate, no RowVer) and AUDITLOG writes entity KIT.EXECUTIONKIT, action REVIEW, Status DRAFT -> REVIEWED, blank reason and authority, source KITCREAT, site = X-STERP-Site (KITCREAT.cob:648-680). The legacy call passes no explicit correlation id: the Idempotency-Key or a new GUID is used."
+      tags:
+        - "Kit Maintenance"
+      parameters:
+        - "$ref": "#/components/parameters/KitKitRefPath"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        description: "No input beyond the path (legacy facade takes only the kit reference)."
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              properties: {}
+            example: {}
+      responses:
+        "200":
+          description: "RC 0 - kit reviewed."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitLifecycleEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-002"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  kitRef: "KIT0001004"
+                  status: "REVIEWED"
+                  prevStatus: "DRAFT"
+                  completeness: "COMPLETE"
+                  shortageCnt: 0
+                  lineTotal: 2
+                  needsAuth: "N"
+                  reasonText: ""
+                  warningText: ""
+                  wipValue: 0.0
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-012"
+        - "FR-STERP-KIT-050"
+        - "FR-STERP-KIT-060"
+      x-sterp-legacy:
+        forms:
+          - "frmKitMaint.ReviewClicked / OnConfirm F10 (frmKitMaint.vb:59-64,110-112)"
+        facade:
+          - "KitService.Review (KitService.vb:64-66)"
+        cobol:
+          - "KITCREAT REVIEW (KITCREAT.cob:503-570,648-709)"
+          - "KITDB HDRGET/LINOPEN/LINNEXT/HDRSTAT"
+          - "AUDITLOG WRITE -> core.usp_WriteAudit"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "No BEGN/COMT in KITCREAT (SME-643): autocommit per statement - header and line reads; UPDATE kit.ExecutionKit Status (KITDB HDRSTAT) commits alone; EXEC core.usp_WriteAudit (AUDITLOG) commits alone. A failure after HDRSTAT leaves the status changed without the audit row (reproduced)."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.EXEC.CREATE"
+        sources:
+          - "menu:KIT.MAINT=KIT.EXEC.CREATE"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/kits/{kitRef}/release":
+    post:
+      operationId: "kit_releaseKit"
+      summary: "Release a kit (authority KIT.EXEC.RELEASE and freeze)"
+      description: "Reproduces KitService.Release (KitService.vb:69-73) -> KITCREAT RELEASE (KITCREAT.cob:576-646). Status must be REVIEWED or DRAFT, else 422 KIT0005 'A kit in status <status> cannot be released.'. PERMCHK CHECK of KIT.EXEC.RELEASE for the user at the kit's own site: any non-zero PERMCHK result sets RC 6 KIT0009, needsAuth Y, message = PERMCHK reason text (normally core.usp_CheckPermission's 'STERP-E-0001: User <user> does not hold permission KIT.EXEC.RELEASE for company <co> site <site>.', db/procs/core/usp_CheckPermission.sql:15) or, when blank, 'Releasing an execution kit needs the kit release authority.'. RC 6 is not CA-FAILED (STCAHDR.cpy:27), so the release continues (BR-KITCREAT-026): the line-completeness gate (as review; RC 8 there replaces the hold and stops), KITDB HDRFRZ (frozen assumptions rewritten from the header just read, SupplyChoiceNote 'Released from bill <rev> selected at <yyyymmdd>'), HDRSTAT RELEASED with ReleasedBy/ReleasedAt, audit RELEASE (blank reason) and reasonText 'Revisions, units and calculation assumptions are now fixed for this kit.'. Without the authority the response is therefore HTTP 202 RC 6 KIT0009 for a kit that has been released (parity, SME-038; decision D-KIT-09; BC-KIT-10 proposes stopping on the hold). One Idempotency-Key per user instruction (the legacy drew a new correlation id per click)."
+      tags:
+        - "Kit Maintenance"
+      parameters:
+        - "$ref": "#/components/parameters/KitKitRefPath"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        description: "No input beyond the path (KC-OWNER-USER is set to the user but not written)."
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              properties: {}
+            example: {}
+      responses:
+        "200":
+          description: "RC 0 - kit released."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitLifecycleEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-002"
+                  correlationId: "7a0d5c1e-2b44-4f0e-8e9a-61c3b2d4e5f6"
+                data:
+                  kitRef: "KIT0001004"
+                  status: "RELEASED"
+                  prevStatus: "DRAFT"
+                  completeness: "COMPLETE"
+                  shortageCnt: 0
+                  lineTotal: 2
+                  needsAuth: "N"
+                  reasonText: "Revisions, units and calculation assumptions are now fixed for this kit."
+                  warningText: ""
+                  wipValue: 0.0
+        "202":
+          description: "RC 6 HOLD KIT0009 - release authority missing; the legacy flow nevertheless froze and released the kit and wrote the audit row (BR-KITCREAT-026, SME-038)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitLifecycleEnvelope"
+              example:
+                outcome:
+                  returnCode: 6
+                  severity: "HOLD"
+                  reasonCode: "KIT0009"
+                  message: "STERP-E-0001: User WHSE does not hold permission KIT.EXEC.RELEASE for company STC site RDG."
+                  messageCount: 0
+                  documentRef: "KIT-002"
+                  correlationId: "7a0d5c1e-2b44-4f0e-8e9a-61c3b2d4e5f6"
+                data:
+                  kitRef: "KIT0001004"
+                  status: "RELEASED"
+                  prevStatus: "DRAFT"
+                  completeness: "COMPLETE"
+                  shortageCnt: 0
+                  lineTotal: 2
+                  needsAuth: "Y"
+                  reasonText: "Revisions, units and calculation assumptions are now fixed for this kit."
+                  warningText: ""
+                  wipValue: 0.0
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-013"
+        - "FR-STERP-KIT-050"
+        - "FR-STERP-KIT-060"
+      x-sterp-legacy:
+        forms:
+          - "frmKitMaint.ReleaseClicked (frmKitMaint.vb:68-77)"
+        facade:
+          - "KitService.Release (KitService.vb:69-73)"
+        cobol:
+          - "KITCREAT RELEASE (KITCREAT.cob:576-680)"
+          - "PERMCHK CHECK KIT.EXEC.RELEASE -> core.usp_CheckPermission"
+          - "KITDB HDRFRZ/HDRSTAT (KITDB.cob:407-438,471-511)"
+          - "AUDITLOG WRITE"
+      x-sterp-permission:
+        - "KIT.EXEC.RELEASE"
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "No BEGN/COMT in KITCREAT (SME-643): autocommit per statement - PERMCHK read; line reads; UPDATE kit.ExecutionKit frozen assumptions (HDRFRZ) commits; UPDATE Status RELEASED (HDRSTAT) commits; core.usp_WriteAudit commits. The same writes happen on the RC 6 KIT0009 path (BR-KITCREAT-026); a failure after HDRFRZ leaves the freeze without the status change (reproduced)."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.EXEC.CREATE"
+        sources:
+          - "menu:KIT.MAINT=KIT.EXEC.CREATE"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/kits/{kitRef}/kind-check":
+    post:
+      operationId: "kit_checkKitKind"
+      summary: "Kind check: may the parent be received into stock"
+      description: "Reproduces KitService.KindCheck (KitService.vb:89-93) -> KITCREAT KINDCHK (KITCREAT.cob:119-175); the kit reference is passed but not read. mayReceive starts N; blank parentItem -> 422 KIT0003 'A parent item code is required.'; unknown item -> 404 KIT0001 'Item <item> is not known in this company.'; first match: COMMERCIAL -> N 'A commercial kit parent is a commercial identity, not an item balance.'; PHANTOM -> N 'A phantom grouping has no receipt, no run and no separate stock.'; TRIAL -> N 'A trial is a calculation and commits nothing.'; stocked item -> Y 'A stocked assembly may be completed into stock.'; otherwise N with RC 4 KIT0006 'This parent item does not hold stock and cannot be received as a finished assembly.'. Read only. The Kit Maintenance page sends kitKind blank (the worklist has no KitKind column, GridHelper.vb:171) and the selected ParentItemCode (decision D-KIT-07)."
+      tags:
+        - "Kit Maintenance"
+      parameters:
+        - "$ref": "#/components/parameters/KitKitRefPath"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/KitKindCheckRequest"
+            example:
+              kitKind: ""
+              parentItem: "FG-BIKE-COMMUTE-M"
+      responses:
+        "200":
+          description: "RC 0 or RC 4 KIT0006 (non-stocked parent)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitKindCheckEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-002"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  kitRef: "KIT0001001"
+                  kitKind: ""
+                  parentItem: "FG-BIKE-COMMUTE-M"
+                  parentDesc: "Commuter bike, medium frame"
+                  mayReceive: "Y"
+                  reasonText: "A stocked assembly may be completed into stock."
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-014"
+        - "FR-STERP-KIT-050"
+        - "FR-STERP-KIT-060"
+      x-sterp-legacy:
+        forms:
+          - "frmKitMaint.KindClicked (frmKitMaint.vb:81-91)"
+        facade:
+          - "KitService.KindCheck (KitService.vb:89-93)"
+        cobol:
+          - "KITCREAT KINDCHK (KITCREAT.cob:119-175)"
+          - "KITDB ITEMGET (KITDB.cob:764-827)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read only (KITDB ITEMGET in autocommit); no write."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.EXEC.CREATE"
+        sources:
+          - "menu:KIT.MAINT=KIT.EXEC.CREATE"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/kits/{kitRef}/issues/check":
+    post:
+      operationId: "kit_checkComponentIssue"
+      summary: "Check a component issue without posting (KITISSUE CHECK)"
+      description: "Reproduces KitExecutionService.Issue with checkOnly true (KitExecutionService.vb:53-77) -> KITISSUE CHECK (KITISSUE.cob:143-145,221-263): every ISSUE validation runs (kit status RELEASED/PARTISSUED/ISSUED/PARTCOMPLETE else KIT0005; line KIT0007; substitution KIT0014 hold; item KIT0001; quantity KIT0003; traceability KIT0012; overissue KIT0008 or KIT0009 hold; AVAILQ eligible stock KIT0010) and, when nothing at RC >= 8 was set, impactText 'Issue would be accepted.' is returned without posting and without raising the shortage exception. An overissue with a reason text (the page sends allowOver N in check mode) returns HTTP 202 RC 6 KIT0009 together with 'Issue would be accepted.' (SME-038). Site = X-STERP-Site; dates = business date; approval ids are never sent."
+      tags:
+        - "Kit Execution"
+      parameters:
+        - "$ref": "#/components/parameters/KitKitRefPath"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/KitIssueRequest"
+            example:
+              lineNum: 1
+              itemCode: "BOLT-M5X16-SS"
+              lotCode: ""
+              serialNo: ""
+              quantity: 10.0
+              location: ""
+              reasonCode: ""
+              reasonText: ""
+              allowOver: "N"
+      responses:
+        "200":
+          description: "RC 0 - the issue would be accepted."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitIssueEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-010"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  kitRef: "KIT0001002"
+                  lineNum: 1
+                  itemCode: "BOLT-M5X16-SS"
+                  plannedItem: "BOLT-M5X16-SS"
+                  revision: ""
+                  site: "RDG"
+                  warehouse: ""
+                  location: ""
+                  lotCode: ""
+                  serialNo: ""
+                  quantity: 10.0
+                  uomCode: "EA"
+                  stockQty: 0.0
+                  factor: 0.0
+                  unitCost: 0.0
+                  valueGbp: 0.0
+                  kitIssueId: 0
+                  movementId: 0
+                  lineGross: 0.0
+                  lineNet: 0.0
+                  lineRemaining: 250.0
+                  lineExcess: 0.0
+                  lineStatus: ""
+                  kitStatus: "RELEASED"
+                  wipValue: 0.0
+                  shortageQty: 0.0
+                  freeQty: 120.0
+                  traced: "N"
+                  duplicate: ""
+                  impactText: "Issue would be accepted."
+                  actualDate: "2026-10-07"
+                  postingDate: "2026-10-07"
+        "202":
+          description: "RC 6 HOLD - overissue without approval (KIT0009) or unapproved substitution (KIT0014); impactText still 'Issue would be accepted.'."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitIssueEnvelope"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-030"
+        - "FR-STERP-KIT-051"
+        - "FR-STERP-KIT-060"
+        - "FR-STERP-KIT-061"
+      x-sterp-legacy:
+        forms:
+          - "frmKitExecution.CheckClicked / Post (frmKitExecution.vb:64-66,78-94)"
+        facade:
+          - "KitExecutionService.Issue checkOnly (KitExecutionService.vb:53-77)"
+        cobol:
+          - "KITISSUE CHECK (KITISSUE.cob:103-408)"
+          - "KITDB HDRGET/LINGET/ITEMGET"
+          - "KITQTY LINEQTY"
+          - "AVAILQ AVAIL (IC-ITM-AVAILQ)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read only: KITDB and AVAILQ reads in autocommit; CHECK raises no exception and posts nothing (KITISSUE.cob:254-257,410-413)."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.ISSUE.POST"
+        sources:
+          - "menu:KIT.EXEC=KIT.ISSUE.POST"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/kits/{kitRef}/issues":
+    post:
+      operationId: "kit_issueComponent"
+      summary: "Issue one component to a kit (KITISSUE ISSUE)"
+      description: "Reproduces KitExecutionService.Issue with checkOnly false (KitExecutionService.vb:53-77) -> KITISSUE ISSUE (KITISSUE.cob:221-672). Validations as the check operation; RC 6 holds (KIT0014 substitution, KIT0009 overissue without approval) do not stop the flow (SME-038). Shortage (eligible < quantity): 422 KIT0010 'Insufficient eligible stock: short by <n>. An approval cannot create physical stock.' and an EXCPRAIS exception 'KIT MATERIAL SHORTAGE' (severity ERROR, priority 2, owner = kit owner) that commits although the issue is refused. Posting: STKMOVE ISSUE with correlation id = first 30 characters of the Idempotency-Key (trimmed) + '-L' + 4-digit line number, unit cost standard (standard-costed, non-zero) else average (non-zero) else standard; kit.KitIssue type ISSUE; open picks consumed oldest first; line gross issued and value increased; STKRESV CONSUME of the planned item when reserved > 0; KITQTY recomputation; line PARTISSUED or ISSUED; LINSAVE (clears the deviation columns); a RELEASED kit becomes PARTISSUED. Excess > 0 returns RC 4 KIT0022 'Issued. Excess material of <n> is now on this line and needs a disposition.' replacing any earlier RC 6 or RC 12 of the call (BC-KIT-07, BC-KIT-08 proposals). Send one Idempotency-Key per user instruction."
+      tags:
+        - "Kit Execution"
+      parameters:
+        - "$ref": "#/components/parameters/KitKitRefPath"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/KitIssueRequest"
+            example:
+              lineNum: 1
+              itemCode: "BOLT-M5X16-SS"
+              lotCode: ""
+              serialNo: ""
+              quantity: 10.0
+              location: ""
+              reasonCode: ""
+              reasonText: ""
+              allowOver: "N"
+      responses:
+        "200":
+          description: "RC 0 posted, or RC 4 KIT0022 posted with excess."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitIssueEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-010"
+                  correlationId: "c0ffee00-1d2e-4f5a-9b8c-7d6e5f4a3b21"
+                data:
+                  kitRef: "KIT0001002"
+                  lineNum: 1
+                  itemCode: "BOLT-M5X16-SS"
+                  plannedItem: "BOLT-M5X16-SS"
+                  revision: ""
+                  site: "RDG"
+                  warehouse: ""
+                  location: ""
+                  lotCode: ""
+                  serialNo: ""
+                  quantity: 10.0
+                  uomCode: "EA"
+                  stockQty: 10.0
+                  factor: 1.0
+                  unitCost: 0.45
+                  valueGbp: 4.5
+                  kitIssueId: 101
+                  movementId: 5001
+                  lineGross: 10.0
+                  lineNet: 10.0
+                  lineRemaining: 240.0
+                  lineExcess: 0.0
+                  lineStatus: "PARTISSUED"
+                  kitStatus: "PARTISSUED"
+                  wipValue: 0.0
+                  shortageQty: 0.0
+                  freeQty: 120.0
+                  traced: "N"
+                  duplicate: "N"
+                  impactText: ""
+                  actualDate: "2026-10-07"
+                  postingDate: "2026-10-07"
+        "202":
+          description: "RC 6 HOLD returned with a posted movement when no excess remains (KIT0014 substitution); see SME-038."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitIssueEnvelope"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-030"
+        - "FR-STERP-KIT-051"
+        - "FR-STERP-KIT-060"
+        - "FR-STERP-KIT-061"
+      x-sterp-legacy:
+        forms:
+          - "frmKitExecution.IssueClicked / OnConfirm F10 / Post (frmKitExecution.vb:59-94)"
+        facade:
+          - "KitExecutionService.Issue (KitExecutionService.vb:53-77)"
+        cobol:
+          - "KITISSUE ISSUE (KITISSUE.cob:103-672)"
+          - "KITDB HDRGET/LINGET/ITEMGET/ISSINS/PCKUSE/LINSAVE/HDRSTAT"
+          - "KITQTY LINEQTY"
+          - "AVAILQ AVAIL, STKMOVE ISSUE (inv.usp_PostStockMovement), STKRESV CONSUME (ITM contracts)"
+          - "EXCPRAIS RAISE -> core.usp_RaiseException"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "No caller transaction (KITISSUE issues no BEGN, SME-643). Shortage path: core.usp_RaiseException commits alone although the issue is refused. Posting path: STKMOVE runs its own transaction because the connection is in autocommit (STKMOVE.cob:631-680; inv.usp_PostStockMovement owns a transaction when outermost) and commits movement, balance, cost layers and idempotency key; then INSERT kit.KitIssue, UPDATE kit.KitPick (PCKUSE batch), STKRESV CONSUME, UPDATE kit.ExecutionKitLine (LINSAVE) and UPDATE kit.ExecutionKit (HDRSTAT) each commit on their own. A failure after the movement leaves it posted without the kit rows (reproduced). Replays are detected only by STKMOVE on the derived '<key30>-L<nnnn>' correlation id (SME-647, SME-1872)."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.ISSUE.POST"
+        sources:
+          - "menu:KIT.EXEC=KIT.ISSUE.POST"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/kits/{kitRef}/backflush":
+    post:
+      operationId: "kit_backflushKit"
+      summary: "Backflush the open lines of a flagged kit (KITISSUE BACKFLSH)"
+      description: "Reproduces KitExecutionService.Backflush (KitExecutionService.vb:83-93) -> KITISSUE BACKFLSH (KITISSUE.cob:681-957). Kit must allow issues; IsBackflush 0 -> 422 KIT0013 'Backflush is not enabled on this kit; it must be explicitly authorised.'; goodQty <= 0 -> 422 KIT0003 'A good parent quantity is required to backflush.'; more than 300 open lines -> 422 KIT0003. Pass 1 checks every open line (no posting, no exception); any failure returns it with impactText 'Backflush refused: no material was issued and no parent was received. First failure on <item>.'. Pass 2 posts each line as the issue operation with kit.KitIssue type BACKFLUSH: item = recorded substitute else line item; traced items fail with KIT0013; FIXEDRUN/FIXEDBATCH issue the whole requirement only while nothing was issued; PROPORTION = round6(round6(requirement / planned) x good) capped at requirement - net issued; bin chosen through AVAILQ ENQUIRE. Success: impactText 'Backflush issued <nnnn> component line(s) once for the good output.'. A pass-2 failure leaves earlier lines posted (SME-643). There is no backflush dry run."
+      tags:
+        - "Kit Execution"
+      parameters:
+        - "$ref": "#/components/parameters/KitKitRefPath"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/KitBackflushRequest"
+            example:
+              goodQty: 1.0
+      responses:
+        "200":
+          description: "RC 0 (or RC 4 KIT0022 when a line ends in excess)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitBackflushEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-010"
+                  correlationId: "5b2e9c71-8d3a-4c6f-a1e0-9f8d7c6b5a43"
+                data:
+                  kitRef: "KIT0001003"
+                  goodQty: 1.0
+                  linesDone: 2
+                  linesFailed: 0
+                  failedItem: ""
+                  impactText: "Backflush issued 0002 component line(s) once for the good output."
+                  kitStatus: "PARTISSUED"
+                  wipValue: 640.0
+                  lineNum: 2
+                  lineStatus: "ISSUED"
+                  shortageQty: 0.0
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-031"
+        - "FR-STERP-KIT-051"
+        - "FR-STERP-KIT-060"
+        - "FR-STERP-KIT-061"
+      x-sterp-legacy:
+        forms:
+          - "frmKitExecution.BackflushClicked (frmKitExecution.vb:98-112)"
+        facade:
+          - "KitExecutionService.Backflush (KitExecutionService.vb:83-93)"
+        cobol:
+          - "KITISSUE BACKFLSH (KITISSUE.cob:681-957)"
+          - "KITDB, KITQTY"
+          - "AVAILQ ENQUIRE/AVAIL, STKMOVE ISSUE, STKRESV CONSUME (ITM contracts)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Pass 1 read only. Pass 2: per line the issue sequence (STKMOVE-owned movement transaction, then autocommit kit statements); lines posted before a later failure stay posted (F-KITISSUE-20, SME-643). Each line's movement carries '<key30>-L<nnnn>'."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.ISSUE.POST"
+        sources:
+          - "menu:KIT.EXEC=KIT.ISSUE.POST"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/kits/{kitRef}/cost":
+    get:
+      operationId: "kit_getKitCost"
+      summary: "Kit cost position: planned against actual with elements"
+      description: "Reproduces KitExecutionService.Cost (KitExecutionService.vb:136-149): KITCOST COST (VARIANCE when varianceOnly=Y; same picture, BR-KITCOST-001) then GETELEM, with cost set (page: STANDARD), as-at = business date, currency GBP, double check Y. KITCOST (KITCOST.cob:90-579): unknown kit -> 404 KIT0001; planned = sum over non-cancelled lines of round2(current requirement x plan unit cost); actuals = kit.KitIssue SUM(ValueGBP) by type up to the as-at posting date (issued = ISSUE + SUBSTISSUE + BACKFLUSH, returned = RETURN, scrapped = SCRAP inside issued, absorbed = LABOUR + OVERHEAD + SUBCON, completed = COMPLETE); child kits (ParentKitRef) counted, double count -> RC 4 KIT0027; without a COMPLETE value completed = round2((issued - returned + absorbed) x min(1, completed qty / planned qty)); residual = issued - returned + absorbed - completed; variance = (issued - returned + absorbed) - planned; reconciled always Y (SME-1901); cost set and currency do not change the figures (SME-1896). Refusals carry the problem data member (contracts 4.7): a KitCostPosition with no elements, because frmKitExecution populates the empty element grid before the error dialog (decision D-KIT-08)."
+      tags:
+        - "Kit Execution"
+      parameters:
+        - "$ref": "#/components/parameters/KitKitRefPath"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+        - name: "costSet"
+          in: "query"
+          required: false
+          description: "KK-COST-SET; the Kit Execution page sends STANDARD; blank becomes STD2026 in KITCOST."
+          schema:
+            type: "string"
+            maxLength: 20
+            default: "STANDARD"
+            x-sterp-legacy-field: "KK-COST-SET PIC X(20)"
+            x-sterp-length: 20
+          example: "STANDARD"
+        - name: "varianceOnly"
+          in: "query"
+          required: false
+          description: "Y runs function VARIANCE instead of COST (identical answer)."
+          schema:
+            type: "string"
+            maxLength: 1
+            enum:
+              - "Y"
+              - "N"
+            default: "N"
+            x-sterp-legacy-field: "facade parameter varianceOnly -> CA-FUNCTION VARIANCE|COST"
+            x-sterp-length: 1
+          example: "N"
+      responses:
+        "200":
+          description: "RC 0 (or RC 4 KIT0027)."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitCostEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-020"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  kitRef: "KIT0001001"
+                  costSet: "STANDARD"
+                  asAt: "2026-10-07"
+                  currency: "GBP"
+                  plannedGbp: 135.0
+                  issuedGbp: 135.0
+                  returnedGbp: 13.0
+                  scrappedGbp: 25.0
+                  absorbedGbp: 0.0
+                  completedGbp: 48.8
+                  residualGbp: 73.2
+                  varianceGbp: -13.0
+                  plannedQty: 10.0
+                  completedQty: 4.0
+                  unitCost: 12.2
+                  planUnitCost: 13.5
+                  subassyCnt: 0
+                  subassyGbp: 0.0
+                  doubleCheck: "Y"
+                  reconciled: "Y"
+                  kitStatus: "PARTCOMPLETE"
+                  noteText: "Residual WIP GBP 73.20 = issued - returned + absorbed - completed; scrap is inside issued. Subassemblies 0, each charged once."
+                  elements:
+                    - element: "MATERIAL"
+                      description: "Bought out material issued"
+                      planned: 135.0
+                      actual: 135.0
+                      variance: 0.0
+                      quantity: 121.0
+                      uom: "EA"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-032"
+        - "FR-STERP-KIT-051"
+        - "FR-STERP-KIT-060"
+      x-sterp-legacy:
+        forms:
+          - "frmKitExecution.CostClicked (frmKitExecution.vb:116-131)"
+        facade:
+          - "KitExecutionService.Cost (KitExecutionService.vb:136-149)"
+        cobol:
+          - "KITCOST COST/VARIANCE/GETELEM (KITCOST.cob:90-579)"
+          - "KITDB HDRGET/LINOPEN/LINNEXT"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read only (KITDB and SQLIO reads of kit.ExecutionKit, kit.ExecutionKitLine, kit.KitIssue in autocommit); no write."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.ISSUE.POST"
+        sources:
+          - "menu:KIT.EXEC=KIT.ISSUE.POST"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/trials":
+    post:
+      operationId: "kit_runTrialKitting"
+      summary: "Trial kitting: non-committing feasibility for a quantity and date"
+      description: "Reproduces KitService.Trial (KitService.vb:100-109,129-148): KITTRIAL TRIAL then GETLINE (0-based offset, no repeated lines) inside one request; selection date = business date; committed always N; nothing is written. KITTRIAL (KITTRIAL.cob:116-650): blank parentItem -> 422 KIT0003 'A parent item is required for a trial.'; requestedQty <= 0 -> 422 KIT0003 'The requested quantity must be greater than zero.'; site and dates default to the session values; one probe: BOMEXPL EXPLODE (calculation EXECUTION, view LEVEL1 when useSubassy Y else LEAF) - BOMEXPL RC > 4 -> 422 KIT0004 with its message, incomplete bill -> RC 4 KIT0004; NOTE/RESOURCE/BYPROD nodes, SERVICE/COSTONLY/NONSTOCK/NOTE supply and zero lines are skipped; net = requirement - stock used by the explosion; free stock from AVAILQ AVAIL for demand KIT/kitRef at the required date (own reservations added back, read once per item, drawn down across lines); expected inbound only when useInbound Y; a residual makes the trial infeasible; the limiting item has the largest residual. Feasible -> RC 0 'Feasible. Maximum complete output <qty>.' with action hint 'RELEASE OR RESERVE'; infeasible -> RC 4 KIT0010 (unless an earlier RC was set) with 'Short on <item> by <qty>. Nothing has been reserved or ordered.' and action hint 'REDUCE, SUBSTITUTE OR ORDER' (KITTRIAL.cob:571-594). The retained KITTRIAL result never crosses requests (decision D-KIT-02). Refusals carry the problem data member (contracts 4.7): a KitTrialResult with the summary as left and no lines, because frmKitTrial populates the empty grid before the error dialog (decision D-KIT-08)."
+      tags:
+        - "Trial Kitting"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/KitTrialRequest"
+            example:
+              kitRef: "KIT0001002"
+              parentItem: "FG-BIKE-COMMUTE-M"
+              parentRev: ""
+              site: "RDG"
+              requestedQty: 1.0
+              reqDate: "2026-10-07"
+              useInbound: "N"
+              useSubassy: "N"
+      responses:
+        "200":
+          description: "RC 0 feasible, or RC 4 KIT0010 / KIT0004 with the shortage lines."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitTrialEnvelope"
+              example:
+                outcome:
+                  returnCode: 4
+                  severity: "WARNING"
+                  reasonCode: "KIT0010"
+                  message: "Short on BOLT-M5X16-SS by 4.000000. Nothing has been reserved or ordered."
+                  messageCount: 0
+                  documentRef: "KIT-006"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  kitRef: "KIT0001002"
+                  parentItem: "FG-BIKE-COMMUTE-M"
+                  site: "RDG"
+                  requestedQty: 1.0
+                  reqDate: "2026-10-07"
+                  selectionDate: "2026-10-07"
+                  feasible: "N"
+                  committed: "N"
+                  completeness: "COMPLETE"
+                  maxBuildable: 0.0
+                  limitingItem: "BOLT-M5X16-SS"
+                  limitingShort: 4.0
+                  shortageCnt: 1
+                  lineTotal: 1
+                  warnings: ""
+                  actionHint: "REDUCE, SUBSTITUTE OR ORDER"
+                  lines:
+                    - lineNum: 1
+                      path: "1"
+                      depth: 1
+                      item: "BOLT-M5X16-SS"
+                      revision: ""
+                      uom: "EA"
+                      gross: 10.0
+                      netRequired: 10.0
+                      free: 6.0
+                      ownReserved: 0.0
+                      otherReserved: 0.0
+                      inbound: 0.0
+                      inboundDate: null
+                      allocated: 6.0
+                      shortage: 4.0
+                      shortDate: "2026-10-07"
+                      limiting: "Y"
+                      action: "ORDER OR SUBSTITUTE"
+                      warning: ""
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-020"
+        - "FR-STERP-KIT-052"
+      x-sterp-legacy:
+        forms:
+          - "frmKitTrial.TrialClicked / OnConfirm F10 (frmKitTrial.vb:48-61)"
+        facade:
+          - "KitService.Trial, KitService.TrialArea (KitService.vb:100-109,129-148)"
+          - "KitArea.Page"
+        cobol:
+          - "KITTRIAL TRIAL/GETLINE (KITTRIAL.cob:116-650)"
+          - "BOMEXPL EXPLODE/GETLINE (IC-BOM-BOMEXPL)"
+          - "AVAILQ AVAIL (IC-ITM-AVAILQ)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read only: BOMEXPL EXPLODE/GETLINE and AVAILQ AVAIL reads through the callee contracts on the request connection in autocommit; no write (KT-COMMITTED always N)."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.TRIAL.RUN"
+        sources:
+          - "menu:KIT.TRIAL=KIT.TRIAL.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/trials/max-build":
+    post:
+      operationId: "kit_runMaxBuildTrial"
+      summary: "Maximum buildable output (KITTRIAL MAXBUILD)"
+      description: "Reproduces KitService.MaxBuild (KitService.vb:112-116) -> KITTRIAL MAXBUILD (KITTRIAL.cob:218-282) with useSubassy N. Parity: the legacy client always sends requestedQty 0, which KITTRIAL refuses with 422 KIT0003 'The requested quantity must be greater than zero.' before any search (SME-648; the Trial Kitting page reproduces this, BC-KIT-06 proposes sending the entered quantity). With a positive seed: the trial at the requested quantity, doubling while feasible (budget 8 probes), integer bisection (21 probes in total), maxBuildable = best; best 0 -> RC 4 KIT0021; the summary describes the requested quantity (re-probe). Only the summary is returned (the facade does not page lines). Nothing is written."
+      tags:
+        - "Trial Kitting"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/KitMaxBuildRequest"
+            example:
+              kitRef: "KIT0001002"
+              parentItem: "FG-BIKE-COMMUTE-M"
+              parentRev: ""
+              site: "RDG"
+              requestedQty: 1.0
+              reqDate: "2026-10-07"
+              useInbound: "N"
+      responses:
+        "200":
+          description: "RC 0, or RC 4 KIT0010/KIT0021."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitMaxBuildEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: "Feasible. Maximum complete output 7.000000."
+                  messageCount: 0
+                  documentRef: "KIT-006"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  kitRef: "KIT0001002"
+                  parentItem: "FG-BIKE-COMMUTE-M"
+                  site: "RDG"
+                  requestedQty: 1.0
+                  reqDate: "2026-10-07"
+                  selectionDate: "2026-10-07"
+                  feasible: "Y"
+                  committed: "N"
+                  completeness: "COMPLETE"
+                  maxBuildable: 7.0
+                  limitingItem: ""
+                  limitingShort: 0.0
+                  shortageCnt: 0
+                  lineTotal: 3
+                  warnings: ""
+                  actionHint: "RELEASE OR RESERVE"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-021"
+        - "FR-STERP-KIT-052"
+      x-sterp-legacy:
+        forms:
+          - "frmKitTrial.MaxClicked (frmKitTrial.vb:65-71)"
+        facade:
+          - "KitService.MaxBuild (KitService.vb:112-116)"
+        cobol:
+          - "KITTRIAL MAXBUILD (KITTRIAL.cob:143-156,218-282)"
+          - "BOMEXPL, AVAILQ (callee contracts)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read only (repeated BOMEXPL and AVAILQ reads); no write."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.TRIAL.RUN"
+        sources:
+          - "menu:KIT.TRIAL=KIT.TRIAL.RUN"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/commercial-kits/{kitItem}/sets":
+    get:
+      operationId: "kit_checkCommercialKitSets"
+      summary: "Commercial kit complete-sets check (KITCOMM SETS)"
+      description: "Reproduces KitExecutionService.Commercial with function SETS (KitExecutionService.vb:157-179), the only function a production caller sends (frmKitMaint.SetsClicked, frmKitMaint.vb:95-107: kit item = selected ParentItemCode, version blank, orderRef = kit reference, orderLine 0, parentQty 1). KITCOMM (KITCOMM.cob:104-434,655-676): parentStock always N; blank item -> 422 KIT0001; latest RELEASED kit.KitDefinition effective at the business date (or the named version) else 404 KIT0001 'No released commercial kit definition for <item> is effective on this date.'; up to 15 lines (silent truncation); per line required = quantity per x parent quantity, free = AVAILQ AVAIL (site, as-at, no demand), sets = INTEGER(free / quantity per); complete sets = minimum over mandatory lines; limiting item and shortage; mayDespatch Y only when complete sets >= parent quantity > 0, else RC 4 KIT0020; note 'Free stock supports <n> complete sets[; limited by <item>, short <s>.]'. Read only. ALLOCATE, FULFIL and RETURNCK are not exposed (no production caller; decision D-KIT-04). Refusals carry the problem data member (contracts 4.7): a KitCommercialSets with no lines, because frmKitMaint populates the empty grid before the error dialog (decision D-KIT-08)."
+      tags:
+        - "Kit Maintenance"
+      parameters:
+        - name: "kitItem"
+          in: "path"
+          required: true
+          description: "Commercial kit item (parent) code."
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "KV-KIT-ITEM PIC X(40)"
+            x-sterp-length: 40
+          example: "KIT-BUILD-GRAVEL-M"
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+        - name: "kitVersion"
+          in: "query"
+          required: false
+          description: "Blank = latest released effective version."
+          schema:
+            type: "string"
+            maxLength: 4
+            x-sterp-legacy-field: "KV-KIT-VERSION PIC X(4)"
+            x-sterp-length: 4
+          example: ""
+        - name: "orderRef"
+          in: "query"
+          required: false
+          description: "Order reference (the page sends the kit reference)."
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "KV-ORDER-REF PIC X(40)"
+            x-sterp-length: 40
+          example: "KIT0001002"
+        - name: "orderLine"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int32"
+            default: 0
+            x-sterp-legacy-field: "KV-ORDER-LINE PIC S9(9) COMP-5"
+            x-sterp-digits: 9
+            x-sterp-signed: true
+          example: 0
+        - name: "parentQty"
+          in: "query"
+          required: false
+          schema:
+            type: "number"
+            format: "decimal"
+            default: 1
+            x-sterp-legacy-field: "KV-PARENT-QTY PIC S9(13)V9(6)"
+            x-sterp-digits: 19
+            x-sterp-scale: 6
+            x-sterp-signed: true
+          example: 1
+      responses:
+        "200":
+          description: "RC 0 (despatchable) or RC 4 KIT0020."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitCommercialSetsEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-023"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  kitItem: "KIT-BUILD-GRAVEL-M"
+                  kitVersion: "A"
+                  kitDefId: 1
+                  site: "RDG"
+                  orderRef: "KIT0001002"
+                  orderLine: 0
+                  parentQty: 1.0
+                  supplyKind: "SINGLE"
+                  asAt: "2026-10-07"
+                  currency: "GBP"
+                  completeSets: 12.0
+                  limitItem: "BOLT-M5X16-SS"
+                  limitShort: 0.0
+                  mayDespatch: "Y"
+                  parentStock: "N"
+                  lineCnt: 1
+                  noteText: "Free stock supports 12.000000 complete sets"
+                  lines:
+                    - lineNum: 1
+                      item: "BOLT-M5X16-SS"
+                      description: "Bolt M5 x 16 stainless"
+                      qtyPer: 10.0
+                      uom: "EA"
+                      required: 10.0
+                      free: 120.0
+                      delivered: 0.0
+                      sets: 12.0
+                      standalonePrice: 1.25
+                      allocationPct: 0.0
+                      allocatedNet: 0.0
+                      unitCost: 0.45
+                      costGbp: 0.0
+                      vatCode: "S"
+                      customerSpecified: "N"
+                      substituteOk: "Y"
+                      limiting: "Y"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-033"
+        - "FR-STERP-KIT-050"
+      x-sterp-legacy:
+        forms:
+          - "frmKitMaint.SetsClicked (frmKitMaint.vb:95-107)"
+        facade:
+          - "KitExecutionService.Commercial SETS (KitExecutionService.vb:157-179)"
+        cobol:
+          - "KITCOMM SETS (KITCOMM.cob:104-434,655-676)"
+          - "AVAILQ AVAIL (IC-ITM-AVAILQ)"
+        sql:
+          - "kit.KitDefinition, kit.KitDefinitionLine (SQLIO reads)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read only (SQLIO reads of kit.KitDefinition/KitDefinitionLine, item and cost rows; AVAILQ reads) in autocommit; no write although the facade draws a correlation id."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.EXEC.CREATE"
+        sources:
+          - "menu:KIT.MAINT=KIT.EXEC.CREATE"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/genealogy/trace":
+    get:
+      operationId: "kit_traceGenealogy"
+      summary: "Genealogy trace FORWARD, BACKWARD or WHEREUSD"
+      description: "Reproduces KitExecutionService.Genealogy (KitExecutionService.vb:101-121): function = BACKWARD or WHEREUSD when the trimmed upper-case direction says so, otherwise FORWARD; returns and scrap included; window 20; every further window re-runs GENEALOG with FROM-LINE = rows already returned (1-based start, so the row at position 20 repeats when the answer exceeds 20 rows; SME-644). GENEALOG (GENEALOG.cob:113-800): maxDepth <= 0 -> 5, > 12 -> 12; FORWARD/BACKWARD need an item, kit reference or completion id (422 KIT0012 'Give an item, a kit reference or a completion identity to trace.'); breadth-first over kit.KitGenealogy - FORWARD follows rows whose parent matches the identity (blank lot/serial = any) down to components, BACKWARD rows whose component matches up to parents; kit filter applied at every depth (SME-650); CONSUMED rows with substitution marking 'Substituted for <planned item>'; RETURN/SCRAP disposition rows at depth 1; 400 rows or 60 identities -> RC 4 KIT0026 'The trace was cut short - narrow the identity or reduce the depth.'; nothing found -> 404 KIT0026 'No genealogy is recorded for <item> <lot><serial>.'; WHEREUSD needs an item (422 KIT0012 'An item code is required for a where used enquiry.') and lists open kits (DRAFT..PARTCOMPLETE) still requiring it as component or substitute, by need date. GN-FROM-DATE/GN-TO-DATE are ignored by the program and not exposed (SME-1905). The completion-id identity is not sent by the legacy facade and is not exposed. Refusals carry the problem data member (contracts 4.7): a KitGenealogyTrace with the summary as left and the lines already collected (none when the first call fails), because frmKitGenealogy populates the grid before the error dialog (decision D-KIT-08)."
+      tags:
+        - "Genealogy Enquiry"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+        - name: "direction"
+          in: "query"
+          required: false
+          description: "FORWARD, BACKWARD or WHEREUSD; any other value runs FORWARD."
+          schema:
+            type: "string"
+            maxLength: 10
+            default: "FORWARD"
+            x-sterp-legacy-field: "GN-DIRECTION PIC X(10) / CA-FUNCTION"
+            x-sterp-length: 10
+          example: "FORWARD"
+        - name: "itemCode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "GN-ITEM-CODE PIC X(40)"
+            x-sterp-length: 40
+          example: "FG-BIKE-COMMUTE-M"
+        - name: "lotCode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "GN-LOT-CODE PIC X(30)"
+            x-sterp-length: 30
+          example: "LOT-FRM-2609"
+        - name: "serialNo"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "GN-SERIAL-NO PIC X(40)"
+            x-sterp-length: 40
+          example: ""
+        - name: "kitRef"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "GN-KIT-REF PIC X(30)"
+            x-sterp-length: 30
+          example: ""
+        - name: "maxDepth"
+          in: "query"
+          required: false
+          description: "The Genealogy Enquiry page sends 10."
+          schema:
+            type: "integer"
+            format: "int32"
+            default: 10
+            x-sterp-legacy-field: "GN-MAX-DEPTH PIC S9(4)"
+            x-sterp-digits: 4
+            x-sterp-signed: true
+          example: 10
+      responses:
+        "200":
+          description: "RC 0, or RC 4 KIT0026 truncated."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitGenealogyEnvelope"
+              example:
+                outcome:
+                  returnCode: 0
+                  severity: "OK"
+                  reasonCode: ""
+                  message: ""
+                  messageCount: 0
+                  documentRef: "KIT-019"
+                  correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+                data:
+                  direction: "FORWARD"
+                  kitRef: ""
+                  itemCode: "FG-BIKE-COMMUTE-M"
+                  lotCode: "LOT-FRM-2609"
+                  serialNo: ""
+                  maxDepth: 10
+                  lineTotal: 3
+                  depthReached: 1
+                  substituteCnt: 1
+                  returnCnt: 0
+                  scrapCnt: 0
+                  kitCnt: 1
+                  truncated: "N"
+                  summaryText: "3 consumption records to depth 1; substitutions 1, returns 0, scrap 0, kits 1."
+                  lines:
+                    - seq: 3
+                      depth: 1
+                      kitRef: "KIT0001001"
+                      parent: "FG-BIKE-COMMUTE-M"
+                      parentLot: "LOT-FRM-2609"
+                      parentSerial: ""
+                      item: "WASHER-M6-SS"
+                      lot: "LOT-SUB-2610"
+                      serial: ""
+                      quantity: 2.0
+                      uom: ""
+                      plannedItem: "BOLT-M5X16-SS"
+                      substitute: "Y"
+                      event: "CONSUMED"
+                      happened: null
+                      operator: ""
+                      note: "Substituted for BOLT-M5X16-SS"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-034"
+        - "FR-STERP-KIT-053"
+      x-sterp-legacy:
+        forms:
+          - "frmKitGenealogy.TraceClicked / LoadData / OnConfirm (frmKitGenealogy.vb:43-72)"
+        facade:
+          - "KitExecutionService.Genealogy (KitExecutionService.vb:101-121)"
+          - "KitArea.Page"
+        cobol:
+          - "GENEALOG FORWARD/BACKWARD/WHEREUSD (GENEALOG.cob:113-800)"
+        sql:
+          - "kit.KitGenealogy, kit.KitIssue, kit.ExecutionKit, kit.ExecutionKitLine (SQLIO reads)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "envelope"
+      x-sterp-uow: "Read only; the trace is recomputed for each window inside the request (legacy behaviour), all reads in autocommit; no write."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.ENQUIRY.VIEW"
+        sources:
+          - "menu:KIT.GENEALOGY=KIT.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/genealogy/recall-list":
+    get:
+      operationId: "kit_listRecallTrace"
+      summary: "Recall list (set-based backward trace)"
+      description: "Reproduces KitExecutionService.GenealogyList (KitExecutionService.vb:124-129) -> kit.usp_KitGenealogy (db/procs/kit/usp_KitEnquiry.sql:140-188): @CompanyCode, @ItemCode, @LotCode and @SerialNo (blank -> NULL), @MaxDepth (the page sends 5; outside 1..12 -> 5). Rows whose component matches, then upward through parents matching item and ISNULL lot/serial, ordered Depth, KitRef, GenealogyId (MAXRECURSION 12). Complete direct list; an undeployed procedure gives an empty list. The page requires an item ('A recall list needs an item code.')."
+      tags:
+        - "Genealogy Enquiry"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+        - name: "itemCode"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "@ItemCode varchar(40)"
+            x-sterp-length: 40
+          example: "WASHER-M6-SS"
+        - name: "lotCode"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            maxLength: 30
+            x-sterp-legacy-field: "@LotCode varchar(30)"
+            x-sterp-length: 30
+          example: "LOT-SUB-2610"
+        - name: "serialNo"
+          in: "query"
+          required: false
+          schema:
+            type: "string"
+            maxLength: 40
+            x-sterp-legacy-field: "@SerialNo varchar(40)"
+            x-sterp-length: 40
+          example: ""
+        - name: "maxDepth"
+          in: "query"
+          required: false
+          schema:
+            type: "integer"
+            format: "int32"
+            default: 5
+            x-sterp-legacy-field: "@MaxDepth int"
+          example: 5
+      responses:
+        "200":
+          description: "Complete recall list in legacy order."
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/KitRecallList"
+              example:
+                items:
+                  - depth: 1
+                    genealogyId: 3
+                    kitRef: "KIT0001001"
+                    parentItemCode: "FG-BIKE-COMMUTE-M"
+                    parentLotCode: "LOT-FRM-2609"
+                    parentSerialNo: null
+                    componentItemCode: "WASHER-M6-SS"
+                    componentLotCode: "LOT-SUB-2610"
+                    componentSerialNo: null
+                    consumedQty: 2.0
+                    wasSubstitute: true
+                    plannedItemCode: "BOLT-M5X16-SS"
+                count: 1
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-035"
+        - "FR-STERP-KIT-053"
+      x-sterp-legacy:
+        forms:
+          - "frmKitGenealogy.RecallClicked (frmKitGenealogy.vb:76-82)"
+        facade:
+          - "KitExecutionService.GenealogyList (KitExecutionService.vb:124-129)"
+          - "KitArea.Opt"
+        sql:
+          - "kit.usp_KitGenealogy (usp_KitEnquiry.sql:140-188)"
+      x-sterp-permission: []
+      x-sterp-engine: "online"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "One autocommit procedure call; kit.usp_KitGenealogy makes no persistent write (Agent 03)."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.ENQUIRY.VIEW"
+        sources:
+          - "menu:KIT.GENEALOGY=KIT.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+  "/api/kit/v1/jobs/KITRDY/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "kit_submitKitReadinessRun"
+      summary: "Submit KITRDY: kit readiness, execution position or shortage listing (RPT-013)"
+      description: "Submits the re-implemented batch program KITRDY (cobol/batch/kit/KITRDY.cob:190-585) with its legacy KEY=VALUE arguments (contracts 8.2). Catalogue rows: KITRP010 MODE=READY, KITRP020 MODE=EXEC, KITRP030 MODE=SHORT (db/seed/85-kit-menu.sql:44-50). The platform registers the run (core.usp_JobRunStart / usp_JobRunEnd, contracts 8.3); the program additionally registers itself with JOBLOG START (job KITRDY) and its JOBLOG END is rejected (run id 0), leaving that row RUNNING (SME-009, SME-010). Listing: spool <run>\\spool\\KITRDY-<CO>-<yyyymmddhhmmss>.lst (132 columns); SHORT = lines with RemainingQty > ReservedQty of RELEASED..PARTCOMPLETE kits ordered by line need date, kit, line; any other MODE = kits of the seven open statuses DRAFT..OPCOMPLETE ordered by NeedDate, KitRef with lines, short lines, ready % (ROUNDED to one decimal; mode inferred), Ready YES/NO, EXEC sums and WIP; footing; heading with 'As at' from ASAT (heading only, SME-1155). Return code 0, or 12 on spool, statement or fetch failure; SYSOUT KIT1000-KIT1005. No STERP-I-SPOOL line is written (SME-1154): core.JobRun.SpoolFile stays as legacy; the spool is still available through GET /api/jobs/v1/runs/{jobRunId}/spool and the JSON data (KitRdyReportResult) through GET /api/jobs/v1/runs/{jobRunId}/result. Gate (contracts 5.4): the catalogue code KIT.ENQUIRY.VIEW of KITRP010-030 is checked through core.usp_UiCheckAccess before the run is registered; refusal 403 PRM0006 '<user> does not hold KIT.ENQUIRY.VIEW'."
+      tags:
+        - "Kit Reports"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/KitRdyRunParameters"
+            examples:
+              ready:
+                summary: "KITRP010 readiness to pick"
+                value:
+                  CO: "STC"
+                  SITE: "RDG"
+                  STATUS: ""
+                  ASAT: "20261007"
+                  MODE: "READY"
+                  USER: "WHSE"
+              short:
+                summary: "KITRP030 shortage list"
+                value:
+                  CO: "STC"
+                  SITE: "RDG"
+                  STATUS: ""
+                  ASAT: "20261007"
+                  MODE: "SHORT"
+                  USER: "WHSE"
+      responses:
+        "202":
+          description: "Run accepted; Location: /api/jobs/v1/runs/{jobRunId}."
+          headers:
+            Location:
+              schema:
+                type: "string"
+              description: "/api/jobs/v1/runs/{jobRunId}"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 4711
+                jobName: "KITRDY"
+                status: "RUNNING"
+                startedAt: "2026-10-07T09:15:02.1230000"
+                links:
+                  self: "/api/jobs/v1/runs/4711"
+                  sysout: "/api/jobs/v1/runs/4711/sysout"
+                  spool: "/api/jobs/v1/runs/4711/spool"
+                  result: "/api/jobs/v1/runs/4711/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+        "501":
+          "$ref": "#/components/responses/NotImplemented"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-040"
+      x-sterp-legacy:
+        reports:
+          - "KITRP010"
+          - "KITRP020"
+          - "KITRP030 (db/seed/85-kit-menu.sql:44-50)"
+        launchers:
+          - "frmReportLauncher / ReportService.Run (ReportService.vb:98-215)"
+          - "STERPOPS operator console"
+        cobol:
+          - "KITRDY (cobol/batch/kit/KITRDY.cob:190-585)"
+          - "CMDARGS, JOBLOG, RUNPATH, SQLIO (PLATFORM kernel)"
+        files:
+          - "FL-050 RPT-FILE (KITRDY spool)"
+      x-sterp-permission:
+        - "KIT.ENQUIRY.VIEW"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Platform run registration (core.usp_JobRunStart at submit, core.usp_JobRunEnd at end). Inside the program: JOBLOG START inserts core.JobRun in autocommit; kit reads in autocommit; JOBLOG END rejected (no write); the spool file is the only other output."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.ENQUIRY.VIEW"
+        sources:
+          - "menu:KIT.RPT.EXEC=KIT.ENQUIRY.VIEW"
+          - "menu:KIT.RPT.READY=KIT.ENQUIRY.VIEW"
+          - "menu:KIT.RPT.SHORT=KIT.ENQUIRY.VIEW"
+          - "report:KITRP010=KIT.ENQUIRY.VIEW"
+          - "report:KITRP020=KIT.ENQUIRY.VIEW"
+          - "report:KITRP030=KIT.ENQUIRY.VIEW"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+  "/api/kit/v1/jobs/KITDOCP/runs":
+    servers:
+      - url: "https://localhost:7102"
+        description: "STERP.Jobs (batch)"
+    post:
+      operationId: "kit_submitKitPickingDocumentRun"
+      summary: "Submit KITDOCP: kit picking document or reprint (RPT-014)"
+      description: "Submits the re-implemented batch program KITDOCP (cobol/batch/kit/KITDOCP.cob:226-598) with its legacy KEY=VALUE arguments; catalogue row KITRP040 (db/seed/85-kit-menu.sql:51-52). A blank KIT is accepted (parity): the program registers JOBLOG START, writes 'STERP-E-KIT1010 KIT= is required - a kit document is printed for one kit', builds no spool and ends rc 12. MODE REPRINT or COPY -> 'REPRINT - PICKING LIST COPY', copy < 2 -> 2, reason default 'not stated', copy line '*** REPRINT copy <nnnn> - reason: <reason> ***', title 'Kit picking document - REPRINT'; otherwise 'ORIGINAL PICKING LIST', 'Original issue of this document.'. One kit by company and reference (and SITE when given): not found rc 8 KIT1014, statement failure rc 12 KIT1015; header, every non-cancelled line (identification Lot / Serial / Lot+Ser / '-', pick-from location or 'any'), footing with 'This document moves no stock...'; no printable lines -> header and zero totals, KIT1017, rc 0; any kit status prints (SME-1160). Spool <run>\\spool\\KITDOCP-<CO>-<yyyymmddhhmmss>.lst; JOBLOG END rejected as KITRDY. JSON data (KitDocpReportResult) at GET /api/jobs/v1/runs/{jobRunId}/result. Gate (contracts 5.4): the catalogue code KIT.ISSUE.POST of KITRP040 is checked through core.usp_UiCheckAccess before the run is registered; refusal 403 PRM0006 '<user> does not hold KIT.ISSUE.POST'."
+      tags:
+        - "Kit Reports"
+      parameters:
+        - "$ref": "#/components/parameters/XSterpCompany"
+        - "$ref": "#/components/parameters/XSterpSite"
+        - "$ref": "#/components/parameters/XSterpBusinessDate"
+        - "$ref": "#/components/parameters/XSterpRunAs"
+        - "$ref": "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              "$ref": "#/components/schemas/KitDocpRunParameters"
+            examples:
+              original:
+                summary: "Original picking list"
+                value:
+                  CO: "STC"
+                  SITE: "RDG"
+                  KIT: "KIT0001002"
+                  MODE: "ORIGINAL"
+                  USER: "WHSE"
+              reprint:
+                summary: "Reprint copy 3"
+                value:
+                  CO: "STC"
+                  SITE: "RDG"
+                  KIT: "KIT0001002"
+                  MODE: "REPRINT"
+                  COPY: "3"
+                  REASON: "Lost"
+                  USER: "WHSE"
+      responses:
+        "202":
+          description: "Run accepted; Location: /api/jobs/v1/runs/{jobRunId}."
+          headers:
+            Location:
+              schema:
+                type: "string"
+              description: "/api/jobs/v1/runs/{jobRunId}"
+          content:
+            "application/json":
+              schema:
+                "$ref": "#/components/schemas/JobRunAccepted"
+              example:
+                jobRunId: 4712
+                jobName: "KITDOCP"
+                status: "RUNNING"
+                startedAt: "2026-10-07T09:16:40.5000000"
+                links:
+                  self: "/api/jobs/v1/runs/4712"
+                  sysout: "/api/jobs/v1/runs/4712/sysout"
+                  spool: "/api/jobs/v1/runs/4712/spool"
+                  result: "/api/jobs/v1/runs/4712/result"
+        "400":
+          "$ref": "#/components/responses/BadRequest"
+        "401":
+          "$ref": "#/components/responses/Unauthorized"
+        "403":
+          "$ref": "#/components/responses/Forbidden"
+        "404":
+          "$ref": "#/components/responses/NotFound"
+        "422":
+          "$ref": "#/components/responses/BusinessRule"
+        "500":
+          "$ref": "#/components/responses/Severe"
+        "501":
+          "$ref": "#/components/responses/NotImplemented"
+      x-sterp-requirements:
+        - "FR-STERP-KIT-041"
+      x-sterp-legacy:
+        reports:
+          - "KITRP040 (db/seed/85-kit-menu.sql:51-52)"
+        launchers:
+          - "frmReportLauncher / ReportService.Run"
+          - "STERPOPS operator console"
+        cobol:
+          - "KITDOCP (cobol/batch/kit/KITDOCP.cob:226-598)"
+          - "CMDARGS, JOBLOG, RUNPATH, SQLIO (PLATFORM kernel)"
+        files:
+          - "FL-049 RPT-FILE (KITDOCP spool)"
+      x-sterp-permission:
+        - "KIT.ISSUE.POST"
+      x-sterp-engine: "batch"
+      x-sterp-outcome: "direct"
+      x-sterp-uow: "Platform run registration; inside the program JOBLOG START inserts core.JobRun (autocommit), kit/item/company reads in autocommit, JOBLOG END rejected; the spool file is the only other output. Nothing records that an original was printed (SME-1161)."
+      x-sterp-wave: "W9"
+      x-sterp-screen-gate:
+        anyOf:
+          - "KIT.ISSUE.POST"
+        sources:
+          - "report:KITRP040=KIT.ISSUE.POST"
+        enforcedBy: "core.usp_UiCheckAccess (contracts 5.4)"
+        note: "parameter-dependent: report rows filtered by core.usp_UiReportList -> core.usp_UiCheckAccess (ReportDef.PermissionCode)"
+components:
+  securitySchemes:
+    windows:
+      type: "http"
+      scheme: "negotiate"
+      description: "Windows integrated authentication (Kerberos/NTLM). Browsers send the signed-on Windows identity automatically; curl: add --negotiate -u : (contracts section 5.1)."
+  parameters:
+    XSterpCompany:
+      name: "X-STERP-Company"
+      in: "header"
+      required: true
+      description: "Company code of the session (legacy SterpSession.CompanyCode -> CA-COMPANY / @CompanyCode). Must be in the caller's access list (core.usp_GetUserContext result set 2); otherwise 403 API0002."
+      schema:
+        type: "string"
+        maxLength: 10
+        x-sterp-legacy-field: "CA-COMPANY PIC X(10)"
+      example: "STC"
+    XSterpSite:
+      name: "X-STERP-Site"
+      in: "header"
+      required: false
+      description: "Site code of the session (legacy SterpSession.SiteCode -> CA-SITE). Required by site-scoped operations; must pair with the company in the access list."
+      schema:
+        type: "string"
+        maxLength: 10
+        x-sterp-legacy-field: "CA-SITE PIC X(10)"
+      example: "RDG"
+    XSterpBusinessDate:
+      name: "X-STERP-Business-Date"
+      in: "header"
+      required: false
+      description: "Business date (legacy SterpSession.BusinessDate -> CA-BUSINESS-DATE yyyyMMdd). Default: server local date, as legacy DateTime.Today (CobolGateway.cs:77)."
+      schema:
+        type: "string"
+        format: "date"
+        x-sterp-legacy-field: "CA-BUSINESS-DATE PIC 9(8)"
+      example: "2026-10-07"
+    XSterpRunAs:
+      name: "X-STERP-Run-As"
+      in: "header"
+      required: false
+      description: "SYSADM 'Continue as' user code (LoginService.SignOnAs). Honoured only when the authenticated user resolves to SYSADM; otherwise 403 API0003."
+      schema:
+        type: "string"
+        maxLength: 20
+        x-sterp-legacy-field: "CA-USER PIC X(20)"
+      example: "SALESREP"
+    IdempotencyKey:
+      name: "Idempotency-Key"
+      in: "header"
+      required: false
+      description: "Legacy correlation id (CA-CORRELATION-ID X(36)); default a new GUID per request (CobolGateway.cs:78). Send one stable key per user instruction where the legacy reused a correlation id (COM-015)."
+      schema:
+        type: "string"
+        maxLength: 36
+        x-sterp-legacy-field: "CA-CORRELATION-ID PIC X(36)"
+      example: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+    KitKitRefPath:
+      name: "kitRef"
+      in: "path"
+      required: true
+      description: "Kit reference (legacy business key, unique per company: UQ_ExecutionKit). The legacy pages upper-case and trim it (frmKitMaint.vb:137-139, frmKitExecution.vb:154-156); the API applies the 4.4 normalization only."
+      schema:
+        type: "string"
+        maxLength: 30
+        x-sterp-legacy-field: "KC-KIT-REF / KS-KIT-REF / KK-KIT-REF PIC X(30); kit.ExecutionKit.KitRef varchar(30)"
+        x-sterp-length: 30
+      example: "KIT0001001"
+  schemas:
+    Outcome:
+      type: "object"
+      description: "Legacy STCAHDR result (STERP-App/cobol/copy/STCAHDR.cpy:12-32; CobolResult.cs:6-26). returnCode 0 OK, 4 WARNING, 6 HOLD (HTTP 202). Failures (8, 12, 16) are returned as ProblemDetails."
+      required:
+        - "returnCode"
+        - "severity"
+        - "reasonCode"
+        - "message"
+        - "messageCount"
+        - "correlationId"
+      properties:
+        returnCode:
+          type: "integer"
+          enum:
+            - 0
+            - 4
+            - 6
+          x-sterp-legacy-field: "CA-RETURN-CODE PIC 9(2)"
+        severity:
+          type: "string"
+          enum:
+            - "OK"
+            - "WARNING"
+            - "HOLD"
+        reasonCode:
+          type: "string"
+          maxLength: 8
+          x-sterp-legacy-field: "CA-REASON-CODE PIC X(8)"
+        message:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "CA-MESSAGE PIC X(200)"
+        messageCount:
+          type: "integer"
+          x-sterp-legacy-field: "CA-MSG-COUNT PIC 9(2)"
+        documentRef:
+          type:
+            - "string"
+            - "null"
+          maxLength: 10
+          x-sterp-legacy-field: "CA-REQ-REF PIC X(10)"
+        correlationId:
+          type: "string"
+          maxLength: 36
+          x-sterp-legacy-field: "CA-CORRELATION-ID PIC X(36)"
+    ProblemDetails:
+      type: "object"
+      description: "RFC 9457 problem (contracts 4.6-4.7). type = https://sterp.local/problems/{business-rule|severe|not-found|validation|forbidden|unauthenticated|not-implemented}; detail = legacy message; reasonCode = legacy reason (or API#### for target-only conditions)."
+      required:
+        - "type"
+        - "title"
+        - "status"
+      properties:
+        type:
+          type: "string"
+          format: "uri"
+        title:
+          type: "string"
+        status:
+          type: "integer"
+        detail:
+          type:
+            - "string"
+            - "null"
+        instance:
+          type:
+            - "string"
+            - "null"
+        returnCode:
+          type:
+            - "integer"
+            - "null"
+          description: "legacy CA-RETURN-CODE (8, 12, 16 or other)"
+        reasonCode:
+          type:
+            - "string"
+            - "null"
+        severity:
+          type:
+            - "string"
+            - "null"
+          enum:
+            - "ERROR"
+            - "SEVERE"
+            - "NOT FOUND"
+            - "E"
+            - "W"
+            - "I"
+            - null
+        messageCount:
+          type:
+            - "integer"
+            - "null"
+        correlationId:
+          type:
+            - "string"
+            - "null"
+        traceId:
+          type:
+            - "string"
+            - "null"
+        errors:
+          type:
+            - "object"
+            - "null"
+          additionalProperties:
+            type: "array"
+            items:
+              type: "string"
+        data:
+          description: "Optional (contracts 4.7): for COBOL-backed operations whose legacy screen reads the COMMAREA after a refusal, the same data object the success envelope would carry."
+      example:
+        type: "https://sterp.local/problems/business-rule"
+        title: "Business rule refused the request"
+        status: 422
+        detail: "Period 202602 is hard closed."
+        returnCode: 8
+        reasonCode: "PER0003"
+        severity: "ERROR"
+        messageCount: 1
+        correlationId: "3f1c2a9e-6d1b-4c8e-9a51-2b7d0c4e8f10"
+        traceId: "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+    JobRunAccepted:
+      type: "object"
+      description: "Returned with HTTP 202 by every job submission (contracts 8.3). Poll /api/jobs/v1/runs/{jobRunId} on STERP.Jobs."
+      required:
+        - "jobRunId"
+        - "jobName"
+        - "status"
+      properties:
+        jobRunId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "core.JobRun.JobRunId bigint"
+        jobName:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "core.JobRun.JobName varchar(40)"
+        status:
+          type: "string"
+          enum:
+            - "RUNNING"
+            - "OK"
+            - "WARNING"
+            - "FAILED"
+            - "ABENDED"
+        startedAt:
+          type: "string"
+          format: "x-sterp-local-date-time"
+        links:
+          type: "object"
+          properties:
+            self:
+              type: "string"
+            sysout:
+              type: "string"
+            spool:
+              type: "string"
+            result:
+              type: "string"
+    ListEnvelope:
+      type: "object"
+      description: "Complete legacy result set in legacy order (contracts 4.10). Use allOf with an 'items' array of your row schema."
+      required:
+        - "items"
+        - "count"
+      properties:
+        items:
+          type: "array"
+          items: {}
+        count:
+          type: "integer"
+    KitWorklistRow:
+      type: "object"
+      description: "One row of kit.usp_KitReadiness result set 1 (db/procs/kit/usp_KitEnquiry.sql:24-58): one kit with its readiness over non-cancelled lines. Bound by frmKitMaint (KitService.Worklist, KitService.vb:36-40)."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "kit.ExecutionKit.KitRef varchar(30)"
+          x-sterp-length: 30
+        siteCode:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "kit.ExecutionKit.SiteCode varchar(10)"
+          x-sterp-length: 10
+        parentItemCode:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "kit.ExecutionKit.ParentItemCode varchar(40)"
+          x-sterp-length: 40
+        status:
+          type: "string"
+          maxLength: 14
+          enum:
+            - "DRAFT"
+            - "REVIEWED"
+            - "RELEASED"
+            - "PARTISSUED"
+            - "ISSUED"
+            - "PARTCOMPLETE"
+            - "OPCOMPLETE"
+            - "FINCLOSED"
+            - "CANCELLED"
+          description: "CK_ExKit_St (db/tables/90-kit/02-ExecutionKit.sql:11)."
+          x-sterp-legacy-field: "kit.ExecutionKit.Status varchar(14)"
+          x-sterp-length: 14
+        plannedGoodQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "kit.ExecutionKit.PlannedGoodQty decimal(19,6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        completedGoodQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "kit.ExecutionKit.CompletedGoodQty decimal(19,6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        needDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "kit.ExecutionKit.NeedDate date"
+        wipValueGBP:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "kit.ExecutionKit.WipValueGBP decimal(18,2)"
+          x-sterp-digits: 18
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        lineCount:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "LineCount = COUNT(l.KitLineId) int"
+        shortLines:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "ShortLines = SUM(CASE WHEN RemainingQty > ReservedQty THEN 1 ELSE 0 END) int"
+        coveredLines:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "CoveredLines = SUM(CASE WHEN RemainingQty <= ReservedQty THEN 1 ELSE 0 END) int"
+        readyPct:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "ReadyPct = CONVERT(decimal(5,1), 100.0 * covered / count), 0 without lines"
+          x-sterp-digits: 5
+          x-sterp-scale: 1
+          x-sterp-signed: true
+        isReady:
+          type: "boolean"
+          x-sterp-legacy-field: "IsReady bit (lines > 0 and no short line)"
+        issuedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "IssuedQty = ISNULL(SUM(GrossIssuedQty),0) decimal(38,6)"
+          x-sterp-digits: 38
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        returnedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "ReturnedQty = ISNULL(SUM(ReturnedQty),0) decimal(38,6)"
+          x-sterp-digits: 38
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        scrappedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "ScrappedQty = ISNULL(SUM(ScrappedQty),0) decimal(38,6)"
+          x-sterp-digits: 38
+          x-sterp-scale: 6
+          x-sterp-signed: true
+    KitWorklistList:
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+      type: "object"
+      properties:
+        items:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/KitWorklistRow"
+        count:
+          type: "integer"
+          x-sterp-legacy-field: "rows bound to the grid (ListForm status '<n> record(s)')"
+    KitExecutionKitLine:
+      type: "object"
+      description: "One requirement line as KITCREAT Fill-Window-Line returns it (KITCREAT.cob:799-824); net issued, remaining and excess are recomputed by KITQTY LINEQTY (KITCREAT.cob:826-843), description is always blank."
+      properties:
+        lineNum:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KC-L-LINE-NUM PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        path:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KC-L-PATH PIC X(20)"
+          x-sterp-length: 20
+        item:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KC-L-ITEM PIC X(40)"
+          x-sterp-length: 40
+        revision:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KC-L-REV PIC X(4)"
+          x-sterp-length: 4
+        description:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KC-L-DESC PIC X(40)"
+          x-sterp-length: 40
+        basis:
+          type: "string"
+          maxLength: 12
+          enum:
+            - "PROPORTION"
+            - "FIXEDRUN"
+            - "FIXEDBATCH"
+          x-sterp-legacy-field: "KC-L-BASIS PIC X(12)"
+          x-sterp-length: 12
+        uom:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KC-L-UOM PIC X(10)"
+          x-sterp-length: 10
+        factor:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-FACTOR PIC S9(9)V9(9)"
+          x-sterp-digits: 18
+          x-sterp-scale: 9
+          x-sterp-signed: true
+        originalRequirement:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-ORIG-REQ PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        currentRequirement:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-CURR-REQ PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        scrapPct:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-SCRAP-PCT PIC S9(5)V9(6)"
+          x-sterp-digits: 11
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        reserved:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-RESERVED PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        picked:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-PICKED PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        grossIssued:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-GROSS-ISS PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        returned:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-RETURNED PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        scrapped:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-SCRAPPED PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        netIssued:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-NET-ISS PIC S9(13)V9(6) (KITQTY KQ-NET-ISSUED)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        remaining:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-REMAINING PIC S9(13)V9(6) (KITQTY KQ-REMAINING)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        excess:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-EXCESS PIC S9(13)V9(6) (KITQTY KQ-EXCESS)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        substitute:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KC-L-SUBST PIC X(40)"
+          x-sterp-length: 40
+        needDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KC-L-NEED-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        location:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KC-L-LOCATION PIC X(20)"
+          x-sterp-length: 20
+        unitCost:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-L-UNIT-COST PIC S9(11)V9(6)"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        status:
+          type: "string"
+          maxLength: 12
+          enum:
+            - "OPEN"
+            - "PARTISSUED"
+            - "ISSUED"
+            - "CLOSED"
+            - "CANCELLED"
+          description: "CK_ExKitL_St (02-ExecutionKit.sql:24)."
+          x-sterp-legacy-field: "KC-L-STATUS PIC X(12)"
+          x-sterp-length: 12
+    KitExecutionKit:
+      type: "object"
+      description: "KITCREAT ENQUIRE header (Copy-Header-Out, KITCREAT.cob:718-747) plus every line drained through GETLINE in one request (KitArea.Page). completeness and shortageCnt are returned as ENQUIRE leaves them (blank and 0). The row at position 20 appears twice when the kit has more than 20 lines (SME-644)."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KC-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        execKitId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "KC-EXEC-KIT-ID PIC S9(17)"
+          x-sterp-digits: 17
+          x-sterp-signed: true
+        site:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KC-SITE PIC X(10)"
+          x-sterp-length: 10
+        parentItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KC-PARENT-ITEM PIC X(40)"
+          x-sterp-length: 40
+        parentRev:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KC-PARENT-REV PIC X(4)"
+          x-sterp-length: 4
+        bomId:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KC-BOM-ID PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        bomRev:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KC-BOM-REV PIC X(4)"
+          x-sterp-length: 4
+        sourceType:
+          type: "string"
+          maxLength: 12
+          x-sterp-legacy-field: "KC-SOURCE-TYPE PIC X(12)"
+          x-sterp-length: 12
+        sourceRef:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KC-SOURCE-REF PIC X(40)"
+          x-sterp-length: 40
+        jobRef:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KC-JOB-REF PIC X(20)"
+          x-sterp-length: 20
+        parentKitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KC-PARENT-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        plannedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-PLANNED-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        completedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-COMPLETED-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        rejectedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-REJECTED-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        grossStarts:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-GROSS-STARTS PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        yield:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-YIELD PIC S9(5)V9(6)"
+          x-sterp-digits: 11
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        quantum:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-QUANTUM PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        batchSize:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-BATCH-SIZE PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        runCount:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KC-RUN-COUNT PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        batchCount:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KC-BATCH-COUNT PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        needDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KC-NEED-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        startDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KC-START-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        completeDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KC-COMPLETE-DATE PIC 9(8) (planned completion)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        selectionDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KC-SELECTION-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        ownerUser:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KC-OWNER-USER PIC X(20)"
+          x-sterp-length: 20
+        status:
+          type: "string"
+          maxLength: 14
+          x-sterp-legacy-field: "KC-STATUS PIC X(14)"
+          x-sterp-length: 14
+        backflush:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "KC-BACKFLUSH PIC X (IsBackflush bit decoded by KITDB)"
+          x-sterp-length: 1
+        wipValue:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-WIP-VALUE PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        approvalId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "KC-APPROVAL-ID PIC S9(17)"
+          x-sterp-digits: 17
+          x-sterp-signed: true
+        completeness:
+          type: "string"
+          maxLength: 12
+          x-sterp-legacy-field: "KC-COMPLETENESS PIC X(12) (not set by ENQUIRE)"
+          x-sterp-length: 12
+        shortageCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KC-SHORTAGE-CNT PIC S9(4) (not set by ENQUIRE)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        warningText:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "KC-WARNING-TEXT PIC X(200)"
+          x-sterp-length: 200
+        lines:
+          type: "array"
+          x-sterp-legacy-field: "KC-LINES OCCURS 20 (drained through GETLINE)"
+          items:
+            "$ref": "#/components/schemas/KitExecutionKitLine"
+    KitExecutionKitEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitExecutionKit"
+    KitLifecycleResult:
+      type: "object"
+      description: "KITCREATCA fields set by REVIEW (KITCREAT.cob:503-570) or RELEASE (KITCREAT.cob:576-646). Header values not copied out by these functions (for example wipValue) are returned as the program leaves them (0)."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KC-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        status:
+          type: "string"
+          maxLength: 14
+          x-sterp-legacy-field: "KC-STATUS PIC X(14)"
+          x-sterp-length: 14
+        prevStatus:
+          type: "string"
+          maxLength: 14
+          x-sterp-legacy-field: "KC-PREV-STATUS PIC X(14)"
+          x-sterp-length: 14
+        completeness:
+          type: "string"
+          maxLength: 12
+          x-sterp-legacy-field: "KC-COMPLETENESS PIC X(12)"
+          x-sterp-length: 12
+        shortageCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KC-SHORTAGE-CNT PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        lineTotal:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KC-LINE-TOTAL PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        needsAuth:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "KC-NEEDS-AUTH PIC X"
+          x-sterp-length: 1
+        reasonText:
+          type: "string"
+          maxLength: 300
+          x-sterp-legacy-field: "KC-REASON-TEXT PIC X(300)"
+          x-sterp-length: 300
+        warningText:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "KC-WARNING-TEXT PIC X(200)"
+          x-sterp-length: 200
+        wipValue:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KC-WIP-VALUE PIC S9(11)V99 (not set by REVIEW/RELEASE)"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+    KitLifecycleEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitLifecycleResult"
+    KitKindCheckRequest:
+      type: "object"
+      description: "KitService.KindCheck parameters (KitService.vb:89-93). The maintenance page sends kitKind blank (the worklist has no KitKind column) and parentItem = the selected ParentItemCode."
+      properties:
+        kitKind:
+          type: "string"
+          maxLength: 12
+          description: "Legacy kinds COMMERCIAL, STOCKASSY, EXECUTION, PHANTOM, TRIAL (KITCREATCA.cpy:55-59); any other value or blank falls to the item's stocked flag."
+          x-sterp-legacy-field: "KC-KIT-KIND PIC X(12)"
+          x-sterp-length: 12
+        parentItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KC-PARENT-ITEM PIC X(40)"
+          x-sterp-length: 40
+    KitKindCheckResult:
+      type: "object"
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KC-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        kitKind:
+          type: "string"
+          maxLength: 12
+          x-sterp-legacy-field: "KC-KIT-KIND PIC X(12)"
+          x-sterp-length: 12
+        parentItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KC-PARENT-ITEM PIC X(40)"
+          x-sterp-length: 40
+        parentDesc:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KC-PARENT-DESC PIC X(40)"
+          x-sterp-length: 40
+        mayReceive:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "KC-MAY-RECEIVE PIC X"
+          x-sterp-length: 1
+        reasonText:
+          type: "string"
+          maxLength: 300
+          x-sterp-legacy-field: "KC-REASON-TEXT PIC X(300)"
+          x-sterp-length: 300
+    KitKindCheckEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitKindCheckResult"
+    KitTrialRequest:
+      type: "object"
+      description: "KitService.Trial / TrialArea parameters (KitService.vb:100-109,129-148). Selection date = business date header; committed N, window 20 and from-line 0 are fixed by the facade."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          description: "Used as the AVAILQ demand reference (own reservations added back)."
+          x-sterp-legacy-field: "KT-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        parentItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KT-PARENT-ITEM PIC X(40)"
+          x-sterp-length: 40
+        parentRev:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KT-PARENT-REV PIC X(4)"
+          x-sterp-length: 4
+        site:
+          type: "string"
+          maxLength: 10
+          description: "Blank takes X-STERP-Site (CA-SITE)."
+          x-sterp-legacy-field: "KT-SITE PIC X(10)"
+          x-sterp-length: 10
+        requestedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-REQUESTED-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        reqDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          description: "Null takes the business date."
+          x-sterp-legacy-field: "KT-REQ-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        useInbound:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          default: "N"
+          x-sterp-legacy-field: "KT-USE-INBOUND PIC X"
+          x-sterp-length: 1
+        useSubassy:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          default: "N"
+          x-sterp-legacy-field: "KT-USE-SUBASSY PIC X"
+          x-sterp-length: 1
+    KitTrialLine:
+      type: "object"
+      properties:
+        lineNum:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KT-L-LINE-NUM PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        path:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KT-L-PATH PIC X(20)"
+          x-sterp-length: 20
+        depth:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KT-L-DEPTH PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        item:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KT-L-ITEM PIC X(40)"
+          x-sterp-length: 40
+        revision:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KT-L-REV PIC X(4)"
+          x-sterp-length: 4
+        uom:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KT-L-UOM PIC X(10)"
+          x-sterp-length: 10
+        gross:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-L-GROSS PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        netRequired:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-L-NET-REQ PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        free:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-L-FREE PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        ownReserved:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-L-OWN-RESV PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        otherReserved:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-L-OTHER-RESV PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        inbound:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-L-INBOUND PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        inboundDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KT-L-INB-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        allocated:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-L-ALLOCATED PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        shortage:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-L-SHORTAGE PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        shortDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KT-L-SHORT-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        limiting:
+          type: "string"
+          maxLength: 1
+          x-sterp-legacy-field: "KT-L-LIMITING PIC X"
+          x-sterp-length: 1
+        action:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KT-L-ACTION PIC X(40)"
+          x-sterp-length: 40
+        warning:
+          type: "string"
+          maxLength: 60
+          x-sterp-legacy-field: "KT-L-WARNING PIC X(60)"
+          x-sterp-length: 60
+    KitTrialSummary:
+      type: "object"
+      description: "KITTRIALCA summary after TRIAL or MAXBUILD (KITTRIAL.cob:175-189,234-249,571-605)."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KT-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        parentItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KT-PARENT-ITEM PIC X(40)"
+          x-sterp-length: 40
+        site:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KT-SITE PIC X(10)"
+          x-sterp-length: 10
+        requestedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-REQUESTED-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        reqDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KT-REQ-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        selectionDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KT-SELECTION-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        feasible:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "KT-FEASIBLE PIC X"
+          x-sterp-length: 1
+        committed:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "N"
+          x-sterp-legacy-field: "KT-COMMITTED PIC X (always N)"
+          x-sterp-length: 1
+        completeness:
+          type: "string"
+          maxLength: 12
+          x-sterp-legacy-field: "KT-COMPLETENESS PIC X(12)"
+          x-sterp-length: 12
+        maxBuildable:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-MAX-BUILDABLE PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        limitingItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KT-LIMITING-ITEM PIC X(40)"
+          x-sterp-length: 40
+        limitingShort:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KT-LIMITING-SHORT PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        shortageCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KT-SHORTAGE-CNT PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        lineTotal:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KT-LINE-TOTAL PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        warnings:
+          type: "string"
+          maxLength: 300
+          x-sterp-legacy-field: "KT-WARNINGS PIC X(300)"
+          x-sterp-length: 300
+        actionHint:
+          type: "string"
+          maxLength: 60
+          x-sterp-legacy-field: "KT-ACTION-HINT PIC X(60)"
+          x-sterp-length: 60
+    KitTrialResult:
+      allOf:
+        - "$ref": "#/components/schemas/KitTrialSummary"
+      type: "object"
+      properties:
+        lines:
+          type: "array"
+          x-sterp-legacy-field: "KT-LINES OCCURS 20 (drained through GETLINE, 0-based offset)"
+          items:
+            "$ref": "#/components/schemas/KitTrialLine"
+    KitTrialEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitTrialResult"
+    KitMaxBuildRequest:
+      type: "object"
+      description: "KitService.MaxBuild parameters (KitService.vb:112-116). The legacy client always sends requestedQty 0 (refused KIT0003, SME-648); useSubassy is fixed N."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KT-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        parentItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KT-PARENT-ITEM PIC X(40)"
+          x-sterp-length: 40
+        parentRev:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KT-PARENT-REV PIC X(4)"
+          x-sterp-length: 4
+        site:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KT-SITE PIC X(10)"
+          x-sterp-length: 10
+        requestedQty:
+          type: "number"
+          format: "decimal"
+          default: 0
+          x-sterp-legacy-field: "KT-REQUESTED-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        reqDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KT-REQ-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        useInbound:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          default: "N"
+          x-sterp-legacy-field: "KT-USE-INBOUND PIC X"
+          x-sterp-length: 1
+    KitMaxBuildEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitTrialSummary"
+    KitIssueRequest:
+      type: "object"
+      description: "KitExecutionService.Issue parameters (KitExecutionService.vb:53-77). Site = X-STERP-Site, actual and posting dates = business date, approval ids are never sent (0). The execution page sends the selected line's number, item and location, lot from the Lot/serial filter, serial blank, reason code OVERISSUE and allowOver Y when the Reason filter is filled."
+      required:
+        - "lineNum"
+      properties:
+        lineNum:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KS-LINE-NUM PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        itemCode:
+          type: "string"
+          maxLength: 40
+          description: "Blank or the line item issues the planned item; another item is a substitution (KIT0014 hold that does not stop posting)."
+          x-sterp-legacy-field: "KS-ITEM-CODE PIC X(40)"
+          x-sterp-length: 40
+        lotCode:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KS-LOT-CODE PIC X(30)"
+          x-sterp-length: 30
+        serialNo:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KS-SERIAL-NO PIC X(40)"
+          x-sterp-length: 40
+        quantity:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-QUANTITY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        location:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KS-LOCATION PIC X(20)"
+          x-sterp-length: 20
+        reasonCode:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KS-REASON-CODE PIC X(20)"
+          x-sterp-length: 20
+        reasonText:
+          type: "string"
+          maxLength: 300
+          x-sterp-legacy-field: "KS-REASON-TEXT PIC X(300)"
+          x-sterp-length: 300
+        allowOver:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          default: "N"
+          x-sterp-legacy-field: "KS-ALLOW-OVER PIC X"
+          x-sterp-length: 1
+    KitIssueResult:
+      type: "object"
+      description: "KITISSUECA after CHECK or ISSUE (KITISSUE.cob:103-672)."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KS-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        lineNum:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KS-LINE-NUM PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        itemCode:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KS-ITEM-CODE PIC X(40) (item actually issued)"
+          x-sterp-length: 40
+        plannedItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KS-PLANNED-ITEM PIC X(40)"
+          x-sterp-length: 40
+        revision:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KS-REVISION PIC X(4)"
+          x-sterp-length: 4
+        site:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KS-SITE PIC X(10)"
+          x-sterp-length: 10
+        warehouse:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KS-WAREHOUSE PIC X(20)"
+          x-sterp-length: 20
+        location:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KS-LOCATION PIC X(20)"
+          x-sterp-length: 20
+        lotCode:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KS-LOT-CODE PIC X(30)"
+          x-sterp-length: 30
+        serialNo:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KS-SERIAL-NO PIC X(40)"
+          x-sterp-length: 40
+        quantity:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-QUANTITY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        uomCode:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KS-UOM-CODE PIC X(10)"
+          x-sterp-length: 10
+        stockQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-STOCK-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        factor:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-FACTOR PIC S9(9)V9(9)"
+          x-sterp-digits: 18
+          x-sterp-scale: 9
+          x-sterp-signed: true
+        unitCost:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-UNIT-COST PIC S9(11)V9(6)"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        valueGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-VALUE-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        kitIssueId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "KS-KIT-ISSUE-ID PIC S9(17)"
+          x-sterp-digits: 17
+          x-sterp-signed: true
+        movementId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "KS-MOVEMENT-ID PIC S9(17)"
+          x-sterp-digits: 17
+          x-sterp-signed: true
+        lineGross:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-LINE-GROSS PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        lineNet:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-LINE-NET PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        lineRemaining:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-LINE-REMAINING PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        lineExcess:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-LINE-EXCESS PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        lineStatus:
+          type: "string"
+          maxLength: 12
+          x-sterp-legacy-field: "KS-LINE-STATUS PIC X(12)"
+          x-sterp-length: 12
+        kitStatus:
+          type: "string"
+          maxLength: 14
+          x-sterp-legacy-field: "KS-KIT-STATUS PIC X(14)"
+          x-sterp-length: 14
+        wipValue:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-WIP-VALUE PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        shortageQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-SHORTAGE-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        freeQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-FREE-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        traced:
+          type: "string"
+          maxLength: 1
+          x-sterp-legacy-field: "KS-TRACED PIC X"
+          x-sterp-length: 1
+        duplicate:
+          type: "string"
+          maxLength: 1
+          x-sterp-legacy-field: "KS-DUPLICATE PIC X"
+          x-sterp-length: 1
+        impactText:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "KS-IMPACT-TEXT PIC X(200)"
+          x-sterp-length: 200
+        actualDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KS-ACTUAL-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        postingDate:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KS-POSTING-DATE PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+    KitIssueEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitIssueResult"
+    KitBackflushRequest:
+      type: "object"
+      description: "KitExecutionService.Backflush parameters (KitExecutionService.vb:83-93); site = X-STERP-Site, dates = business date."
+      required:
+        - "goodQty"
+      properties:
+        goodQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-GOOD-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+    KitBackflushResult:
+      type: "object"
+      description: "KITISSUECA after BACKFLSH (KITISSUE.cob:681-957). The per-line fields describe the last line processed."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KS-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        goodQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-GOOD-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        linesDone:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KS-LINES-DONE PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        linesFailed:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KS-LINES-FAILED PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        failedItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KS-FAILED-ITEM PIC X(40)"
+          x-sterp-length: 40
+        impactText:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "KS-IMPACT-TEXT PIC X(200)"
+          x-sterp-length: 200
+        kitStatus:
+          type: "string"
+          maxLength: 14
+          x-sterp-legacy-field: "KS-KIT-STATUS PIC X(14)"
+          x-sterp-length: 14
+        wipValue:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-WIP-VALUE PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        lineNum:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KS-LINE-NUM PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        lineStatus:
+          type: "string"
+          maxLength: 12
+          x-sterp-legacy-field: "KS-LINE-STATUS PIC X(12)"
+          x-sterp-length: 12
+        shortageQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KS-SHORTAGE-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+    KitBackflushEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitBackflushResult"
+    KitCostElement:
+      type: "object"
+      properties:
+        element:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KK-E-ELEMENT PIC X(10)"
+          x-sterp-length: 10
+        description:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KK-E-DESC PIC X(30)"
+          x-sterp-length: 30
+        planned:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-E-PLANNED PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        actual:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-E-ACTUAL PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        variance:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-E-VARIANCE PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        quantity:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-E-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        uom:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KK-E-UOM PIC X(10)"
+          x-sterp-length: 10
+    KitCostPosition:
+      type: "object"
+      description: "KITCOSTCA after COST (or VARIANCE) and GETELEM (KITCOST.cob:90-579)."
+      properties:
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "KK-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        costSet:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "KK-COST-SET PIC X(20)"
+          x-sterp-length: 20
+        asAt:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KK-AS-AT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        currency:
+          type: "string"
+          maxLength: 3
+          x-sterp-legacy-field: "KK-CURRENCY PIC X(3)"
+          x-sterp-length: 3
+        plannedGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-PLANNED-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        issuedGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-ISSUED-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        returnedGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-RETURNED-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        scrappedGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-SCRAPPED-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        absorbedGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-ABSORBED-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        completedGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-COMPLETED-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        residualGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-RESIDUAL-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        varianceGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-VARIANCE-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        plannedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-PLANNED-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        completedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-COMPLETED-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        unitCost:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-UNIT-COST PIC S9(11)V9(6)"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        planUnitCost:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-PLAN-UNIT-COST PIC S9(11)V9(6)"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        subassyCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KK-SUBASSY-CNT PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        subassyGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KK-SUBASSY-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        doubleCheck:
+          type: "string"
+          maxLength: 1
+          x-sterp-legacy-field: "KK-DOUBLE-CHECK PIC X"
+          x-sterp-length: 1
+        reconciled:
+          type: "string"
+          maxLength: 1
+          x-sterp-legacy-field: "KK-RECONCILED PIC X (always Y, SME-1901)"
+          x-sterp-length: 1
+        kitStatus:
+          type: "string"
+          maxLength: 14
+          x-sterp-legacy-field: "KK-KIT-STATUS PIC X(14)"
+          x-sterp-length: 14
+        noteText:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "KK-NOTE-TEXT PIC X(200)"
+          x-sterp-length: 200
+        elements:
+          type: "array"
+          maxItems: 12
+          x-sterp-legacy-field: "KK-ELEMS OCCURS 12 (KK-ELEM-CNT used)"
+          items:
+            "$ref": "#/components/schemas/KitCostElement"
+    KitCostEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitCostPosition"
+    KitCommercialLine:
+      type: "object"
+      properties:
+        lineNum:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KV-L-LINE-NUM PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        item:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KV-L-ITEM PIC X(40)"
+          x-sterp-length: 40
+        description:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KV-L-DESC PIC X(40)"
+          x-sterp-length: 40
+        qtyPer:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-QTY-PER PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        uom:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KV-L-UOM PIC X(10)"
+          x-sterp-length: 10
+        required:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-REQUIRED PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        free:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-FREE PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        delivered:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-DELIVERED PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        sets:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-SETS PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        standalonePrice:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-SSP PIC S9(11)V9(6)"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        allocationPct:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-ALLOC-PCT PIC S9(5)V9(6)"
+          x-sterp-digits: 11
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        allocatedNet:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-ALLOC-NET PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        unitCost:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-UNIT-COST PIC S9(11)V9(6)"
+          x-sterp-digits: 17
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        costGbp:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-L-COST-GBP PIC S9(11)V99"
+          x-sterp-digits: 13
+          x-sterp-scale: 2
+          x-sterp-signed: true
+        vatCode:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KV-L-VAT-CODE PIC X(4)"
+          x-sterp-length: 4
+        customerSpecified:
+          type: "string"
+          maxLength: 1
+          x-sterp-legacy-field: "KV-L-CUST-SPEC PIC X"
+          x-sterp-length: 1
+        substituteOk:
+          type: "string"
+          maxLength: 1
+          x-sterp-legacy-field: "KV-L-SUB-OK PIC X"
+          x-sterp-length: 1
+        limiting:
+          type: "string"
+          maxLength: 1
+          x-sterp-legacy-field: "KV-L-LIMITING PIC X"
+          x-sterp-length: 1
+    KitCommercialSets:
+      type: "object"
+      description: "KITCOMMCA after SETS (KITCOMM.cob:104-434,655-676)."
+      properties:
+        kitItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KV-KIT-ITEM PIC X(40)"
+          x-sterp-length: 40
+        kitVersion:
+          type: "string"
+          maxLength: 4
+          x-sterp-legacy-field: "KV-KIT-VERSION PIC X(4)"
+          x-sterp-length: 4
+        kitDefId:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KV-KIT-DEF-ID PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        site:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KV-SITE PIC X(10)"
+          x-sterp-length: 10
+        orderRef:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KV-ORDER-REF PIC X(40)"
+          x-sterp-length: 40
+        orderLine:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KV-ORDER-LINE PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        parentQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-PARENT-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        supplyKind:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "KV-SUPPLY-KIND PIC X(10)"
+          x-sterp-length: 10
+        asAt:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "KV-AS-AT PIC 9(8)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        currency:
+          type: "string"
+          maxLength: 3
+          x-sterp-legacy-field: "KV-CURRENCY PIC X(3)"
+          x-sterp-length: 3
+        completeSets:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-COMPLETE-SETS PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        limitItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "KV-LIMIT-ITEM PIC X(40)"
+          x-sterp-length: 40
+        limitShort:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "KV-LIMIT-SHORT PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        mayDespatch:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "KV-MAY-DESPATCH PIC X"
+          x-sterp-length: 1
+        parentStock:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "N"
+          x-sterp-legacy-field: "KV-PARENT-STOCK PIC X (always N)"
+          x-sterp-length: 1
+        lineCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "KV-LINE-CNT PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        noteText:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "KV-NOTE-TEXT PIC X(200)"
+          x-sterp-length: 200
+        lines:
+          type: "array"
+          maxItems: 15
+          x-sterp-legacy-field: "KV-LINES OCCURS 15 (KV-LINE-CNT used)"
+          items:
+            "$ref": "#/components/schemas/KitCommercialLine"
+    KitCommercialSetsEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitCommercialSets"
+    KitGenealogyLine:
+      type: "object"
+      properties:
+        seq:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-L-SEQ PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        depth:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-L-DEPTH PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "GN-L-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        parent:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "GN-L-PARENT PIC X(40)"
+          x-sterp-length: 40
+        parentLot:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "GN-L-PAR-LOT PIC X(30)"
+          x-sterp-length: 30
+        parentSerial:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "GN-L-PAR-SERIAL PIC X(40)"
+          x-sterp-length: 40
+        item:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "GN-L-ITEM PIC X(40)"
+          x-sterp-length: 40
+        lot:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "GN-L-LOT PIC X(30)"
+          x-sterp-length: 30
+        serial:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "GN-L-SERIAL PIC X(40)"
+          x-sterp-length: 40
+        quantity:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "GN-L-QTY PIC S9(13)V9(6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        uom:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "GN-L-UOM PIC X(10)"
+          x-sterp-length: 10
+        plannedItem:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "GN-L-PLANNED PIC X(40)"
+          x-sterp-length: 40
+        substitute:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "GN-L-SUBSTITUTE PIC X"
+          x-sterp-length: 1
+        event:
+          type: "string"
+          maxLength: 12
+          description: "CONSUMED, RETURN, SCRAP or the where-used event (GENEALOG.cob:432-693)."
+          x-sterp-legacy-field: "GN-L-EVENT PIC X(12)"
+          x-sterp-length: 12
+        happened:
+          type:
+            - "string"
+            - "null"
+          format: "date"
+          x-sterp-legacy-field: "GN-L-WHEN PIC 9(8) (0 when not numeric)"
+          x-sterp-legacy-format: "yyyyMMdd"
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        operator:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "GN-L-OPERATOR PIC X(20)"
+          x-sterp-length: 20
+        note:
+          type: "string"
+          maxLength: 60
+          x-sterp-legacy-field: "GN-L-NOTE PIC X(60)"
+          x-sterp-length: 60
+    KitGenealogyTrace:
+      type: "object"
+      description: "GENEALOGCA summary of the last call and every window drained in one request (GENEALOG.cob:698-800; KitArea.Page). The row at position 20 appears twice when the answer has more than 20 rows (SME-644)."
+      properties:
+        direction:
+          type: "string"
+          maxLength: 10
+          enum:
+            - "FORWARD"
+            - "BACKWARD"
+            - "WHEREUSD"
+          description: "Function actually run: BACKWARD or WHEREUSD when requested, otherwise FORWARD (KitExecutionService.vb:117-118)."
+          x-sterp-legacy-field: "CA-FUNCTION / GN-DIRECTION PIC X(10)"
+          x-sterp-length: 10
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "GN-KIT-REF PIC X(30)"
+          x-sterp-length: 30
+        itemCode:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "GN-ITEM-CODE PIC X(40)"
+          x-sterp-length: 40
+        lotCode:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "GN-LOT-CODE PIC X(30)"
+          x-sterp-length: 30
+        serialNo:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "GN-SERIAL-NO PIC X(40)"
+          x-sterp-length: 40
+        maxDepth:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-MAX-DEPTH PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        lineTotal:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-LINE-TOTAL PIC S9(9) COMP-5"
+          x-sterp-digits: 9
+          x-sterp-signed: true
+        depthReached:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-DEPTH-REACHED PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        substituteCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-SUBSTITUTE-CNT PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        returnCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-RETURN-CNT PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        scrapCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-SCRAP-CNT PIC S9(4)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        kitCnt:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "GN-KIT-CNT PIC S9(4) (counts at most 40 kits)"
+          x-sterp-digits: 4
+          x-sterp-signed: true
+        truncated:
+          type: "string"
+          maxLength: 1
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "GN-TRUNCATED PIC X"
+          x-sterp-length: 1
+        summaryText:
+          type: "string"
+          maxLength: 200
+          x-sterp-legacy-field: "GN-SUMMARY-TEXT PIC X(200)"
+          x-sterp-length: 200
+        lines:
+          type: "array"
+          x-sterp-legacy-field: "GN-LINES OCCURS 20 (drained, 1-based windows)"
+          items:
+            "$ref": "#/components/schemas/KitGenealogyLine"
+    KitGenealogyEnvelope:
+      type: "object"
+      required:
+        - "outcome"
+        - "data"
+      properties:
+        outcome:
+          "$ref": "#/components/schemas/Outcome"
+        data:
+          "$ref": "#/components/schemas/KitGenealogyTrace"
+    KitRecallRow:
+      type: "object"
+      description: "One row of kit.usp_KitGenealogy result set 1 (db/procs/kit/usp_KitEnquiry.sql:175-187)."
+      properties:
+        depth:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "trace.Depth int"
+        genealogyId:
+          type: "integer"
+          format: "int64"
+          x-sterp-legacy-field: "kit.KitGenealogy.GenealogyId bigint"
+        kitRef:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "kit.KitGenealogy.KitRef varchar(30)"
+          x-sterp-length: 30
+        parentItemCode:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "kit.KitGenealogy.ParentItemCode varchar(40)"
+          x-sterp-length: 40
+        parentLotCode:
+          type:
+            - "string"
+            - "null"
+          maxLength: 30
+          x-sterp-legacy-field: "kit.KitGenealogy.ParentLotCode varchar(30) NULL"
+          x-sterp-length: 30
+        parentSerialNo:
+          type:
+            - "string"
+            - "null"
+          maxLength: 40
+          x-sterp-legacy-field: "kit.KitGenealogy.ParentSerialNo varchar(40) NULL"
+          x-sterp-length: 40
+        componentItemCode:
+          type: "string"
+          maxLength: 40
+          x-sterp-legacy-field: "kit.KitGenealogy.ComponentItemCode varchar(40)"
+          x-sterp-length: 40
+        componentLotCode:
+          type:
+            - "string"
+            - "null"
+          maxLength: 30
+          x-sterp-legacy-field: "kit.KitGenealogy.ComponentLotCode varchar(30) NULL"
+          x-sterp-length: 30
+        componentSerialNo:
+          type:
+            - "string"
+            - "null"
+          maxLength: 40
+          x-sterp-legacy-field: "kit.KitGenealogy.ComponentSerialNo varchar(40) NULL"
+          x-sterp-length: 40
+        consumedQty:
+          type: "number"
+          format: "decimal"
+          x-sterp-legacy-field: "kit.KitGenealogy.ConsumedQty decimal(19,6)"
+          x-sterp-digits: 19
+          x-sterp-scale: 6
+          x-sterp-signed: true
+        wasSubstitute:
+          type: "boolean"
+          x-sterp-legacy-field: "kit.KitGenealogy.WasSubstitute bit"
+        plannedItemCode:
+          type:
+            - "string"
+            - "null"
+          maxLength: 40
+          x-sterp-legacy-field: "kit.KitGenealogy.PlannedItemCode varchar(40) NULL"
+          x-sterp-length: 40
+    KitRecallList:
+      allOf:
+        - "$ref": "#/components/schemas/ListEnvelope"
+      type: "object"
+      properties:
+        items:
+          type: "array"
+          items:
+            "$ref": "#/components/schemas/KitRecallRow"
+        count:
+          type: "integer"
+          x-sterp-legacy-field: "rows bound to the grid (ListForm status '<n> record(s)')"
+    KitRdyRunParameters:
+      type: "object"
+      description: "KITRDY KEY=VALUE arguments with the legacy keys and value formats (contracts 8.2; KITRDY.cob:209-247). Absent keys take the program defaults: CO STC, USER STORES (the platform sends the caller's user as the launcher did), MODE READY, ASAT the machine date. MODE values: READY (KITRP010), EXEC (KITRP020), SHORT (KITRP030); any other value prints READY. Further keys are passed through on the command line and ignored by the program."
+      properties:
+        CO:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "CM-CO (CMDARGS) -> Ws-Co"
+          x-sterp-length: 10
+        SITE:
+          type: "string"
+          maxLength: 10
+          description: "Blank = all sites."
+          x-sterp-legacy-field: "CM-SITE -> Ws-Site"
+          x-sterp-length: 10
+        STATUS:
+          type: "string"
+          maxLength: 14
+          description: "Blank = no status filter."
+          x-sterp-legacy-field: "GET STATUS -> Ws-Status-Arg"
+          x-sterp-length: 14
+        ASAT:
+          type: "string"
+          maxLength: 8
+          description: "yyyymmdd, heading only (SME-1155); not validated (NUMVAL)."
+          x-sterp-legacy-field: "CM-ASAT -> Ws-Asat PIC 9(8)"
+          x-sterp-length: 8
+          x-sterp-digits: 8
+          x-sterp-signed: false
+        MODE:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "CM-MODE -> Ws-Mode"
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "CM-USER -> Ws-User"
+          x-sterp-length: 20
+      additionalProperties:
+        type: "string"
+    KitDocpRunParameters:
+      type: "object"
+      description: "KITDOCP KEY=VALUE arguments (KITDOCP.cob:247-311). Defaults: CO STC, USER STORES, MODE ORIGINAL; KIT is required by the program (blank ends rc 12 KIT1010 after JOBLOG START); MODE REPRINT or COPY prints a reprint (COPY < 2 becomes 2, blank REASON becomes 'not stated'); any other MODE prints an ORIGINAL."
+      properties:
+        CO:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "CM-CO -> Ws-Co"
+          x-sterp-length: 10
+        SITE:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "CM-SITE -> Ws-Site"
+          x-sterp-length: 10
+        USER:
+          type: "string"
+          maxLength: 20
+          x-sterp-legacy-field: "CM-USER -> Ws-User"
+          x-sterp-length: 20
+        KIT:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "GET KIT -> Ws-Kit-Ref"
+          x-sterp-length: 30
+        MODE:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "CM-MODE -> Ws-Mode"
+          x-sterp-length: 10
+        COPY:
+          type: "string"
+          maxLength: 4
+          description: "Copy number (NUMVAL, not validated)."
+          x-sterp-legacy-field: "GET COPY -> Ws-Copy-No"
+          x-sterp-length: 4
+        REASON:
+          type: "string"
+          maxLength: 60
+          x-sterp-legacy-field: "GET REASON -> Ws-Reason"
+          x-sterp-length: 60
+      additionalProperties:
+        type: "string"
+    KitRdyReportResult:
+      type: "object"
+      description: "JSON form of the KITRDY listing returned by the platform resource GET /api/jobs/v1/runs/{jobRunId}/result (contracts 8.5). Columns follow the fetched values of KITRDY.cob:376-402 (READY/EXEC) and :488-510 (SHORT) before print editing."
+      properties:
+        mode:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "Ws-Mode"
+          x-sterp-length: 10
+        company:
+          type: "string"
+          maxLength: 10
+          x-sterp-legacy-field: "Ws-Co"
+          x-sterp-length: 10
+        asAtText:
+          type: "string"
+          maxLength: 8
+          x-sterp-legacy-field: "Ws-Asat (heading only)"
+          x-sterp-length: 8
+        kits:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              kitRef:
+                type: "string"
+                maxLength: 30
+                x-sterp-legacy-field: "kit.ExecutionKit.KitRef varchar(30)"
+                x-sterp-length: 30
+              parentItemCode:
+                type: "string"
+                maxLength: 40
+                x-sterp-legacy-field: "kit.ExecutionKit.ParentItemCode varchar(40)"
+                x-sterp-length: 40
+              status:
+                type: "string"
+                maxLength: 14
+                x-sterp-legacy-field: "kit.ExecutionKit.Status varchar(14)"
+                x-sterp-length: 14
+              plannedGoodQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKit.PlannedGoodQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              completedGoodQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKit.CompletedGoodQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              needDate:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "kit.ExecutionKit.NeedDate date"
+              lines:
+                type: "integer"
+                format: "int32"
+                x-sterp-legacy-field: "COUNT(l.KitLineId)"
+              shortLines:
+                type: "integer"
+                format: "int32"
+                x-sterp-legacy-field: "SUM(RemainingQty > ISNULL(ReservedQty,0))"
+              readyPct:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "D-Ready-Pct ROUNDED one decimal (rounding mode inferred)"
+                x-sterp-digits: 4
+                x-sterp-scale: 1
+                x-sterp-signed: false
+              ready:
+                type: "string"
+                enum:
+                  - "YES"
+                  - "NO"
+                x-sterp-legacy-field: "D-Ready-Flag"
+              issuedQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "SUM(GrossIssuedQty) decimal(38,6)"
+                x-sterp-digits: 38
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              returnedQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "SUM(ReturnedQty) decimal(38,6)"
+                x-sterp-digits: 38
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              scrappedQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "SUM(ScrappedQty) decimal(38,6)"
+                x-sterp-digits: 38
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              wipValueGBP:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKit.WipValueGBP decimal(18,2)"
+                x-sterp-digits: 18
+                x-sterp-scale: 2
+                x-sterp-signed: true
+        shortages:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              kitRef:
+                type: "string"
+                maxLength: 30
+                x-sterp-legacy-field: "kit.ExecutionKit.KitRef varchar(30)"
+                x-sterp-length: 30
+              componentItemCode:
+                type: "string"
+                maxLength: 40
+                x-sterp-legacy-field: "kit.ExecutionKitLine.ComponentItemCode varchar(40)"
+                x-sterp-length: 40
+              uomCode:
+                type: "string"
+                maxLength: 10
+                x-sterp-legacy-field: "kit.ExecutionKitLine.UomCode varchar(10)"
+                x-sterp-length: 10
+              currentRequirementQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.CurrentRequirementQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              remainingQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.RemainingQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              reservedQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.ReservedQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              pickedQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.PickedQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              needDate:
+                type:
+                  - "string"
+                  - "null"
+                format: "date"
+                x-sterp-legacy-field: "ISNULL(l.NeedDate, k.NeedDate) date"
+              lineStatus:
+                type: "string"
+                maxLength: 12
+                x-sterp-legacy-field: "kit.ExecutionKitLine.Status varchar(12)"
+                x-sterp-length: 12
+        footing:
+          type: "object"
+          properties:
+            kitsListed:
+              type: "integer"
+              format: "int32"
+              x-sterp-legacy-field: "T-Kits"
+            readyToPick:
+              type: "integer"
+              format: "int32"
+              x-sterp-legacy-field: "T-Ready"
+            shortLines:
+              type: "integer"
+              format: "int32"
+              x-sterp-legacy-field: "T-Short-Lines"
+            wipValueGBP:
+              type: "number"
+              format: "decimal"
+              x-sterp-legacy-field: "T-Wip"
+              x-sterp-digits: 18
+              x-sterp-scale: 2
+              x-sterp-signed: true
+    KitDocpReportResult:
+      type: "object"
+      description: "JSON form of the KITDOCP picking document returned by GET /api/jobs/v1/runs/{jobRunId}/result (contracts 8.5); values before print editing (KITDOCP.cob:290-311,413-503,548-574)."
+      properties:
+        documentKind:
+          type: "string"
+          maxLength: 30
+          x-sterp-legacy-field: "H-Doc-Kind"
+          x-sterp-length: 30
+        copyNo:
+          type: "integer"
+          format: "int32"
+          x-sterp-legacy-field: "Ws-Copy-No"
+        copyText:
+          type: "string"
+          maxLength: 80
+          x-sterp-legacy-field: "H-Copy-Text"
+          x-sterp-length: 80
+        found:
+          type: "string"
+          enum:
+            - "Y"
+            - "N"
+          x-sterp-legacy-field: "Ws-Found"
+        header:
+          type: "object"
+          properties:
+            kitRef:
+              type: "string"
+              maxLength: 30
+              x-sterp-legacy-field: "Ws-Kit-Ref (as entered)"
+              x-sterp-length: 30
+            status:
+              type: "string"
+              maxLength: 14
+              x-sterp-legacy-field: "kit.ExecutionKit.Status varchar(14)"
+              x-sterp-length: 14
+            parentItemCode:
+              type: "string"
+              maxLength: 40
+              x-sterp-legacy-field: "kit.ExecutionKit.ParentItemCode varchar(40)"
+              x-sterp-length: 40
+            parentDescription:
+              type: "string"
+              maxLength: 100
+              x-sterp-legacy-field: "inv.Item.Description (blank when missing)"
+              x-sterp-length: 100
+            plannedGoodQty:
+              type: "number"
+              format: "decimal"
+              x-sterp-legacy-field: "kit.ExecutionKit.PlannedGoodQty decimal(19,6)"
+              x-sterp-digits: 19
+              x-sterp-scale: 6
+              x-sterp-signed: true
+            completedGoodQty:
+              type: "number"
+              format: "decimal"
+              x-sterp-legacy-field: "kit.ExecutionKit.CompletedGoodQty decimal(19,6)"
+              x-sterp-digits: 19
+              x-sterp-scale: 6
+              x-sterp-signed: true
+            needDate:
+              type:
+                - "string"
+                - "null"
+              format: "date"
+              x-sterp-legacy-field: "kit.ExecutionKit.NeedDate date"
+            siteCode:
+              type: "string"
+              maxLength: 10
+              x-sterp-legacy-field: "kit.ExecutionKit.SiteCode varchar(10)"
+              x-sterp-length: 10
+            raisedFor:
+              type: "string"
+              maxLength: 53
+              x-sterp-legacy-field: "SourceDemandType + SourceDemandRef"
+              x-sterp-length: 53
+            backflush:
+              type: "string"
+              enum:
+                - "Yes"
+                - "No"
+              x-sterp-legacy-field: "IsBackflush bit"
+            ownerUser:
+              type: "string"
+              maxLength: 20
+              x-sterp-legacy-field: "kit.ExecutionKit.OwnerUser varchar(20)"
+              x-sterp-length: 20
+        lines:
+          type: "array"
+          items:
+            type: "object"
+            properties:
+              lineNum:
+                type: "integer"
+                format: "int32"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.LineNum int"
+              componentItemCode:
+                type: "string"
+                maxLength: 40
+                x-sterp-legacy-field: "kit.ExecutionKitLine.ComponentItemCode varchar(40)"
+                x-sterp-length: 40
+              description:
+                type: "string"
+                maxLength: 100
+                x-sterp-legacy-field: "inv.Item.Description"
+                x-sterp-length: 100
+              uomCode:
+                type: "string"
+                maxLength: 10
+                x-sterp-legacy-field: "kit.ExecutionKitLine.UomCode varchar(10)"
+                x-sterp-length: 10
+              currentRequirementQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.CurrentRequirementQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              outstandingQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.RemainingQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              reservedQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.ReservedQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+              identification:
+                type: "string"
+                enum:
+                  - "Lot"
+                  - "Serial"
+                  - "Lot+Ser"
+                  - "-"
+                x-sterp-legacy-field: "inv.Item.TraceabilityType mapped (KITDOCP.cob:562-570)"
+              lineStatus:
+                type: "string"
+                maxLength: 12
+                x-sterp-legacy-field: "kit.ExecutionKitLine.Status varchar(12)"
+                x-sterp-length: 12
+              pickFrom:
+                type: "string"
+                maxLength: 20
+                x-sterp-legacy-field: "kit.ExecutionKitLine.IssueLocationCode varchar(20) or 'any'"
+                x-sterp-length: 20
+              pickedQty:
+                type: "number"
+                format: "decimal"
+                x-sterp-legacy-field: "kit.ExecutionKitLine.PickedQty decimal(19,6)"
+                x-sterp-digits: 19
+                x-sterp-scale: 6
+                x-sterp-signed: true
+        footing:
+          type: "object"
+          properties:
+            linesPrinted:
+              type: "integer"
+              format: "int32"
+              x-sterp-legacy-field: "material lines printed"
+            linesNeedingIdentification:
+              type: "integer"
+              format: "int32"
+              x-sterp-legacy-field: "lines needing lot or serial"
+            totalOutstanding:
+              type: "number"
+              format: "decimal"
+              x-sterp-legacy-field: "sum of RemainingQty (all units)"
+              x-sterp-digits: 38
+              x-sterp-scale: 6
+              x-sterp-signed: true
+  responses:
+    BadRequest:
+      description: "Malformed request or context header (API0001, API0004)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: "Not authenticated (API0401)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Forbidden:
+      description: "No STERP user (API0010), company/site not permitted (API0002), run-as refused (API0003), or a legacy permission refusal."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    NotFound:
+      description: "Legacy RC 16 (NOT FOUND)."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    BusinessRule:
+      description: "Legacy RC 08 or procedure THROW 'STERP-<s>-<code>: text' - no business effect."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    Severe:
+      description: "Legacy RC 12 (SQL0001 and other severe errors) or SYS0001."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"
+    NotImplemented:
+      description: "API0501 - the operation belongs to a slice not yet delivered, or a job stream step is in an undelivered slice."
+      content:
+        "application/problem+json":
+          schema:
+            "$ref": "#/components/schemas/ProblemDetails"

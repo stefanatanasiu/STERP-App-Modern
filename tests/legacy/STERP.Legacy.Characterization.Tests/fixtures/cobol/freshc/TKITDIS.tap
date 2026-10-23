@@ -1,0 +1,57 @@
+# suite TKITDIS disassembly (spec 09 s
+ok 1 - DISASSY refuses an unknown function with KIT0002
+ok 2 - An unknown function is an error, not a warning
+ok 3 - Nothing can be taken apart in quantity zero - KIT0003
+ok 4 - A quantity of zero is refused with 8
+ok 5 - An assembly is never taken apart unexplained - KIT0008
+ok 6 - A refused create allocates no disassembly reference
+ok 7 - A stocked parent assembly was built
+ok 8 - CREATE raises a draft disassembly
+ok 9 - A new disassembly starts in DRAFT
+ok 10 - NUMGEN gives the order a DIS reference
+ok 11 - AC-084 value available is 110.00 - carrying plus approved cost
+ok 12 - A recovered component needs an item code - KIT0003
+ok 13 - A negative recovery is refused with KIT0003
+ok 14 - A refused line is an error, not a warning
+ok 15 - Three recovered components are on the order
+ok 16 - A draft disassembly cannot be posted
+ok 17 - An unapproved post is refused with 8
+ok 18 - Nothing was posted
+ok 19 - Recovery above 110.00 is refused with KIT0019
+ok 20 - An over recovery is refused with 8
+ok 21 - A refused allocation does not claim to balance
+ok 22 - VALUE allocates the recovery
+ok 23 - AC-084 recovered value is 95.00
+ok 24 - AC-084 recognised loss is 15.00
+ok 25 - AC-084 value available stays 110.00
+ok 26 - AC-084 DISASSY says the disassembly balances
+ok 27 - D-12 recovery plus loss equals carrying plus approved cost
+ok 28 - The largest line carries the rounding penny
+ok 29 - The second line keeps its rounded 11.88
+ok 30 - Damaged quantity carries no value - line 3 is 11.88 too
+ok 31 - The allocated lines add back to the recovery exactly
+ok 32 - No penny is lost between the lines and the total
+ok 33 - Recovered parts come back in INSPECTION condition
+ok 34 - Planned two but only one came back on line 3
+ok 35 - One of them was damaged
+ok 36 - An unnamed approval is held with KIT0009
+ok 37 - A missing approver is a hold, not an error
+ok 38 - A named approver moves the order to APPROVED
+ok 39 - An approved disassembly takes no more lines - KIT0005
+ok 40 - ENQUIRE reads the approved disassembly back
+ok 41 - All three lines are still there
+ok 42 - The stored recovery is still 95.00
+ok 43 - The stored loss is still 15.00
+ok 44 - The recovered quantity on line 1 is still 6
+ok 45 - The damaged quantity on line 3 is still 1
+ok 46 - The damaged quantity on line 3 is still 1
+ok 47 - The parent assembly is in stock before it is taken apart
+ok 48 - An approved disassembly posts
+ok 49 - All three recovered components post, not just the first
+ok 50 - The disassembly is POSTED
+ok 51 - One parent issue and three component receipts moved stock
+ok 52 - Every sub-instruction got a correlation id of its own
+ok 53 - The caller's own 36 character id is never filed on a movement
+1..53
+# TKITDIS disassembly (spec 09 s passed 00053 failed 00000
+# exit 0

@@ -1,0 +1,4304 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-ITM",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-ITM-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-001-AC1",
+          "ac": 1,
+          "title": "inv contract: drift check clean, inv.Item write audited by tr_Item_Audit, movement rows only via usp_PostStockMovement",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "audit",
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "ready",
+              "call": "api_getReadiness"
+            },
+            {
+              "save": "item",
+              "call": "platform_saveMaintenanceRow",
+              "path": {
+                "maintCode": "ITM.ITEM"
+              },
+              "body": {
+                "mode": "CHANGE",
+                "values": {
+                  "CompanyCode": "STC",
+                  "ItemCode": "NUT-M6-NYLOC",
+                  "Description": "Nyloc nut M6, stainless A4"
+                }
+              }
+            },
+            {
+              "save": "mv",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": -1,
+                "uomCode": "EA",
+                "reasonCode": "COUNT",
+                "reason": "A07 contract check",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-001-ADJ"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ready",
+              "status": 200
+            },
+            {
+              "on": "ready",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "ready",
+              "json": "$.driftDifferences",
+              "count": 0
+            },
+            {
+              "on": "item",
+              "status": 200
+            },
+            {
+              "on": "item",
+              "json": "$.rowsAffected",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'inv.Item' AND EntityKey = 'NUT-M6-NYLOC' AND Action = 'UPDATE' AND Source = 'TRIGGER' AND UserCode = 'SYSADM'",
+              "equals": 1
+            },
+            {
+              "on": "mv",
+              "status": 200
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-001-ADJ'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT Status FROM core.IdempotencyKey WHERE CorrelationId = 'A07-ITM-001-ADJ'",
+              "equals": "COMPLETED"
+            }
+          ],
+          "derivation": "AC (drift check of the 30 inv objects, no DDL, inv.tr_Item_Audit row, balances/movements only from inv.usp_PostStockMovement) with STERP-ITM.md FR-STERP-ITM-001, db/triggers/inv/tr_Item.sql:8-14 (EntityType inv.Item, Source TRIGGER, COALESCE(ModifiedBy...)) and the procedure's COMPLETED idempotency key (usp_PostStockMovement.sql:45-59); the SQL-trace part of 'no DDL' is outside the DSL and is covered by the clean drift result.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-002-AC1",
+          "ac": 1,
+          "title": "Stock Control menu for WHSE at STC/RDG, routing to Stock Enquiry and Stock Reports, RESTRICT gated from movement entry",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "navigation",
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "menu",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "Stock Control"
+                }
+              ]
+            },
+            {
+              "save": "enq",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Enquiry..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "rpt",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Reports..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "sysmenu",
+              "call": "platform_getMenu",
+              "as": "SYSADM"
+            },
+            {
+              "save": "perm",
+              "call": "platform_checkPermissions",
+              "body": {
+                "permissionCodes": [
+                  "ITM.STOCK.ADJUST"
+                ]
+              },
+              "as": "RESTRICT"
+            },
+            {
+              "save": "deny",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": -2,
+                "uomCode": "EA",
+                "reasonCode": "COUNT",
+                "reason": "Bin check",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "as": "RESTRICT",
+              "idempotencyKey": "A07-ITM-002-DENY"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "menu",
+              "text": "Item and Part Maintenance..."
+            },
+            {
+              "on": "menu",
+              "text": "Ctrl+I"
+            },
+            {
+              "on": "menu",
+              "text": "Stock Enquiry..."
+            },
+            {
+              "on": "menu",
+              "text": "Ctrl+K"
+            },
+            {
+              "on": "menu",
+              "text": "Stock Movement Entry..."
+            },
+            {
+              "on": "menu",
+              "text": "Stock Count and Adjustment..."
+            },
+            {
+              "on": "menu",
+              "text": "Lots..."
+            },
+            {
+              "on": "menu",
+              "text": "Serial Numbers..."
+            },
+            {
+              "on": "menu",
+              "text": "Count Line Entry..."
+            },
+            {
+              "on": "menu",
+              "text": "Stock Reports..."
+            },
+            {
+              "on": "menu",
+              "notText": "Units of Measure..."
+            },
+            {
+              "on": "enq",
+              "text": "Stock Enquiry"
+            },
+            {
+              "on": "enq",
+              "notText": "STERP-E-0004"
+            },
+            {
+              "on": "rpt",
+              "text": "Stock status by item and location"
+            },
+            {
+              "on": "rpt",
+              "text": "Stock valuation"
+            },
+            {
+              "on": "rpt",
+              "text": "Lot and serial traceability"
+            },
+            {
+              "on": "rpt",
+              "text": "Stock count sheet and adjustment"
+            },
+            {
+              "on": "rpt",
+              "text": "Opening stock load"
+            },
+            {
+              "on": "rpt",
+              "notText": "Compliance and packaging report"
+            },
+            {
+              "on": "sysmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "ITM.UOM"
+            },
+            {
+              "on": "sysmenu",
+              "json": "$.items[*].formArgument",
+              "equals": "ITM.UOM"
+            },
+            {
+              "on": "perm",
+              "json": "$.items[0].allowed",
+              "equals": false
+            },
+            {
+              "on": "deny",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "PRM0006",
+                "detailContains": "RESTRICT does not hold ITM.STOCK.ADJUST"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-002-DENY'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with the Stock Control rows of db/seed/27-itm-menu.sql:19-39 filtered by the WHSE grants (03-core-roles-users.sql:49: no ITM.UOM.MAINT, ITM.ITEM.MAINT, ITM.LOCATION.MAINT, ITM.CUSTOMS.MAINT), the itm catalogue rows :63-73 (RPT-019 needs ITM.CUSTOMS.MAINT) and contracts 5.4 (PRM0006 '<user> does not hold <permission>'); Units of Measure routing is checked as the frmGenericMaint/ITM.UOM row SYSADM receives, because WHSE does not hold its permission.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-010-AC1",
+          "ac": 1,
+          "title": "Item header returns the seeded NUT-M6-NYLOC row with rowVersion; unknown item 404 text; tab lists and an empty tab",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "hdr",
+              "call": "itm_getItem",
+              "path": {
+                "itemCode": "NUT-M6-NYLOC"
+              }
+            },
+            {
+              "save": "missing",
+              "call": "itm_getItem",
+              "path": {
+                "itemCode": "NO-SUCH-ITEM"
+              }
+            },
+            {
+              "save": "units",
+              "call": "itm_listItemUnits",
+              "path": {
+                "itemCode": "NUT-M6-NYLOC"
+              }
+            },
+            {
+              "save": "lots",
+              "call": "itm_listItemLots",
+              "path": {
+                "itemCode": "NUT-M6-NYLOC"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "hdr",
+              "status": 200
+            },
+            {
+              "on": "hdr",
+              "json": "$.itemCode",
+              "equals": "NUT-M6-NYLOC"
+            },
+            {
+              "on": "hdr",
+              "json": "$.description",
+              "equals": "Nyloc nut M6, stainless A4"
+            },
+            {
+              "on": "hdr",
+              "json": "$.itemClass",
+              "equals": "BOUGHT"
+            },
+            {
+              "on": "hdr",
+              "json": "$.stockUomCode",
+              "equals": "EA"
+            },
+            {
+              "on": "hdr",
+              "json": "$.lifecycleStatus",
+              "equals": "RELEASED"
+            },
+            {
+              "on": "hdr",
+              "json": "$.rowVersion",
+              "exists": true
+            },
+            {
+              "on": "missing",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "detailContains": "Item NO-SUCH-ITEM does not exist in STC."
+              }
+            },
+            {
+              "on": "units",
+              "status": 200
+            },
+            {
+              "on": "units",
+              "json": "$.count",
+              "equals": 2
+            },
+            {
+              "on": "units",
+              "json": "$.items[*].uomCode",
+              "equals": "PK500"
+            },
+            {
+              "on": "units",
+              "json": "$.items[*].stockUnitsPerUom",
+              "equals": 500
+            },
+            {
+              "on": "lots",
+              "status": 200
+            },
+            {
+              "on": "lots",
+              "json": "$.items",
+              "count": 0
+            },
+            {
+              "on": "lots",
+              "json": "$.count",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with the seeded row db/seed/20-itm-items-a.sql:57 (BOUGHT, EA, RELEASED), frmItemMaster.vb:93-96 404 text, the inv.ItemUom rows of 22-itm-item-detail.sql (STOCK EA 1 and PURCHASE PK500 500 for NUT-M6-NYLOC) and no inv.Lot rows for a NONE-traced item (65-itm-partners-stock.sql lots only for LOT items); ItemService.vb:36-73.",
+          "confidence": "observed"
+        },
+        {
+          "id": "FR-STERP-ITM-010-EDGE-RECORD-KEY-CASE",
+          "ac": null,
+          "title": "A lower-case item key reaches the seeded row through the case-insensitive collation",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "save": "lower",
+              "call": "itm_getItem",
+              "path": {
+                "itemCode": "nut-m6-nyloc"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "lower",
+              "status": 200
+            },
+            {
+              "on": "lower",
+              "json": "$.itemCode",
+              "equals": "NUT-M6-NYLOC"
+            }
+          ],
+          "derivation": "Edge record of STERP-ITM.md section 10 (NULL versus empty-string and key literals): itm_getItem executes ItemService.Header's 'WHERE CompanyCode = @c AND ItemCode = @i' unchanged (ItemService.vb:36-39) and SQL Server compares under Latin1_General_CI_AS (contracts 7.1; STERP-ITM.md section 8.2), so the stored upper-case code is returned.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-011-AC1",
+          "ac": 1,
+          "title": "Activation review: missing SALE VAT class gives 422 ITM0004 with an ITM-025 fault; unknown item 404 ITM0001",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "sql": "DELETE FROM inv.ItemVatClass WHERE CompanyCode = 'STC' AND ItemCode = 'WASHER-M6-SS' AND Direction = 'SALE'"
+            },
+            {
+              "save": "novat",
+              "call": "itm_reviewItemActivation",
+              "path": {
+                "itemCode": "WASHER-M6-SS"
+              }
+            },
+            {
+              "save": "unknown",
+              "call": "itm_reviewItemActivation",
+              "path": {
+                "itemCode": "NO-SUCH-ITEM"
+              }
+            },
+            {
+              "save": "warn",
+              "call": "itm_reviewItemActivation",
+              "path": {
+                "itemCode": "HUB-REAR-148-BOOST-XD"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "novat",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "ITM0004"
+              }
+            },
+            {
+              "on": "novat",
+              "outcome": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "novat",
+              "json": "$.data.ready",
+              "equals": "N"
+            },
+            {
+              "on": "novat",
+              "json": "$.data.faults[*].fReq",
+              "equals": "ITM-025"
+            },
+            {
+              "on": "novat",
+              "json": "$.data.faults[*].fSeverity",
+              "equals": "ERROR"
+            },
+            {
+              "on": "unknown",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "ITM0001"
+              }
+            },
+            {
+              "on": "warn",
+              "status": 200
+            },
+            {
+              "on": "warn",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "ITM0004",
+                "messageContains": "Item HUB-REAR-148-BOOST-XD has the information its enabled processes need"
+              }
+            }
+          ],
+          "derivation": "AC text with ITEMVAL.cob:110-228,611-671 (RC 08 ITM0004 any ERROR, RC 04 warnings only, RC 16 ITM0001) and contracts 4.7 problem data; the legacy route ItemService.Review(item, VALIDATE) over every fresh STC item (amendment evidence p4/runs/rg017-itm011-legacy-route.txt) shows NUT-M6-NYLOC RC 08 (ITM-010 ERROR, a stocked item without an inventory account mapping, ITEMVAL.cob:784-789; db/seed/20-itm-items-a.sql:57), HUB-REAR-148-BOOST-XD warnings-only (ITM-007, ITM-008) and LINK-QUICK-11S complete, and the replay of this scenario observed WASHER-M6-SS RC 08 ITM0004 ready N with an ITM-025 ERROR fault, NO-SUCH-ITEM RC 16 ITM0001 and HUB-REAR-148-BOOST-XD RC 04 ITM0004 'Item HUB-REAR-148-BOOST-XD has the information its enabled processes need' (rg017-itm011-replay-legacy-route.txt); no fresh item has more than 24 faults (maximum 8), so that clause is not pinned. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-017: NUT-M6-NYLOC is RC 08 on fresh; the warnings-only case uses the seeded HUB-REAR-148-BOOST-XD]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-012-AC1",
+          "ac": 1,
+          "title": "Stock enquiry buckets: RDG quarantine, BHM quarantine/inspection, CAL/GLA serial buckets, CAL/LIV empty, ALL sends NULL",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "rdgq",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "NUT-M6-NYLOC",
+                "siteCode": "RDG",
+                "condition": "QUARANTINE"
+              }
+            },
+            {
+              "save": "rdgall",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "NUT-M6-NYLOC",
+                "siteCode": "RDG",
+                "condition": "ALL"
+              }
+            },
+            {
+              "save": "bhmq",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "TUBE-AL7005-34.9X1.4",
+                "siteCode": "BHM",
+                "condition": "QUARANTINE"
+              }
+            },
+            {
+              "save": "bhmi",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "BAR-AL6082-25MM",
+                "siteCode": "BHM",
+                "condition": "INSPECTION"
+              }
+            },
+            {
+              "save": "gla",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "CAL-BIKE-GRAVEL-M",
+                "siteCode": "GLA",
+                "condition": "ALL"
+              },
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "GLA"
+              }
+            },
+            {
+              "save": "liv",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "CAL-BIKE-GRAVEL-M",
+                "siteCode": "LIV",
+                "condition": "ALL"
+              },
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "LIV"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rdgq",
+              "json": "$.items[0].locationCode",
+              "equals": "QUAR01"
+            },
+            {
+              "on": "rdgq",
+              "json": "$.items[0].qualityStatus",
+              "equals": "QUARANTINE"
+            },
+            {
+              "on": "rdgq",
+              "json": "$.items[0].isEligible",
+              "equals": false
+            },
+            {
+              "on": "rdgq",
+              "json": "$.items[0].notEligibleReason",
+              "equals": "Quality condition quarantine"
+            },
+            {
+              "on": "rdgq",
+              "json": "$.items[0].qtyOnHand",
+              "equals": 60
+            },
+            {
+              "on": "rdgall",
+              "json": "$.items[*].locationCode",
+              "equals": "STKA01"
+            },
+            {
+              "on": "rdgall",
+              "json": "$.items[*].locationCode",
+              "equals": "QUAR01"
+            },
+            {
+              "on": "bhmq",
+              "json": "$.items[0].locationCode",
+              "equals": "QUAR01"
+            },
+            {
+              "on": "bhmq",
+              "json": "$.items[0].isEligible",
+              "equals": false
+            },
+            {
+              "on": "bhmq",
+              "json": "$.items[0].qtyOnHand",
+              "equals": 85
+            },
+            {
+              "on": "bhmi",
+              "json": "$.items[0].locationCode",
+              "equals": "INSP01"
+            },
+            {
+              "on": "bhmi",
+              "json": "$.items[0].isEligible",
+              "equals": false
+            },
+            {
+              "on": "bhmi",
+              "json": "$.items[0].qtyOnHand",
+              "equals": 55
+            },
+            {
+              "on": "gla",
+              "json": "$.items[0].serialNo",
+              "matches": "^SN26RAVELM00[1-4]$"
+            },
+            {
+              "on": "gla",
+              "json": "$.items[0].qtyOnHand",
+              "equals": 1
+            },
+            {
+              "on": "liv",
+              "json": "$.count",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with inv.usp_StockEnquiry (usp_StockEnquiry.sql:16-38, ORDER BY item, site, warehouse, location) on the seed: QUAR01 60 = +180 -120 of DEMO-QH-66 (91-itm-demo.sql:71-74), BHM QUAR01 85 and INSP01 55 (65-itm-partners-stock.sql v-table), one serial per GLA bucket (SN26 + RAVELM + nnn, :116) and no LIV balance (docs/DEMO-WORKFLOWS.md:79-81,96,142); the spec takes the quarantine quantity from the legacy oracle.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-013-AC1",
+          "ac": 1,
+          "title": "Availability: quarantined stock is physical but neither eligible nor free; no stock at the site is 404 AVL0001",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "rdg",
+              "call": "itm_getItemAvailability",
+              "path": {
+                "itemCode": "NUT-M6-NYLOC"
+              },
+              "query": {
+                "siteCode": "RDG"
+              }
+            },
+            {
+              "save": "bhm",
+              "call": "itm_getItemAvailability",
+              "path": {
+                "itemCode": "TUBE-AL7005-34.9X1.4"
+              },
+              "query": {
+                "siteCode": "BHM"
+              }
+            },
+            {
+              "save": "none",
+              "call": "itm_getItemAvailability",
+              "path": {
+                "itemCode": "NUT-M6-NYLOC"
+              },
+              "query": {
+                "siteCode": "BHM"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rdg",
+              "status": 200
+            },
+            {
+              "on": "rdg",
+              "json": "$.data.qtyQuarantine",
+              "equals": 60
+            },
+            {
+              "on": "rdg",
+              "json": "$.data.qtyPhysical",
+              "gte": 60
+            },
+            {
+              "on": "bhm",
+              "status": 200
+            },
+            {
+              "on": "bhm",
+              "json": "$.data.qtyPhysical",
+              "equals": 85
+            },
+            {
+              "on": "bhm",
+              "json": "$.data.qtyQuarantine",
+              "equals": 85
+            },
+            {
+              "on": "bhm",
+              "json": "$.data.qtyEligible",
+              "equals": 0
+            },
+            {
+              "on": "bhm",
+              "json": "$.data.qtyFree",
+              "equals": 0
+            },
+            {
+              "on": "none",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "AVL0001"
+              }
+            }
+          ],
+          "derivation": "AC text with the AVAILQ ladder (AVAILQ.cob:266-351: QUARANTINE counted in physical and quarantine only; RC 16 AVL0001 when no stock in scope) on the seeded QUAR01 buckets (NUT-M6-NYLOC 60 at RDG, TUBE-AL7005-34.9X1.4 85 at BHM, the only BHM bucket of that item); the >40-bucket AVL0003 case, the unreadable-supply AVL0004 case and the page status line are not arranged (no binding way to force a supply read failure; page covered by FR-STERP-ITM-041), so the full criterion is unknown.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-014-AC1",
+          "ac": 1,
+          "title": "Movement history: DEMO-QH-66 quality legs newest first within 180 days of the business date; window and blank filters",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "nut",
+              "call": "itm_listStockMovements",
+              "query": {
+                "itemCode": "NUT-M6-NYLOC",
+                "siteCode": "RDG",
+                "days": 180
+              }
+            },
+            {
+              "save": "short",
+              "call": "itm_listStockMovements",
+              "query": {
+                "itemCode": "NUT-M6-NYLOC",
+                "siteCode": "RDG",
+                "days": 2
+              }
+            },
+            {
+              "save": "all",
+              "call": "itm_listStockMovements",
+              "query": {
+                "itemCode": "",
+                "siteCode": "",
+                "days": 180
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "nut",
+              "status": 200
+            },
+            {
+              "on": "nut",
+              "json": "$.count",
+              "equals": 4
+            },
+            {
+              "on": "nut",
+              "json": "$.items[*].sourceDocRef",
+              "equals": "DEMO-QH-66"
+            },
+            {
+              "on": "nut",
+              "json": "$.items[0].movementType",
+              "equals": "QUALITY"
+            },
+            {
+              "on": "nut",
+              "json": "$.items[0].movementDate",
+              "equals": "2026-10-05"
+            },
+            {
+              "on": "nut",
+              "json": "$.items[3].movementDate",
+              "equals": "2026-09-24"
+            },
+            {
+              "on": "short",
+              "json": "$.count",
+              "equals": 2
+            },
+            {
+              "on": "all",
+              "status": 200
+            },
+            {
+              "on": "all",
+              "json": "$.count",
+              "lte": 500
+            },
+            {
+              "on": "all",
+              "json": "$.items[*].itemCode",
+              "equals": "SCREW-M4X10-SS"
+            }
+          ],
+          "derivation": "AC text with StockService.vb:114-121 (TOP 500, MovementDate >= business date - days, ORDER BY MovementId DESC, blank -> NULL) on the four DEMO-QH-66 legs dated 2026-09-24 and 2026-10-05 (91-itm-demo.sql:71-74; the OPENING row of 2026-04-01 is outside 180 days of 2026-10-07) and the company-wide demo movements such as SCREW-M4X10-SS (:54-64).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-015",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-015-AC1",
+          "ac": 1,
+          "title": "Serial trace lists opening and ISSUE movements, 30-movement lot cut at 25 lines, unknown lot 404, page needs a row",
+          "layer": "api-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "sql": "INSERT inv.StockMovement (CompanyCode, SiteCode, WarehouseCode, LocationCode, ItemCode, Revision, LotCode, SerialNo, OwnerType, OwnerCode, QualityStatus, MovementType, Quantity, UomCode, EnteredQuantity, ConversionFactor, MovementDate, PostingDate, FiscalYear, PeriodNo, SourceModule, SourceDocType, SourceDocRef, ReasonCode, Reason, CreatedBy, CreatedAt) SELECT b.CompanyCode, b.SiteCode, b.WarehouseCode, b.LocationCode, b.ItemCode, b.Revision, b.LotCode, b.SerialNo, b.OwnerType, b.OwnerCode, b.QualityStatus, v.MovementType, v.Qty, 'EA', v.Qty, 1, v.MovementDate, v.MovementDate, 2026, v.PeriodNo, 'ITM', v.DocType, 'A07-TRACE-SN', v.ReasonCode, 'A07 trace arrangement', 'SYSADM', CAST(v.MovementDate AS datetime2(3)) FROM inv.StockBalance b CROSS JOIN (VALUES ('OPENING', 1.0, CAST('2026-04-01' AS date), 1, 'OPENINGLOAD', 'CUTOVER'), ('ISSUE', -1.0, CAST('2026-10-06' AS date), 7, 'DESPATCH', 'SALE')) AS v (MovementType, Qty, MovementDate, PeriodNo, DocType, ReasonCode) WHERE b.CompanyCode = 'CAL' AND b.ItemCode = 'CAL-BIKE-GRAVEL-M' AND b.SerialNo = 'SN26RAVELM001'"
+            },
+            {
+              "save": "serial",
+              "call": "itm_traceItemLotSerial",
+              "path": {
+                "itemCode": "CAL-BIKE-GRAVEL-M"
+              },
+              "query": {
+                "serialNo": "SN26RAVELM001"
+              },
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "GLA"
+              }
+            },
+            {
+              "sql": "INSERT inv.StockMovement (CompanyCode, SiteCode, WarehouseCode, LocationCode, ItemCode, Revision, LotCode, SerialNo, OwnerType, OwnerCode, QualityStatus, MovementType, Quantity, UomCode, EnteredQuantity, ConversionFactor, MovementDate, PostingDate, FiscalYear, PeriodNo, SourceModule, SourceDocType, SourceDocRef, ReasonCode, Reason, CreatedBy, CreatedAt) SELECT TOP (30) 'STC', 'RDG', 'MAIN', 'STKA01', 'BOLT-M5X16-SS', 'A', 'A07-LOT30', '', 'OWNED', '', 'ACCEPTED', CASE WHEN n % 2 = 1 THEN 'RECEIPT' ELSE 'ISSUE' END, CASE WHEN n % 2 = 1 THEN 2.0 ELSE -1.0 END, 'EA', 1.0, 1, '2026-10-01', '2026-10-01', 2026, 7, 'ITM', 'STOCKMOVE', CONCAT('A07-LOT30-', n), 'A07', 'A07 thirty movements', 'SYSADM', SYSDATETIME() FROM (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n FROM sys.all_objects) q ORDER BY n"
+            },
+            {
+              "save": "lot30",
+              "call": "itm_traceItemLotSerial",
+              "path": {
+                "itemCode": "BOLT-M5X16-SS"
+              },
+              "query": {
+                "lotCode": "A07-LOT30"
+              }
+            },
+            {
+              "save": "unknown",
+              "call": "itm_traceItemLotSerial",
+              "path": {
+                "itemCode": "NUT-M6-NYLOC"
+              },
+              "query": {
+                "lotCode": "A07-NO-SUCH-LOT"
+              }
+            },
+            {
+              "save": "page",
+              "gui": "/itm/stock-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Lot trace"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "serial",
+              "status": 200
+            },
+            {
+              "on": "serial",
+              "json": "$.data.trace",
+              "count": 2
+            },
+            {
+              "on": "serial",
+              "json": "$.data.trace[0].tType",
+              "equals": "OPENING"
+            },
+            {
+              "on": "serial",
+              "json": "$.data.trace[1].tType",
+              "equals": "ISSUE"
+            },
+            {
+              "on": "lot30",
+              "status": 200
+            },
+            {
+              "on": "lot30",
+              "json": "$.data.trace",
+              "count": 25
+            },
+            {
+              "on": "unknown",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "LOT0006"
+              }
+            },
+            {
+              "on": "page",
+              "text": "Select a lot or serial row first."
+            }
+          ],
+          "derivation": "AC text with LOTSER.cob:749-818 (first 25 inv.StockMovement rows by MovementId, RC 16 LOT0006 when none) and frmStockEnquiry.vb:71-77; the serial's opening and despatch movements are arranged in the shape of the 91-itm-demo.sql OPENING rows and the SOC900004 ISSUE of docs/DEMO-WORKFLOWS.md:122 because the seed holds serial balances without movements, and the 30-movement lot is an arranged lot of BOLT-M5X16-SS.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-016",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-016-AC1",
+          "ac": 1,
+          "title": "Stock movement posting: ADJUST -2 posts ADJUSTDOWN once, replay is a duplicate, zero/BLOCKED/RELEASE/over-issue refusals",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "idempotency",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "adj",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": -2,
+                "uomCode": "EA",
+                "reasonCode": "COUNT",
+                "reason": "Bin check",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-016-ADJ"
+            },
+            {
+              "save": "replay",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": -2,
+                "uomCode": "EA",
+                "reasonCode": "COUNT",
+                "reason": "Bin check",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-016-ADJ"
+            },
+            {
+              "save": "zero",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": 0,
+                "uomCode": "EA",
+                "reasonCode": "COUNT",
+                "reason": "Bin check",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-016-ZERO"
+            },
+            {
+              "sql": "UPDATE inv.Item SET LifecycleStatus = 'BLOCKED', StatusReason = 'A07 blocked item' WHERE CompanyCode = 'STC' AND ItemCode = 'WASHER-M6-SS'"
+            },
+            {
+              "save": "blocked",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "WASHER-M6-SS",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": 10,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-016-BLK"
+            },
+            {
+              "sql": "UPDATE inv.Item SET LifecycleStatus = 'RELEASED', StatusReason = NULL WHERE CompanyCode = 'STC' AND ItemCode = 'WASHER-M6-SS'"
+            },
+            {
+              "save": "release",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RELEASE",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "QUAR01",
+                "quantity": 10,
+                "uomCode": "EA",
+                "reasonCode": "QCRELEASE",
+                "reason": "A07 release",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-016-REL"
+            },
+            {
+              "save": "over",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ISSUE",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": 999999,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-016-OVR"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "adj",
+              "status": 200
+            },
+            {
+              "on": "adj",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK"
+              }
+            },
+            {
+              "on": "adj",
+              "json": "$.data.movementType",
+              "equals": "ADJUSTDOWN"
+            },
+            {
+              "on": "adj",
+              "json": "$.data.duplicate",
+              "equals": "N"
+            },
+            {
+              "on": "adj",
+              "json": "$.data.stockQty",
+              "equals": -2
+            },
+            {
+              "on": "adj",
+              "json": "$.data.movementId",
+              "exists": true,
+              "normalize": "generated-id"
+            },
+            {
+              "on": "adj",
+              "json": "$.data.qtyBefore",
+              "exists": true
+            },
+            {
+              "on": "adj",
+              "json": "$.data.qtyAfter",
+              "exists": true
+            },
+            {
+              "on": "replay",
+              "status": 200
+            },
+            {
+              "on": "replay",
+              "json": "$.data.duplicate",
+              "equals": "Y"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-016-ADJ'",
+              "equals": 1
+            },
+            {
+              "on": "zero",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0003"
+              }
+            },
+            {
+              "on": "blocked",
+              "status": 202
+            },
+            {
+              "on": "blocked",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "STK0001"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CorrelationId LIKE 'A07-ITM-016-BLK%'",
+              "equals": 0
+            },
+            {
+              "on": "release",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0014"
+              }
+            },
+            {
+              "on": "over",
+              "bodyContains": "Insufficient physical stock"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CorrelationId LIKE 'A07-ITM-016-OVR%'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with the ItmStockMovementRequest example (ADJUST -2 EA NUT-M6-NYLOC RDG/MAIN/STKA01 COUNT), STERP-ITM.md section 4.1 (STK0003 zero, BLOCKED RECEIPT RC 06 STK0001, RELEASE without hold id STK0014 per SME-184, procedure STERP-E-0015 'Insufficient physical stock' classified STK0006 RC 08 or SQL0001 RC 12 per SME-011, so only the message is asserted) and the procedure replay rule (usp_PostStockMovement.sql:45-59, WasDuplicate -> duplicate Y).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-ITM-016-EDGE-TEXT-NORMALIZATION",
+          "ac": null,
+          "title": "Reason text outside Windows-1252 becomes '?' and a 25-character reason code keeps its first 20 characters",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "txt",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "TUBE-STEEL-1IN-16G",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "RAW01",
+                "quantity": 1,
+                "uomCode": "M",
+                "reasonCode": "ABCDEFGHIJKLMNOPQRSTUVWXY",
+                "reason": "A07 text 漢字 check",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-EDGE-TXT"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "txt",
+              "status": 200
+            },
+            {
+              "sql": "SELECT ReasonCode FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-EDGE-TXT'",
+              "equals": "ABCDEFGHIJKLMNOPQRST"
+            },
+            {
+              "sql": "SELECT Reason FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-EDGE-TXT'",
+              "equals": "A07 text ?? check"
+            }
+          ],
+          "derivation": "Contracts 4.4 alphanumeric rule (CobolCodec.cs:15,37-43: Windows-1252 with '?' for unrepresentable characters, right truncation) on SM-REASON-CODE PIC X(20) and SM-REASON PIC X(200) of ItmStockMovementRequest, posted as an ADJUSTUP of the divisible NONE-traced TUBE-STEEL-1IN-16G at RDG/MAIN/RAW01 (20-itm-items-a.sql, 25-itm-locations.sql).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-ITM-016-EDGE-NUMERIC-SCALE",
+          "ac": null,
+          "title": "A quantity with seven decimals is rounded half away from zero to the six-decimal COMMAREA scale",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "scale",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "TUBE-STEEL-1IN-16G",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "RAW01",
+                "quantity": 1.0000005,
+                "uomCode": "M",
+                "reasonCode": "COUNT",
+                "reason": "A07 scale",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-EDGE-SCL"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "scale",
+              "status": 200
+            },
+            {
+              "on": "scale",
+              "json": "$.data.quantity",
+              "equals": 1.000001
+            },
+            {
+              "on": "scale",
+              "json": "$.data.stockQty",
+              "equals": 1.000001
+            },
+            {
+              "sql": "SELECT Quantity FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-EDGE-SCL'",
+              "equals": 1.000001
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-with-scale rule (CobolCodec.cs:24-29 half away from zero) on SM-QUANTITY PIC S9(13)V9(6); TUBE-STEEL-1IN-16G is not indivisible, so neither the UOMCONV nor the procedure quantum check applies (usp_PostStockMovement.sql:33).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-ITM-016-EDGE-DATE-BOUNDARY",
+          "ac": null,
+          "title": "Blank movement date defaults to the business date; the last day of October posts into fiscal 2026 period 7",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "nodate",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "TUBE-STEEL-1IN-16G",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "RAW01",
+                "quantity": 1,
+                "uomCode": "M",
+                "reasonCode": "COUNT",
+                "reason": "A07 date default",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-EDGE-DT0"
+            },
+            {
+              "save": "monthend",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "TUBE-STEEL-1IN-16G",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "RAW01",
+                "quantity": 1,
+                "uomCode": "M",
+                "reasonCode": "COUNT",
+                "reason": "A07 period end",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N",
+                "movementDate": "2026-10-31"
+              },
+              "idempotencyKey": "A07-ITM-EDGE-DT1"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "nodate",
+              "status": 200
+            },
+            {
+              "sql": "SELECT CONVERT(char(10), MovementDate, 23) FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-EDGE-DT0'",
+              "equals": "2026-10-07"
+            },
+            {
+              "on": "monthend",
+              "status": 200
+            },
+            {
+              "sql": "SELECT CONCAT(FiscalYear, '/', PeriodNo) FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-EDGE-DT1'",
+              "equals": "2026/7"
+            }
+          ],
+          "derivation": "Contracts 4.4 dates (yyyyMMdd via CommArea.cs:72-84) with the facade rule 'movement date parsed, else the business date' (StockService.vb:161-165) and the procedure period lookup (usp_PostStockMovement.sql:36-38) on the STC October period 2026/07 (period ends 31/10/2026, platform_listConsolePeriods example).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-017",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-017-AC1",
+          "ac": 1,
+          "title": "Count list: OPEN filter lists only the SHEET-created count; lines in line order with variance = counted - expected",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "sheet",
+              "job": "itm_submitCountadjRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "SHEET",
+                "REF": "A07CNT017",
+                "WH": "MAIN",
+                "USER": "WHSE"
+              }
+            },
+            {
+              "save": "open",
+              "call": "itm_listStockCounts",
+              "query": {
+                "status": "OPEN"
+              }
+            },
+            {
+              "save": "newlines",
+              "call": "itm_listStockCountLines",
+              "path": {
+                "countRef": "A07CNT017"
+              }
+            },
+            {
+              "save": "seeded",
+              "call": "itm_listStockCountLines",
+              "path": {
+                "countRef": "CNT-2026-001"
+              }
+            },
+            {
+              "save": "unknown",
+              "call": "itm_listStockCountLines",
+              "path": {
+                "countRef": "A07-NO-SUCH-COUNT"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "sheet",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "open",
+              "json": "$.count",
+              "equals": 1
+            },
+            {
+              "on": "open",
+              "json": "$.items[0].countRef",
+              "equals": "A07CNT017"
+            },
+            {
+              "on": "open",
+              "json": "$.items[0].status",
+              "equals": "OPEN"
+            },
+            {
+              "on": "newlines",
+              "json": "$.items[0].lineNum",
+              "equals": 1
+            },
+            {
+              "on": "newlines",
+              "json": "$.items[1].lineNum",
+              "equals": 2
+            },
+            {
+              "on": "newlines",
+              "json": "$.items[0].countedQty",
+              "isNull": true
+            },
+            {
+              "on": "newlines",
+              "json": "$.items[0].status",
+              "equals": "OPEN"
+            },
+            {
+              "on": "seeded",
+              "json": "$.count",
+              "equals": 4
+            },
+            {
+              "on": "seeded",
+              "json": "$.items[0].varianceQty",
+              "equals": 0
+            },
+            {
+              "on": "seeded",
+              "json": "$.items[2].lineNum",
+              "equals": 3
+            },
+            {
+              "on": "seeded",
+              "json": "$.items[2].itemCode",
+              "equals": "WASHER-M6-SS"
+            },
+            {
+              "on": "seeded",
+              "json": "$.items[2].varianceQty",
+              "equals": -6
+            },
+            {
+              "on": "unknown",
+              "json": "$.count",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with StockService.vb:124-138 (no site filter, ORDER BY CountRef / LineNum, VarianceQty = ISNULL(CountedQty,0) - ExpectedQty), COUNTADJ SHEET with REF (STERP-ITM.md section 4.4) and the seeded count CNT-2026-001 (APPROVED; line 3 WASHER-M6-SS counted 6 short, lines 1, 2, 4 counted to book; 91-itm-demo.sql:171-229).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-018",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-018-AC1",
+          "ac": 1,
+          "title": "Counted quantity 58 stored as 58.000000/COUNTED with audit and page message; 'abc' returns the procedure error",
+          "layer": "integration",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "audit"
+          ],
+          "steps": [
+            {
+              "save": "page",
+              "gui": "/itm/stock-count",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Count ref",
+                    "value": "CNT-2026-001"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "SCREW-M4X10-SS"
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "fill": {
+                    "label": "Counted quantity for SCREW-M4X10-SS",
+                    "value": "58"
+                  }
+                },
+                {
+                  "click": "OK"
+                }
+              ]
+            },
+            {
+              "save": "abc",
+              "call": "itm_recordCountedQuantity",
+              "path": {
+                "countId": 1,
+                "lineNum": 1
+              },
+              "body": {
+                "countedQty": "abc"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "page",
+              "json": "$.shown[*]",
+              "contains": "Counted quantity recorded for SCREW-M4X10-SS."
+            },
+            {
+              "sql": "SELECT l.CountedQty FROM inv.StockCountLine l JOIN inv.StockCount c ON c.CountId = l.CountId WHERE c.CountRef = 'CNT-2026-001' AND l.LineNum = 1",
+              "equals": 58
+            },
+            {
+              "sql": "SELECT l.Status FROM inv.StockCountLine l JOIN inv.StockCount c ON c.CountId = l.CountId WHERE c.CountRef = 'CNT-2026-001' AND l.LineNum = 1",
+              "equals": "COUNTED"
+            },
+            {
+              "sql": "SELECT Status FROM inv.StockCount WHERE CountRef = 'CNT-2026-001'",
+              "equals": "APPROVED"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'ITM.COUNTLINE' AND EntityKey = '1/1' AND Action = 'CHANGE'",
+              "equals": 1
+            },
+            {
+              "on": "abc",
+              "problem": {
+                "status": 500,
+                "type": "severe",
+                "reasonCode": "SYS0001",
+                "detailContains": "converting data type nvarchar to numeric"
+              }
+            }
+          ],
+          "derivation": "AC text with StockService.vb:141-148 and core.usp_UiMaintSave (db/procs/core/usp_UiMaintSave.sql: CHANGE by keys CountId/LineNum, value passed as nvarchar and converted by SQL Server, audit row EntityType = MaintCode, EntityKey '<CountId>/<LineNum>'), the seeded count CNT-2026-001 (CountId 1 on a fresh deploy, line 1 SCREW-M4X10-SS; 91-itm-demo.sql:171-195) and contracts 4.6 (non-THROW database error -> 500 SYS0001 with the driver text); page text frmStockCount.vb:48-73. The page writes 'Counted quantity recorded for <item>.' (painted, BaseForm.vb:136-141) and then reloads the lines, whose '<n> record(s)' overwrites it (frmStockCount.vb:64-71, ListForm.vb:111-114), so the message is asserted among the texts the page showed. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-106: status message is overwritten by the list reload]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-020",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-020-AC1",
+          "ac": 1,
+          "title": "STKMOVE: PO receipt valued 410.83, CONVLOAD OPENING rerun posts nothing twice, TRANSFER/transit/function refusals",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "coexistence",
+            "idempotency"
+          ],
+          "steps": [
+            {
+              "save": "val",
+              "call": "po_validateGoodsReceipt",
+              "headers": {
+                "X-STERP-Company": "STC",
+                "X-STERP-Site": "BHM"
+              },
+              "body": {
+                "orderNumber": "PO00000004",
+                "deliveryNote": "DN-77812",
+                "physicalDate": "2026-10-07",
+                "warehouse": "MAIN",
+                "ownership": "RECEIPT",
+                "shipEvidence": "",
+                "importEntry": "",
+                "location": "GOODSIN",
+                "lotCode": "LOT-QA-1"
+              },
+              "as": "WHSE"
+            },
+            {
+              "save": "grn",
+              "call": "po_confirmGoodsReceipt",
+              "headers": {
+                "X-STERP-Company": "STC",
+                "X-STERP-Site": "BHM"
+              },
+              "body": {
+                "receipt": {
+                  "orderNumber": "PO00000004",
+                  "supplier": "S0001",
+                  "deliveryNote": "DN-77812",
+                  "physicalDate": "2026-10-07",
+                  "postingDate": "2026-10-07",
+                  "warehouse": "MAIN",
+                  "ownership": "RECEIPT",
+                  "dupPolicy": "WARN",
+                  "receivedBy": "WHSE",
+                  "currency": "GBP",
+                  "fxRate": 1.0,
+                  "lineCnt": 1,
+                  "lineTable": {
+                    "line": [
+                      {
+                        "lNum": 1,
+                        "lPoLine": 1,
+                        "lSchedule": 1,
+                        "lItem": "BAR-AL6082-25MM",
+                        "lOrdered": 40,
+                        "lCancelled": 0,
+                        "lCounted": 0,
+                        "lReceived": 40,
+                        "lUom": "M",
+                        "lFactor": 1,
+                        "lLocation": "GOODSIN",
+                        "lLot": "LOT-QA-1",
+                        "lTrace": "LOT",
+                        "lInspect": "N",
+                        "lStocked": "Y",
+                        "lPrice": 10.27075,
+                        "lOverPct": 0
+                      }
+                    ]
+                  }
+                }
+              },
+              "as": "WHSE",
+              "idempotencyKey": "A07-ITM-020-GRN"
+            },
+            {
+              "save": "conv1",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALSTOCK.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              },
+              "as": "FINCTRL"
+            },
+            {
+              "save": "conv2",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALSTOCK.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              },
+              "as": "FINCTRL"
+            },
+            {
+              "save": "same",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "TRANSFER",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": 1,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N",
+                "toSite": "RDG",
+                "toWarehouse": "MAIN",
+                "toLocation": "STKA01"
+              },
+              "idempotencyKey": "A07-ITM-020-SAME"
+            },
+            {
+              "sql": "UPDATE inv.Location SET IsActive = 0 WHERE CompanyCode = 'STC' AND SiteCode = 'BHM' AND WarehouseCode = 'MAIN' AND LocationCode = 'TRANSIT'"
+            },
+            {
+              "save": "transit",
+              "call": "itm_postStockMovement",
+              "headers": {
+                "X-STERP-Company": "STC",
+                "X-STERP-Site": "BHM"
+              },
+              "body": {
+                "function": "TRANSFER",
+                "itemCode": "TUBE-AL7005-34.9X1.4",
+                "site": "BHM",
+                "warehouse": "MAIN",
+                "location": "QUAR01",
+                "lotCode": "L26001-.9X1.4",
+                "quantity": 1,
+                "uomCode": "M",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "Y",
+                "condition": "QUARANTINE",
+                "toSite": "RDG",
+                "toWarehouse": "MAIN",
+                "toLocation": "RAW01"
+              },
+              "idempotencyKey": "A07-ITM-020-TRN"
+            },
+            {
+              "sql": "UPDATE inv.Location SET IsActive = 1 WHERE CompanyCode = 'STC' AND SiteCode = 'BHM' AND WarehouseCode = 'MAIN' AND LocationCode = 'TRANSIT'"
+            },
+            {
+              "save": "func",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "SHIFT",
+                "itemCode": "NUT-M6-NYLOC",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKA01",
+                "quantity": 1,
+                "uomCode": "EA",
+                "reasonCode": "COUNT",
+                "reason": "Bin check",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-020-FUN"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "val",
+              "status": 200
+            },
+            {
+              "on": "grn",
+              "status": 200
+            },
+            {
+              "on": "grn",
+              "json": "$.data.totalGbp",
+              "equals": 410.83
+            },
+            {
+              "on": "grn",
+              "json": "$.data.status",
+              "equals": "CONFIRMED"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CompanyCode = 'STC' AND SiteCode = 'BHM' AND ItemCode = 'BAR-AL6082-25MM' AND LotCode = 'LOT-QA-1' AND MovementType = 'RECEIPT' AND Quantity = 40 AND ValueGBP = 410.83",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT CASE WHEN COUNT(*) > 0 AND COUNT(*) = COUNT(DISTINCT CorrelationId) THEN 1 ELSE 0 END FROM inv.StockMovement WHERE CompanyCode = 'CAL' AND MovementType = 'OPENING' AND CorrelationId LIKE 'CVL|CALSTOCK|20260331|%'",
+              "equals": 1
+            },
+            {
+              "on": "same",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0009"
+              }
+            },
+            {
+              "on": "transit",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0013"
+              }
+            },
+            {
+              "on": "func",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0008"
+              }
+            }
+          ],
+          "derivation": "AC text with STERP-ITM.md FR-STERP-ITM-020 and section 4.1 (STK0009 same place, STK0013 no active TRANSIT location, STK0008 unknown function after validation), docs/DEMO-WORKFLOWS.md:95,120 (PO00000004 40 m BAR-AL6082-25MM valued 410.83; CONVLOAD restart loads nothing twice, correlation CVL|<base>|<cutover>|<seq>) and the named po_* / xmd_submitConvloadRun examples; the SOS900008 despatch, the SOC900004 serial ISSUED and the caller-transaction refusal clauses need SO pick-list values and a failing caller unit that no binding example fixes, so they are not asserted and the criterion is unknown as a whole. STKMOVE TRANSFER checks traceability (0500-TRACE-CHECK) before the transit location (2100-FIND-TRANSIT, STKMOVE.cob:819-832) and TUBE-AL7005-34.9X1.4 is lot controlled, so the staged transfer names the accepted lot L26001-.9X1.4 to reach STK0013; the legacy route StockService.Post TRANSFER on demo with the BHM TRANSIT location inactive observed STK0005 without the lot and STK0013 'Site BHM has no transit location, so a staged transfer cannot be recorded' with it, posting nothing (amendment evidence p4/runs/rg018-itm020-legacy-route.txt). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-018: the staged transfer carries a valid lot so the trace check passes and the transit check is reached]",
+          "confidence": "unknown"
+        },
+        {
+          "id": "FR-STERP-ITM-020-EDGE-NUMERIC-MAGNITUDE",
+          "ac": null,
+          "title": "A 14-digit quantity keeps its low-order 13 integer digits in the COMMAREA and 12 in the posted movement",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "numeric-magnitude"
+          ],
+          "steps": [
+            {
+              "save": "big",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ADJUST",
+                "itemCode": "TUBE-STEEL-1IN-16G",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "RAW01",
+                "quantity": 12345678901234,
+                "uomCode": "M",
+                "reasonCode": "COUNT",
+                "reason": "A07 magnitude",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-EDGE-MAG"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "big",
+              "status": 200
+            },
+            {
+              "on": "big",
+              "json": "$.data.quantity",
+              "equals": 2345678901234
+            },
+            {
+              "sql": "SELECT Quantity FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-EDGE-MAG'",
+              "equals": 345678901234
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-too-large rule (CobolCodec.cs:76-79 high-order truncation to SM-QUANTITY PIC S9(13)V9(6)) and BR-STKMOVE-037 (quantities beyond 12 integer digits lose leading digits in the 6-decimal edit picture passed to inv.usp_PostStockMovement; STERP-ITM.md section 4.1 step 10).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-ITM-020-EDGE-DEMO-JOURNEY",
+          "ac": null,
+          "title": "ITM demo journeys: quarantine/inspection stock unavailable, PO receipt 410.83, CONVLOAD rerun, GLA vs LIV, RESTRICT",
+          "layer": "e2e",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "journey",
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "cameo",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "NUT-M6-NYLOC",
+                "siteCode": "RDG",
+                "condition": "QUARANTINE"
+              }
+            },
+            {
+              "save": "cameoav",
+              "call": "itm_getItemAvailability",
+              "path": {
+                "itemCode": "NUT-M6-NYLOC"
+              },
+              "query": {
+                "siteCode": "RDG"
+              }
+            },
+            {
+              "save": "tube",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "TUBE-AL7005-34.9X1.4",
+                "siteCode": "BHM",
+                "condition": "QUARANTINE"
+              },
+              "headers": {
+                "X-STERP-Company": "STC",
+                "X-STERP-Site": "BHM"
+              },
+              "as": "QUALITY"
+            },
+            {
+              "save": "bar",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "BAR-AL6082-25MM",
+                "siteCode": "BHM",
+                "condition": "INSPECTION"
+              },
+              "headers": {
+                "X-STERP-Company": "STC",
+                "X-STERP-Site": "BHM"
+              },
+              "as": "QUALITY"
+            },
+            {
+              "save": "val",
+              "call": "po_validateGoodsReceipt",
+              "headers": {
+                "X-STERP-Company": "STC",
+                "X-STERP-Site": "BHM"
+              },
+              "body": {
+                "orderNumber": "PO00000004",
+                "deliveryNote": "DN-77812",
+                "physicalDate": "2026-10-07",
+                "warehouse": "MAIN",
+                "ownership": "RECEIPT",
+                "shipEvidence": "",
+                "importEntry": "",
+                "location": "GOODSIN",
+                "lotCode": "LOT-QA-1"
+              },
+              "as": "WHSE"
+            },
+            {
+              "save": "grn",
+              "call": "po_confirmGoodsReceipt",
+              "headers": {
+                "X-STERP-Company": "STC",
+                "X-STERP-Site": "BHM"
+              },
+              "body": {
+                "receipt": {
+                  "orderNumber": "PO00000004",
+                  "supplier": "S0001",
+                  "deliveryNote": "DN-77812",
+                  "physicalDate": "2026-10-07",
+                  "postingDate": "2026-10-07",
+                  "warehouse": "MAIN",
+                  "ownership": "RECEIPT",
+                  "dupPolicy": "WARN",
+                  "receivedBy": "WHSE",
+                  "currency": "GBP",
+                  "fxRate": 1.0,
+                  "lineCnt": 1,
+                  "lineTable": {
+                    "line": [
+                      {
+                        "lNum": 1,
+                        "lPoLine": 1,
+                        "lSchedule": 1,
+                        "lItem": "BAR-AL6082-25MM",
+                        "lOrdered": 40,
+                        "lCancelled": 0,
+                        "lCounted": 0,
+                        "lReceived": 40,
+                        "lUom": "M",
+                        "lFactor": 1,
+                        "lLocation": "GOODSIN",
+                        "lLot": "LOT-QA-1",
+                        "lTrace": "LOT",
+                        "lInspect": "N",
+                        "lStocked": "Y",
+                        "lPrice": 10.27075,
+                        "lOverPct": 0
+                      }
+                    ]
+                  }
+                }
+              },
+              "as": "WHSE",
+              "idempotencyKey": "A07-ITM-DEMO-GRN"
+            },
+            {
+              "save": "conv1",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALSTOCK.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              },
+              "as": "FINCTRL"
+            },
+            {
+              "save": "conv2",
+              "job": "xmd_submitConvloadRun",
+              "body": {
+                "CO": "CAL",
+                "FILE": "data\\legacy\\CALSTOCK.DAT",
+                "CUTOVER": "20260331",
+                "MODE": "COMMIT"
+              },
+              "as": "FINCTRL"
+            },
+            {
+              "save": "gla",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "CAL-BIKE-GRAVEL-M",
+                "siteCode": "GLA",
+                "condition": "ALL"
+              },
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "GLA"
+              },
+              "as": "WHSE"
+            },
+            {
+              "save": "liv",
+              "call": "itm_listStockBalances",
+              "query": {
+                "itemCode": "CAL-BIKE-GRAVEL-M",
+                "siteCode": "LIV",
+                "condition": "ALL"
+              },
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "LIV"
+              },
+              "as": "WHSE"
+            },
+            {
+              "save": "restrict",
+              "call": "platform_signOn",
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "LIV"
+              },
+              "body": {
+                "companyCode": "CAL",
+                "siteCode": "LIV",
+                "businessDate": "2026-10-07"
+              },
+              "as": "RESTRICT"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "cameo",
+              "json": "$.items[0].locationCode",
+              "equals": "QUAR01"
+            },
+            {
+              "on": "cameo",
+              "json": "$.items[0].isEligible",
+              "equals": false
+            },
+            {
+              "on": "cameoav",
+              "json": "$.data.qtyQuarantine",
+              "equals": 60
+            },
+            {
+              "on": "tube",
+              "json": "$.items[0].qtyOnHand",
+              "equals": 85
+            },
+            {
+              "on": "tube",
+              "json": "$.items[0].isEligible",
+              "equals": false
+            },
+            {
+              "on": "bar",
+              "json": "$.items[0].qtyOnHand",
+              "equals": 55
+            },
+            {
+              "on": "bar",
+              "json": "$.items[0].isEligible",
+              "equals": false
+            },
+            {
+              "on": "grn",
+              "status": 200
+            },
+            {
+              "on": "grn",
+              "json": "$.data.totalGbp",
+              "equals": 410.83
+            },
+            {
+              "on": "grn",
+              "json": "$.data.grniGbp",
+              "equals": 410.83
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CompanyCode = 'STC' AND ItemCode = 'BAR-AL6082-25MM' AND LotCode = 'LOT-QA-1' AND MovementType = 'RECEIPT' AND ValueGBP = 410.83",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT CASE WHEN COUNT(*) > 0 AND COUNT(*) = COUNT(DISTINCT CorrelationId) THEN 1 ELSE 0 END FROM inv.StockMovement WHERE CompanyCode = 'CAL' AND MovementType = 'OPENING' AND CorrelationId LIKE 'CVL|CALSTOCK|20260331|%'",
+              "equals": 1
+            },
+            {
+              "on": "gla",
+              "json": "$.items[*].serialNo",
+              "matches": "^SN26RAVELM00[1-4]$"
+            },
+            {
+              "on": "gla",
+              "json": "$.items[0].qtyOnHand",
+              "equals": 1
+            },
+            {
+              "on": "liv",
+              "json": "$.count",
+              "equals": 0
+            },
+            {
+              "on": "restrict",
+              "problem": {
+                "status": 403,
+                "type": "forbidden",
+                "reasonCode": "API0002"
+              }
+            }
+          ],
+          "derivation": "STERP-ITM.md section 10 demo-workflow journeys with docs/DEMO-WORKFLOWS.md: workflow 2 quality cameo (QUAR01 60 physical but not available, :79-81), workflow 3 step 5 (TUBE-AL7005-34.9X1.4 QUAR01 85 and BAR-AL6082-25MM INSP01 55, :96), workflow 3 step 4 (PO00000004 40 m valued 410.83 with the GRNI journal, :95, named po_* examples), workflow 4 step 2 (CALSTOCK.DAT COMMIT twice posts nothing twice, :120) and workflow 5 steps 4-5 (GLA serial buckets, nothing at LIV, RESTRICT refused CAL/LIV, :141-142); the SO despatch steps (workflow 1 step 3, workflow 4 step 4) depend on pick-list contents fixed only by the demo run and are left to the STERP-SO journey.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-021",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-021-AC1",
+          "ac": 1,
+          "title": "Reservation service through SORESV: a request beyond free stock reserves partially with RC 04 (RSV0003 renamed SRV0003)",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "save": "part",
+              "call": "so_reserveSalesOrderLine",
+              "path": {
+                "orderNumber": "SOC900001",
+                "lineNum": 1
+              },
+              "headers": {
+                "X-STERP-Company": "CAL",
+                "X-STERP-Site": "GLA"
+              },
+              "body": {
+                "itemCode": "CAL-BIKE-GRAVEL-M",
+                "site": "GLA",
+                "customer": "K0002",
+                "qtyRequested": 12,
+                "requiredDate": "2026-10-07"
+              },
+              "idempotencyKey": "A07-ITM-021-RSV"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "part",
+              "status": 200
+            },
+            {
+              "on": "part",
+              "outcome": {
+                "returnCode": 4,
+                "severity": "WARNING",
+                "reasonCode": "SRV0003"
+              }
+            },
+            {
+              "on": "part",
+              "json": "$.data.qtyShortfall",
+              "gte": 8
+            },
+            {
+              "on": "part",
+              "json": "$.data.status",
+              "equals": "ACTIVE"
+            }
+          ],
+          "derivation": "AC text with STKRESV.cob:211-237 (partial RESERVE RC 04 RSV0003 with the shortfall) reached through the only binding caller surface so_reserveSalesOrderLine (SORESV renames RSV0003 to SRV0003 and always sends allow-partial Y; SORESV.cob:496-566) on CAL order SOC900001 line 1 (93-so-demo.sql) where GLA holds at most four CAL-BIKE-GRAVEL-M serial units (65-itm-partners-stock.sql:116); the RC 08 no-partial, CONSUME RSV0006, ENQUIRE 25-line and caller-rollback clauses have no binding surface, so the criterion is unknown.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-022",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-022-AC1",
+          "ac": 1,
+          "title": "Availability AVAIL over 45 arranged buckets stays RC 00 (AVL0003 is ENQUIRE-only); third-party stock never physical",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "sql": "INSERT inv.StockBalance (CompanyCode, SiteCode, WarehouseCode, LocationCode, ItemCode, Revision, LotCode, SerialNo, OwnerType, OwnerCode, QualityStatus, QtyOnHand, QtyReserved, QtyInTransit, LastMovementAt) SELECT TOP (45) 'STC', 'RDG', 'MAIN', 'STKA02', 'BOLT-M5X16-SS', 'A', CONCAT('A07-B', RIGHT('00' + CAST(n AS varchar(3)), 2)), '', 'OWNED', '', 'ACCEPTED', 1, 0, 0, SYSDATETIME() FROM (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n FROM sys.all_objects) q ORDER BY n"
+            },
+            {
+              "save": "many",
+              "call": "itm_getItemAvailability",
+              "path": {
+                "itemCode": "BOLT-M5X16-SS"
+              },
+              "query": {
+                "siteCode": "RDG"
+              }
+            },
+            {
+              "save": "third",
+              "call": "itm_getItemAvailability",
+              "path": {
+                "itemCode": "DECAL-SET-ROAD"
+              },
+              "query": {
+                "siteCode": "RDG"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "many",
+              "status": 200
+            },
+            {
+              "on": "many",
+              "outcome": {
+                "returnCode": 0,
+                "severity": "OK",
+                "reasonCode": ""
+              }
+            },
+            {
+              "on": "many",
+              "json": "$.data.qtyPhysical",
+              "gte": 45
+            },
+            {
+              "on": "third",
+              "status": 200
+            },
+            {
+              "on": "third",
+              "json": "$.data.qtyThirdparty",
+              "equals": 300
+            }
+          ],
+          "derivation": "AC text with AVAILQ.cob:174-383 on 45 arranged lot buckets of BOLT-M5X16-SS and the seeded customer-owned 300 DECAL-SET-ROAD at RDG/SUB/CUSTOWN (65-itm-partners-stock.sql v-table); itm_getItemAvailability is AVAILQ function AVAIL (StockService.vb:34-48) and 1450-ADD-LINE leaves before the 40-line overflow test for AVAIL (AVAILQ.cob:353-358), so AVAIL never returns AVL0003: the legacy route StockService.Availability on this arrangement observed RC 00 with physical 228 over the 48 RDG buckets and third-party 300 for DECAL-SET-ROAD (amendment evidence p4/runs/rg019-itm022-legacy-route.txt); the criterion's ENQUIRE clause (40 lines, RC 04 AVL0003) is reachable only in-process (IC-ITM-AVAILQ; no binding HTTP route returns it) and the unreadable kit.ExecutionKit (AVL0004) case cannot be arranged without DDL or permission changes. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-019: AVAIL cannot overflow; pin the legacy AVAIL outcome RC 00]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-023",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-023-AC1",
+          "ac": 1,
+          "title": "Unit conversion via STKMOVE: 2 BOX = 12 EA factor 6, stock unit factor 1, quantum refusal STK0004, unknown unit STK0003",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "box",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "PKG-STRETCHWRAP-500",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKB01",
+                "quantity": 2,
+                "uomCode": "BOX",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-023-BOX"
+            },
+            {
+              "save": "ea",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "PKG-STRETCHWRAP-500",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKB01",
+                "quantity": 2,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-023-EA"
+            },
+            {
+              "sql": "UPDATE inv.Item SET QuantumQty = 5 WHERE CompanyCode = 'STC' AND ItemCode = 'GAS-ARGON-50L'"
+            },
+            {
+              "save": "quantum",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "GAS-ARGON-50L",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "CONSUM",
+                "quantity": 12,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-023-QNT"
+            },
+            {
+              "sql": "UPDATE inv.Item SET QuantumQty = 1 WHERE CompanyCode = 'STC' AND ItemCode = 'GAS-ARGON-50L'"
+            },
+            {
+              "save": "unit",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "PKG-STRETCHWRAP-500",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKB01",
+                "quantity": 2,
+                "uomCode": "XXBOGUS",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N"
+              },
+              "idempotencyKey": "A07-ITM-023-UNK"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "box",
+              "status": 200
+            },
+            {
+              "on": "box",
+              "json": "$.data.stockQty",
+              "equals": 12
+            },
+            {
+              "on": "box",
+              "json": "$.data.factor",
+              "equals": 6
+            },
+            {
+              "sql": "SELECT Quantity FROM inv.StockMovement WHERE CorrelationId = 'A07-ITM-023-BOX'",
+              "equals": 12
+            },
+            {
+              "on": "ea",
+              "status": 200
+            },
+            {
+              "on": "ea",
+              "json": "$.data.factor",
+              "equals": 1
+            },
+            {
+              "on": "ea",
+              "json": "$.data.stockQty",
+              "equals": 2
+            },
+            {
+              "on": "quantum",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0004"
+              }
+            },
+            {
+              "on": "quantum",
+              "outcome": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "unit",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0003"
+              }
+            }
+          ],
+          "derivation": "AC text with UOMCONV.cob:203-605 (PURCHASE ItemUom row first, identity for the stock unit, indivisible quantum check UOM0006, unknown unit UOM0002) reached through STKMOVE RECEIPT (usage PURCHASE; UOM0006 -> STK0004, other refusals -> STK0003; STERP-ITM.md section 4.1 step 7) on PKG-STRETCHWRAP-500 BOX = 6 EA (22-itm-item-detail.sql:14) and GAS-ARGON-50L (indivisible EA) with an arranged quantum of 5; the rounded quantity 15 is a COMMAREA output that STKMOVE does not return.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-024",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-024-AC1",
+          "ac": 1,
+          "title": "Lot/serial control: expired lot refused, shelf-life hold, serial already in stock, NEWLOT overwrite, EXPCHK banner",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "sql": "UPDATE inv.Lot SET ExpiryDate = '2026-09-30' WHERE CompanyCode = 'STC' AND ItemCode = 'ADHESIVE-EP420-250ML' AND LotCode = 'L26001-0250ML'"
+            },
+            {
+              "save": "expired",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ISSUE",
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "CONSUM",
+                "quantity": 1,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N",
+                "lotCode": "L26001-0250ML"
+              },
+              "idempotencyKey": "A07-ITM-024-EXP"
+            },
+            {
+              "sql": "UPDATE inv.Item SET MinRemainingShelfLifeDays = 400 WHERE CompanyCode = 'STC' AND ItemCode = 'ADHESIVE-EP420-250ML'; UPDATE inv.Lot SET ExpiryDate = '2027-04-01' WHERE CompanyCode = 'STC' AND ItemCode = 'ADHESIVE-EP420-250ML' AND LotCode = 'L26001-0250ML'"
+            },
+            {
+              "save": "shelf",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "ISSUE",
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "CONSUM",
+                "quantity": 1,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N",
+                "lotCode": "L26001-0250ML"
+              },
+              "idempotencyKey": "A07-ITM-024-SHL"
+            },
+            {
+              "sql": "UPDATE inv.Item SET MinRemainingShelfLifeDays = NULL WHERE CompanyCode = 'STC' AND ItemCode = 'ADHESIVE-EP420-250ML'; UPDATE inv.Lot SET ExpiryDate = '2027-01-31', SupplierLotRef = 'A07-SUPPLIER-LOT' WHERE CompanyCode = 'STC' AND ItemCode = 'ADHESIVE-EP420-250ML' AND LotCode = 'L26001-0250ML'"
+            },
+            {
+              "save": "newlot",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "ADHESIVE-EP420-250ML",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "CONSUM",
+                "quantity": 1,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N",
+                "lotCode": "L26001-0250ML"
+              },
+              "idempotencyKey": "A07-ITM-024-NEW"
+            },
+            {
+              "save": "serial",
+              "call": "itm_postStockMovement",
+              "body": {
+                "function": "RECEIPT",
+                "itemCode": "CTRL-EBIKE-250W",
+                "site": "RDG",
+                "warehouse": "MAIN",
+                "location": "STKB01",
+                "quantity": 1,
+                "uomCode": "EA",
+                "sourceDocType": "STOCKMOVE",
+                "viaTransit": "N",
+                "serialNo": "SN26KE250W001"
+              },
+              "idempotencyKey": "A07-ITM-024-SER"
+            },
+            {
+              "save": "expchk",
+              "job": "itm_submitLottraceRun",
+              "body": {
+                "CO": "STC",
+                "ITEM": "ADHESIVE-EP420-250ML",
+                "LOT": "L26001-0250ML",
+                "MODE": "BOTH"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "expired",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0011"
+              }
+            },
+            {
+              "on": "expired",
+              "outcome": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "shelf",
+              "status": 202
+            },
+            {
+              "on": "shelf",
+              "outcome": {
+                "returnCode": 6,
+                "severity": "HOLD",
+                "reasonCode": "STK0011"
+              }
+            },
+            {
+              "on": "newlot",
+              "status": 200
+            },
+            {
+              "sql": "SELECT CASE WHEN ExpiryDate <> '2027-01-31' THEN 1 ELSE 0 END FROM inv.Lot WHERE CompanyCode = 'STC' AND ItemCode = 'ADHESIVE-EP420-250ML' AND LotCode = 'L26001-0250ML'",
+              "equals": 1
+            },
+            {
+              "on": "serial",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "STK0010"
+              }
+            },
+            {
+              "on": "expchk",
+              "spoolContains": "L26001-0250ML"
+            }
+          ],
+          "derivation": "AC text with LOTSER.cob:236-743 (CHKMOVE O expired LOT0008 RC 08, inside minimum shelf life LOT0009 RC 06, NEWSER/serial in stock LOT0004, NEWLOT MERGE overwriting expiry, EXPCHK banner in LOTTRACE) mapped by STKMOVE step 8 (LOT0007/8/9 -> STK0011 with LOTSER's return code, LOT0004 -> STK0010) on the seeded lot L26001-0250ML of ADHESIVE-EP420-250ML at CONSUM and serial SN26KE250W001 (65-itm-partners-stock.sql lot and serial patterns) with arranged expiry and shelf-life values; SETSTAT of a missing serial has no binding surface.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-025",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-025-AC1",
+          "ac": 1,
+          "title": "Substitution check has no HTTP surface; the rule data CHECK evaluates is readable through the substitutes tab",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "steps": [
+            {
+              "sql": "SET NOCOUNT ON; UPDATE inv.ItemSubstitute SET ContextSales = 1 WHERE CompanyCode = 'STC' AND ItemCode = 'BOLT-M5X16-SS' AND SubstituteItemCode = 'BOLT-M6X20-TI';"
+            },
+            {
+              "save": "subs",
+              "call": "itm_listItemSubstitutes",
+              "path": {
+                "itemCode": "BOLT-M5X16-SS"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "subs",
+              "status": 200
+            },
+            {
+              "on": "subs",
+              "json": "$.items[0].substituteItemCode",
+              "equals": "BOLT-M6X20-TI"
+            },
+            {
+              "on": "subs",
+              "json": "$.items[0].contextSales",
+              "equals": true
+            },
+            {
+              "on": "subs",
+              "json": "$.items[0].requiresCustomerAgreement",
+              "equals": true
+            },
+            {
+              "on": "subs",
+              "json": "$.items[0].conversionRatio",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC text (SUBSTCHK CHECK: ratio 1.5 permitted Y and 15.000000, agreement RC 06 SUB0005, validity RC 08 SUB0003, unapproved RC 08 SUB0006) with STERP-ITM.md FR-STERP-ITM-025 stating the contract has no HTTP exposure (only caller SO PICKGEN, potentially unused, SME-1228); the closest binding operation reads the rule rows CHECK evaluates (ItemService.Part SUBST, ItemService.vb:69-72); the seeded BOLT-M5X16-SS -> BOLT-M6X20-TI rule is a KIT-context rule (ContextSales 0, db/seed/22-itm-item-detail.sql:129), so the arrangement gives it the SALES context the criterion names, and the legacy route ItemService.Part on that state observed BOLT-M6X20-TI, ContextSales true, RequiresCustomerAgreement true and ratio 1.000000000 (amendment evidence p4/runs/rg020-rg021-legacy-route.txt); the CHECK outcomes themselves stay unknown. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-020: the seeded rule is not a SALES rule; arrange the SALES context instead of expecting it from the seed]",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-026",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-026-AC1",
+          "ac": 1,
+          "title": "Date helper: online trace as at the business date shows days remaining 0; LOTTRACE prints 284 days via DAYSBTWN",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT inv.StockMovement (CompanyCode, SiteCode, WarehouseCode, LocationCode, ItemCode, Revision, LotCode, SerialNo, OwnerType, OwnerCode, QualityStatus, MovementType, Quantity, UomCode, EnteredQuantity, ConversionFactor, MovementDate, PostingDate, FiscalYear, PeriodNo, SourceModule, SourceDocType, SourceDocRef, ReasonCode, Reason, CreatedBy, CreatedAt) VALUES ('STC', 'RDG', 'MAIN', 'CONSUM', 'ADHESIVE-EP420-250ML', 'A', 'L26001-0250ML', '', 'OWNED', '', 'ACCEPTED', 'RECEIPT', 1, 'EA', 1, 1, '2026-10-01', '2026-10-01', 2026, 7, 'ITM', 'STOCKMOVE', 'A07-ITM-026', 'A07', 'A07 date helper arrangement', 'SYSADM', SYSDATETIME())"
+            },
+            {
+              "save": "trace",
+              "call": "itm_traceItemLotSerial",
+              "path": {
+                "itemCode": "ADHESIVE-EP420-250ML"
+              },
+              "query": {
+                "lotCode": "L26001-0250ML"
+              }
+            },
+            {
+              "save": "lot",
+              "job": "itm_submitLottraceRun",
+              "body": {
+                "CO": "STC",
+                "ITEM": "ADHESIVE-EP420-250ML",
+                "LOT": "L26001-0250ML",
+                "ASAT": "20261007"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "trace",
+              "status": 200
+            },
+            {
+              "on": "trace",
+              "json": "$.data.asAt",
+              "equals": "2026-10-07"
+            },
+            {
+              "on": "trace",
+              "json": "$.data.daysRemaining",
+              "equals": 0
+            },
+            {
+              "on": "lot",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "lot",
+              "spoolContains": "Days remaining:     284"
+            }
+          ],
+          "derivation": "AC text (TODAY = system date; ADDDAYS/DAYSBTWN from the PLATFORM calendar whatever the company; refusals passed back) with ITMDATE.cob:41-62 and LOTSER.cob: TRACE (6000-TRACE :749-819) never reads the lot, so LS-DAYS-REMAINING keeps the 0 set at :83 while LS-AS-AT is the business date, whereas EXPCHK (5000 :705-745) reads the lot and computes days remaining through ITMDATE DAYSBTWN (0450 :219-231), which the binding job itm_submitLottraceRun prints ('Days remaining:', LOTTRACE.cob:118-119,279-294); lot L26001-0250ML expires 2027-07-18 (seeded), 284 days after 2026-10-07; the legacy routes StockService.Trace and ReportService.Run LOTTRACE on this arrangement observed as-at 20261007 with days remaining 0 and the banner 'Expiry:  18/07/2027   Days remaining:     284', run OK RC 0 (amendment evidence p4/runs/rg020-rg021-legacy-route.txt, listing rg021-LOTTRACE-STC-20261021232452.lst); the ADDDAYS and refusal clauses stay covered by the kernel golden master only. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-021: TRACE never computes days remaining (0); DAYSBTWN is checked through the LOTTRACE banner]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-027",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-027-AC1",
+          "ac": 1,
+          "title": "Compliance determination inside PKGRPT: VAT column '----' while VATCODE fails, customs 'none held', run warns",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "pkg",
+              "job": "itm_submitPkgrptRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20260101",
+                "TO": "20261031",
+                "MODE": "ALL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "pkg",
+              "run": {
+                "status": "WARNING",
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "pkg",
+              "spoolContains": "----"
+            },
+            {
+              "on": "pkg",
+              "spoolContains": "none held"
+            }
+          ],
+          "derivation": "AC text with STERP-ITM.md FR-STERP-ITM-027 (VATCODE reads the non-existent fin.VatCode.RatePct, db/tables/10-fin/05-VatCode.sql:4-11, so RC 12 SQL0001 and '----' for every item; CUSTOMS 'none held'; COMPLY CMP0008; PACKAGE quantity 0 computed for 1) and PKGRPT RC 4 when any fault is noted (PKGRPT.cob:620-631); the VATCODE failure is to be confirmed against the legacy oracle and the item-level COMPLY/PACKAGE values are not fixed by the specification, so the expected values are unknown.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-030",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-030-AC1",
+          "ac": 1,
+          "title": "STKSTAT prints the RDG quarantine bucket not eligible with free 0, keeps it in totals, registers launcher/program rows",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "all",
+              "job": "itm_submitStkstatRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ITEM": "NUT-M6-NYLOC",
+                "ASAT": "20261007",
+                "MODE": "ALL"
+              }
+            },
+            {
+              "save": "elig",
+              "job": "itm_submitStkstatRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ITEM": "NUT-M6-NYLOC",
+                "ASAT": "20261007",
+                "MODE": "ELIGIBLE"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "all",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "all",
+              "spoolContains": "QUAR01"
+            },
+            {
+              "on": "all",
+              "spoolContains": "0.000 No  Quality condition"
+            },
+            {
+              "on": "elig",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "elig",
+              "spoolContains": "NUT-M6-NYLOC"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'STKSTAT'",
+              "equals": 4
+            }
+          ],
+          "derivation": "AC text with STKSTAT.cob:305-403 (buckets from inv.usp_StockEnquiry, free 0 when not eligible, MODE=ELIGIBLE hides non-eligible buckets from print only) on the seeded QUAR01 bucket (91-itm-demo.sql:71-74) and the double registration launcher + JOBLOG row per run (SME-010; STERP-ITM.md section 3.4); the omission of QUAR01 from the ELIGIBLE print and the unwritable-spool RC 12 cannot be asserted with the DSL (no negative spool assertion, no folder fault injection). The reason prints in COLUMN 115 PIC X(18) (STKSTAT.cob:124), so 'Quality condition quarantine' is cut to 'Quality condition ' and the QUAR01 line ends '0.000 No  Quality condition'; the legacy route ReportService.Run STKSTAT observed that line (free 0.000, not eligible) in the ALL listing, its absence from the ELIGIBLE listing, both runs OK RC 0 and four STKSTAT core.JobRun rows (amendment evidence p4/runs/rg022-itm030-legacy-route.txt, listings rg022-all-*.lst and rg022-elig-*.lst). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-022: the not-eligible reason is printed as its first 18 characters]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-031",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-031-AC1",
+          "ac": 1,
+          "title": "STKVALF values owned buckets at last movement cost and ends RC 4 W-0402 when a bucket has no cost evidence",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "val",
+              "job": "itm_submitStkvalfRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ASAT": "20261031",
+                "MODE": "ALL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "val",
+              "run": {
+                "status": "WARNING",
+                "returnCode": 4,
+                "messageContains": "W-0402"
+              }
+            },
+            {
+              "on": "val",
+              "spoolContains": "LASTMOVE"
+            },
+            {
+              "on": "val",
+              "spoolContains": "NO COST"
+            }
+          ],
+          "derivation": "AC text with STKVALF.cob:420-556 (LASTMOVE unit cost of the highest-MovementId costed movement, value ROUNDED 2 dp, NO COST bucket -> exit 4 'STERP-W-0402 <n> bucket(s) have no cost evidence'); on the seed most RDG buckets have no costed movement (65-itm-partners-stock.sql balances without movements) while the 91-itm-demo.sql movements carry unit costs; per-bucket values and the ELIGIBLE/PREVIEW listing differences are oracle values not fixed by the specification.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-032",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-032-AC1",
+          "ac": 1,
+          "title": "STKVALF CSV extract (FL-047) header and tail carry-over of a shorter line",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "file-format"
+          ],
+          "steps": [
+            {
+              "save": "val",
+              "job": "itm_submitStkvalfRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ASAT": "20261031",
+                "MODE": "ALL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "val",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "val",
+              "spoolContains": "NO COST"
+            }
+          ],
+          "derivation": "AC text with STKVALF.cob:283-287,516-536 (header ITEM,SITE,WAREHOUSE,LOCATION,LOT,OWNER,CONDITION,QTY,UNITCOST,VALUE,COSTSOURCE; WS-TEXT never cleared, FR-STKVALF-013); the extract is written under the run root extracts folder with a timestamped name that no binding operation lists or returns (jobs_listSpoolFiles covers spool and logs only), so the header and byte comparison are unknown and only the producing run is pinned.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-033",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-033-AC1",
+          "ac": 1,
+          "title": "LOTTRACE prints banner and movements of a lot, ends RC 12 E-1001 for a lot without movements, refuses a missing ITEM",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "report",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "sql": "INSERT inv.StockMovement (CompanyCode, SiteCode, WarehouseCode, LocationCode, ItemCode, Revision, LotCode, SerialNo, OwnerType, OwnerCode, QualityStatus, MovementType, Quantity, UomCode, EnteredQuantity, ConversionFactor, MovementDate, PostingDate, FiscalYear, PeriodNo, SourceModule, SourceDocType, SourceDocRef, ReasonCode, Reason, CreatedBy, CreatedAt) VALUES ('STC', 'RDG', 'MAIN', 'STKA01', 'BOLT-M5X16-SS', 'A', 'L26001-5X16SS', '', 'OWNED', '', 'ACCEPTED', 'RECEIPT', 10, 'EA', 10, 1, '2026-09-15', '2026-09-15', 2026, 6, 'ITM', 'PURCHRECEIPT', 'A07-LT-1', 'PORCPT', 'A07 lot trace receipt', 'WHSE', '2026-09-15T10:00:00'), ('STC', 'RDG', 'MAIN', 'STKA01', 'BOLT-M5X16-SS', 'A', 'L26001-5X16SS', '', 'OWNED', '', 'ACCEPTED', 'ISSUE', -4, 'EA', 4, 1, '2026-10-02', '2026-10-02', 2026, 7, 'ITM', 'WORKSORDER', 'A07-LT-2', 'WOISSUE', 'A07 lot trace issue', 'WHSE', '2026-10-02T10:00:00')"
+            },
+            {
+              "save": "lot",
+              "job": "itm_submitLottraceRun",
+              "body": {
+                "CO": "STC",
+                "ITEM": "BOLT-M5X16-SS",
+                "LOT": "L26001-5X16SS",
+                "MODE": "BOTH"
+              }
+            },
+            {
+              "save": "fwd",
+              "job": "itm_submitLottraceRun",
+              "body": {
+                "CO": "STC",
+                "ITEM": "BOLT-M5X16-SS",
+                "LOT": "L26001-5X16SS",
+                "MODE": "FORWARD"
+              }
+            },
+            {
+              "save": "empty",
+              "job": "itm_submitLottraceRun",
+              "body": {
+                "CO": "STC",
+                "ITEM": "BOLT-M5X16-SS",
+                "LOT": "L26003-5X16SS",
+                "MODE": "BOTH"
+              }
+            },
+            {
+              "save": "noitem",
+              "call": "itm_submitLottraceRun",
+              "body": {
+                "CO": "STC",
+                "LOT": "L26001-5X16SS",
+                "MODE": "BOTH"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "lot",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "lot",
+              "spoolContains": "L26001-5X16SS"
+            },
+            {
+              "on": "lot",
+              "spoolContains": "A07-LT-1"
+            },
+            {
+              "on": "lot",
+              "spoolContains": "A07-LT-2"
+            },
+            {
+              "on": "fwd",
+              "run": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "fwd",
+              "spoolContains": "A07-LT-2"
+            },
+            {
+              "on": "empty",
+              "run": {
+                "status": "FAILED",
+                "returnCode": 12,
+                "messageContains": "E-1001"
+              }
+            },
+            {
+              "on": "noitem",
+              "problem": {
+                "status": 422
+              }
+            },
+            {
+              "on": "noitem",
+              "bodyContains": "0102"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'LOTTRACE' AND ReturnCode = 8",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with LOTTRACE.cob:174-491 (missing ITEM E-0102 RC 8 before job start, TRACE RC > 8 -> RC 12 E-1001, Forward = negative quantity, MODE filters print only) and the PLATFORM submission rule that a pre-registration refusal is a 422 with nothing registered; the lot L26001-5X16SS is a seeded lot (65-itm-partners-stock.sql) given two arranged movements, L26003-5X16SS has none.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-034",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-034-AC1",
+          "ac": 1,
+          "title": "COUNTADJ: SHEET opens a count, same-user APPROVE warns W-3003, POST adjusts only the first line, PREVIEW ends RC 8",
+          "layer": "api-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "report",
+            "audit"
+          ],
+          "steps": [
+            {
+              "save": "sheet",
+              "job": "itm_submitCountadjRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "SHEET",
+                "REF": "A07CNT034",
+                "WH": "MAIN",
+                "USER": "WHSE"
+              }
+            },
+            {
+              "save": "opened",
+              "sql": "SELECT Status FROM inv.StockCount WHERE CompanyCode = 'STC' AND CountRef = 'A07CNT034'"
+            },
+            {
+              "save": "enter1",
+              "job": "itm_submitCountadjRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "ENTER",
+                "REF": "A07CNT034",
+                "LINE": "1",
+                "QTY": "5",
+                "USER": "WHSE"
+              }
+            },
+            {
+              "save": "selfappr",
+              "job": "itm_submitCountadjRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "APPROVE",
+                "REF": "A07CNT034",
+                "USER": "WHSE"
+              }
+            },
+            {
+              "save": "afterself",
+              "sql": "SELECT Status FROM inv.StockCount WHERE CompanyCode = 'STC' AND CountRef = 'A07CNT034'"
+            },
+            {
+              "save": "enter2",
+              "job": "itm_submitCountadjRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "ENTER",
+                "REF": "A07CNT034",
+                "LINE": "2",
+                "QTY": "5",
+                "USER": "WHSE"
+              }
+            },
+            {
+              "save": "enter3",
+              "job": "itm_submitCountadjRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "ENTER",
+                "REF": "A07CNT034",
+                "LINE": "3",
+                "QTY": "5",
+                "USER": "WHSE"
+              }
+            },
+            {
+              "save": "appr",
+              "job": "itm_submitCountadjRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "APPROVE",
+                "REF": "A07CNT034",
+                "USER": "INVMGR"
+              }
+            },
+            {
+              "save": "post",
+              "job": "itm_submitCountadjRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "MODE": "POST",
+                "REF": "A07CNT034",
+                "USER": "INVMGR"
+              }
+            },
+            {
+              "save": "page",
+              "gui": "/itm/stock-count",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Count ref",
+                    "value": "A07CNT034"
+                  }
+                },
+                {
+                  "click": "Count sheet"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "sheet",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "sheet",
+              "spoolContains": "A07CNT034"
+            },
+            {
+              "on": "opened",
+              "json": "$[0].Status",
+              "equals": "OPEN"
+            },
+            {
+              "on": "enter1",
+              "run": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "selfappr",
+              "run": {
+                "status": "WARNING",
+                "returnCode": 4,
+                "messageContains": "W-3003"
+              }
+            },
+            {
+              "on": "afterself",
+              "json": "$[0].Status",
+              "equals": "COUNTED"
+            },
+            {
+              "on": "appr",
+              "run": {
+                "returnCode": 0
+              }
+            },
+            {
+              "sql": "SELECT Status FROM inv.StockCount WHERE CompanyCode = 'STC' AND CountRef = 'A07CNT034'",
+              "equals": "POSTED"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockCountLine l JOIN inv.StockCount c ON c.CountId = l.CountId WHERE c.CountRef = 'A07CNT034' AND l.Status = 'POSTED'",
+              "equals": 1
+            },
+            {
+              "on": "page",
+              "json": "$.shown[*]",
+              "contains": "COUNTADJ preview finished with return code 8."
+            },
+            {
+              "on": "page",
+              "json": "$.shown[*]",
+              "contains": "*** ERROR"
+            }
+          ],
+          "derivation": "AC text with the STERP-ITM.md section 4.4 mode table (SHEET OPEN count and COUNTSHT spool; APPROVE by the counting user RC 4 W-3003; POST loop ending after the first marked line and header POSTED, FR-COUNTADJ-015/SME-1487; PREVIEW/COMMIT rejected RC 8 STERP-E-0001, SME-1474) and frmStockCount.vb:85-102 page status text; the count reference is supplied with REF so the run is deterministic. Legacy COUNTADJ runs of S0-S8 on the restored freshc (isolated runtime 00631916): SHEET opens 295 lines, APPROVE by WHSE RC 4 W-3003, POST RC 4 with W-4101 on lines 1-2 (SQL Server error 3988 from STKMOVE's transaction inside the open POST cursor on the MARS connection of c/sterpsql.c:45-46 and jobs/SETENV.cmd:20) and line 3 (lot in INSPECTION), 0 adjustments, header POSTED; the AC's 'adjusts only the first' is kept (binding-change-required). The page's PREVIEW run ends RC 8 STERP-E-0001 and its message is overwritten by the reload (frmStockCount.vb:90-100). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-106/RG-111: page texts are overwritten by the reload; POST line count kept as the binding AC]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-035",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-035-AC1",
+          "ac": 1,
+          "title": "PKGRPT for 2026 prints VAT '----', customs 'none held' and ends RC 4; FROM after TO is refused RC 8 without a run",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "report",
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "rpt",
+              "job": "itm_submitPkgrptRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20260101",
+                "TO": "20261031",
+                "MODE": "ALL"
+              }
+            },
+            {
+              "save": "bad",
+              "call": "itm_submitPkgrptRun",
+              "body": {
+                "CO": "STC",
+                "FROM": "20261101",
+                "TO": "20261031",
+                "MODE": "ALL"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "rpt",
+              "run": {
+                "status": "WARNING",
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "rpt",
+              "spoolContains": "----"
+            },
+            {
+              "on": "rpt",
+              "spoolContains": "none held"
+            },
+            {
+              "on": "bad",
+              "problem": {
+                "status": 422
+              }
+            },
+            {
+              "on": "bad",
+              "outcome": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "bad",
+              "bodyContains": "FROM= is later than TO="
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.JobRun WHERE JobName = 'PKGRPT' AND ReturnCode = 8",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with PKGRPT.cob:253-257 (DISPLAY 'STERP-E-0101 FROM= is later than TO=' before 0200-JOB-START, hence a pre-registration 422 under the PLATFORM submission rule) and :620-631 (RC 4 when any fault), with the VATCODE '----' outcome of FR-STERP-ITM-027 and 'none held' customs text; per-item compliance and packaging lines are oracle values.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-036",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-036-AC1",
+          "ac": 1,
+          "title": "OPENSTK PREVIEW/COMMIT/re-COMMIT of a four-row file and MODE=TEST refusal",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "idempotency",
+            "file-format"
+          ],
+          "steps": [
+            {
+              "file": {
+                "root": "target-output",
+                "name": "extracts\\OPENSTK-STC.csv",
+                "encoding": "ascii",
+                "newline": "crlf",
+                "lines": [
+                  "ITEM,SITE,WHSE,LOC,LOT,SERIAL,CONDITION,QTY,UOM,UNITCOST,EXPIRY,OWNERTYPE,OWNERCODE,REFERENCE",
+                  "BB-SHELL-BSA68,RDG,MAIN,STKA01,,,,10,EA,4.50,,,,A07-OPEN-1",
+                  "BOLT-M8X35-SS,RDG,MAIN,STKA02,,,,200,EA,0.12,,,,A07-OPEN-2",
+                  "BOTTLE-CAGE-ALU,RDG,MAIN,RAW01,,,,25,EA,3.20,,,,A07-OPEN-3",
+                  "BELL-ALU,RDG,MAIN,,,,,5,EA,2.00,,,,A07-OPEN-4"
+                ]
+              }
+            },
+            {
+              "save": "prev",
+              "job": "itm_submitOpenstkRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ASAT": "20261007",
+                "MODE": "PREVIEW"
+              }
+            },
+            {
+              "save": "afterPrev",
+              "sql": "SELECT COUNT(*) AS n FROM inv.StockMovement WHERE MovementType = 'OPENING' AND CorrelationId LIKE 'OPENSTK|STC|%'"
+            },
+            {
+              "save": "commit",
+              "job": "itm_submitOpenstkRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ASAT": "20261007",
+                "MODE": "COMMIT"
+              }
+            },
+            {
+              "save": "again",
+              "job": "itm_submitOpenstkRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ASAT": "20261007",
+                "MODE": "COMMIT"
+              }
+            },
+            {
+              "save": "test",
+              "call": "itm_submitOpenstkRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ASAT": "20261007",
+                "MODE": "TEST"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "prev",
+              "run": {
+                "status": "WARNING",
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "prev",
+              "spoolContains": "OPN0007"
+            },
+            {
+              "on": "prev",
+              "spoolContains": "OPN0002"
+            },
+            {
+              "on": "prev",
+              "spoolContains": "Rows read:         4     Posted:       0     Rejected:       4     Duplicate:       0"
+            },
+            {
+              "on": "afterPrev",
+              "json": "$[0].n",
+              "equals": 0
+            },
+            {
+              "on": "commit",
+              "spoolContains": "Rows read:         4     Posted:       3     Rejected:       1     Duplicate:       0"
+            },
+            {
+              "on": "again",
+              "spoolContains": "OPN0008"
+            },
+            {
+              "on": "again",
+              "spoolContains": "Rows read:         4     Posted:       3     Rejected:       1     Duplicate:       3"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE MovementType = 'OPENING' AND CorrelationId LIKE 'OPENSTK|STC|%'",
+              "equals": 3
+            },
+            {
+              "on": "test",
+              "problem": {
+                "status": 422
+              }
+            },
+            {
+              "on": "test",
+              "bodyContains": "0101"
+            }
+          ],
+          "derivation": "AC text with OPENSTK.cob:202-293,363-610; the file (header, three valid rows, one row without location) is the default input <OutputRoot>\\extracts\\OPENSTK-<CO>.csv (OPENSTK.cob:232-242; an IN= value is cut to 60 bytes by CMDARGS, CMDARGSCA.cpy:28, so a long fixture path would be unreadable); values observed in attributable legacy runs of OPENSTK.exe (00631916) on the same file and freshc (evidence p1 legacy-run-OPENSTK-036-*): PREVIEW exit 4 with three OPN0007, one OPN0002, totals Posted 0 Rejected 4 and no movement; COMMIT exit 4 posting three OPENING movements (correlation 27-character stem + '#' + line) with Posted 3 Rejected 1 Duplicate 0 (the listing holds no upper-case 'OPENING'); a second COMMIT lists three OPN0008 (Posted 3 Duplicate 3, replays count as posted, SME-037) and adds no movement; MODE=TEST ends exit 8 STERP-E-0101 before registration; the submitted run ends WARNING 4 as the ReportService.Run launcher row (ReportService.vb:116-180) while OPENSTK's own JOBLOG row stays RUNNING (0500-JOB-END re-initialises the area, JOB0002, SME-009; not asserted). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-023: input file staged by the file step; listing texts and counts pinned to legacy OPENSTK runs]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-037",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-037-AC1",
+          "ac": 1,
+          "title": "Opening stock file (FL-043): ITEM header skip, quoted comma split, calendar-invalid expiry accepted, blank row counted",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "file-format",
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "file": {
+                "root": "target-output",
+                "name": "extracts\\OPENSTK-STC.csv",
+                "encoding": "ascii",
+                "newline": "crlf",
+                "lines": [
+                  "ITEM,SITE,WHSE,LOC,LOT,SERIAL,CONDITION,QTY,UOM,UNITCOST,EXPIRY,OWNERTYPE,OWNERCODE,REFERENCE",
+                  "ITEMX01,RDG,MAIN,STKA01,,,,10,EA,1.25,,,,REF1",
+                  "BB-SHELL-BSA68,RDG,MAIN,\"STKA01,X\",,,,10,EA,4.50,,,,REF2",
+                  "BOTTLE-CAGE-ALU,RDG,MAIN,RAW01,,,,25,EA,3.20,20260230,,,REF3",
+                  "",
+                  "BOLT-M8X35-SS,RDG,MAIN,STKA02,,,,200,EA,0.12,,,,REF4"
+                ]
+              }
+            },
+            {
+              "save": "prev",
+              "job": "itm_submitOpenstkRun",
+              "body": {
+                "CO": "STC",
+                "SITE": "RDG",
+                "ASAT": "20261007",
+                "MODE": "PREVIEW"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "prev",
+              "run": {
+                "returnCode": 4
+              }
+            },
+            {
+              "on": "prev",
+              "spoolContains": "OPN0007"
+            },
+            {
+              "on": "prev",
+              "spoolContains": "      3  BB-SHELL-BSA68                            RDG/\"STKA01               X\"                           0.000   OPN0003"
+            },
+            {
+              "on": "prev",
+              "spoolContains": "      4  BOTTLE-CAGE-ALU                           RDG/RAW01                                             25.000   OPN0007"
+            },
+            {
+              "on": "prev",
+              "spoolContains": "      6  BOLT-M8X35-SS                             RDG/STKA02                                           200.000   OPN0007"
+            },
+            {
+              "on": "prev",
+              "spoolContains": "Rows read:         3     Posted:       0     Rejected:       3     Duplicate:       0"
+            }
+          ],
+          "derivation": "AC text with OPENSTK.cob:363-468 and the binding example row 'ITEMX01,RDG,MAIN,STKA01,,,,10,EA,1.25,,,,REF1'; the file is the default input <OutputRoot>\\extracts\\OPENSTK-<CO>.csv (OPENSTK.cob:232-242; IN= is cut to 60 bytes by CMDARGS, CMDARGSCA.cpy:28); values observed in an attributable legacy PREVIEW run of OPENSTK.exe (00631916) on the same file and freshc (evidence p1 legacy-run-OPENSTK-037-*): exit 4; the header and the ITEMX01 row are skipped (no listing line); the quoted field is split at its comma (line 3: location RDG/\"STKA01, lot X\", no quantity, OPN0003); expiry 20260230 passes the range test (line 4 OPN0007); the blank line 5 is counted as a physical record (the next row is line 6) but not processed (Rows read 3). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-023: FL-043 edge file staged by the file step; listing pinned to the legacy OPENSTK run]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-040",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-040-AC1",
+          "ac": 1,
+          "title": "Item and Part Maintenance: Ctrl+I opens it, lower-case code loads NUT-M6-NYLOC, tab loads on change, F10 shows ITM0004",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "open",
+              "gui": "/",
+              "actions": [
+                {
+                  "press": "Ctrl+I"
+                }
+              ]
+            },
+            {
+              "save": "load",
+              "gui": "/itm/item-master",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item code",
+                    "value": "nut-m6-nyloc"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Units"
+                }
+              ]
+            },
+            {
+              "sql": "DELETE FROM inv.ItemVatClass WHERE CompanyCode = 'STC' AND ItemCode = 'WASHER-M6-SS' AND Direction = 'SALE'"
+            },
+            {
+              "save": "review",
+              "gui": "/itm/item-master",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item code",
+                    "value": "WASHER-M6-SS"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "open",
+              "text": "Item and Part Maintenance"
+            },
+            {
+              "on": "load",
+              "text": "Nyloc nut M6, stainless A4 | BOUGHT / FASTENER | stock unit EA | revision A | traceability NONE | cost method MWA"
+            },
+            {
+              "on": "load",
+              "text": "PK500"
+            },
+            {
+              "on": "review",
+              "text": "Reason code: ITM0004"
+            },
+            {
+              "on": "review",
+              "text": "ITM-025"
+            }
+          ],
+          "derivation": "AC text with frmItemMaster.vb:11-115 (Ctrl+I menu shortcut 27-itm-menu.sql:21, trim/upper-case, caption '<Description> | <ItemClass> / <Category> | stock unit ... | cost method ...', tab reload, F10 review binding faults to the first grid) on the seeded NUT-M6-NYLOC row (20-itm-items-a.sql:57: BOUGHT, FASTENER, EA, A, NONE, MWA) and its PURCHASE PK500 unit row; the incomplete item is WASHER-M6-SS without its SALE VAT class (ITEMVAL ITM-025 ERROR -> RC 08 ITM0004).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-041",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-041-AC1",
+          "ac": 1,
+          "title": "Stock Enquiry page: Ctrl+K quarantine bucket not eligible, availability line, lot trace needs a row, CAL/LIV 0 record(s)",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "list",
+              "gui": "/",
+              "actions": [
+                {
+                  "press": "Ctrl+K"
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "avail",
+              "gui": "/itm/stock-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "trace",
+              "gui": "/itm/stock-enquiry",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Lot trace"
+                }
+              ]
+            },
+            {
+              "save": "liv",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "File",
+                    "Select Company / Site..."
+                  ]
+                },
+                {
+                  "select": {
+                    "label": "Company / site",
+                    "value": "CAL / LIV"
+                  }
+                },
+                {
+                  "click": "OK"
+                },
+                {
+                  "menu": [
+                    "Stock Control",
+                    "Stock Enquiry..."
+                  ]
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "CAL-BIKE-GRAVEL-M"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "list",
+              "text": "QUAR01"
+            },
+            {
+              "on": "list",
+              "text": "Quality condition quarantine"
+            },
+            {
+              "on": "avail",
+              "text": "Physical "
+            },
+            {
+              "on": "avail",
+              "text": "| eligible "
+            },
+            {
+              "on": "avail",
+              "text": "| free "
+            },
+            {
+              "on": "trace",
+              "text": "Select a lot or serial row first."
+            },
+            {
+              "on": "liv",
+              "text": "0 record(s)"
+            }
+          ],
+          "derivation": "AC text with frmStockEnquiry.vb:23-92 (Ctrl+K row 27-itm-menu.sql:22, Availability status 'Physical p | eligible e | reserved r | free f | expected x | planned y', 'Select a lot or serial row first.'), ListForm '<n> record(s)' and the seeded buckets (QUAR01 60 for NUT-M6-NYLOC at RDG is the only RDG physical stock outside STKA01 for that item - 91-itm-demo.sql:71-74; no CAL-BIKE-GRAVEL-M balance at LIV); WHSE holds CAL access (03-core-roles-users.sql:105).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-042",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-042-AC1",
+          "ac": 1,
+          "title": "Stock Movement Entry: empty quantity warning, confirmed ISSUE posts, doubled F10 posts once, RELEASE shows STK0014",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "idempotency",
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "empty",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "issue",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Movement",
+                    "value": "ISSUE"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Location",
+                    "value": "STKA01"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "1"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            },
+            {
+              "save": "double",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Movement",
+                    "value": "ADJUST"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Location",
+                    "value": "STKA01"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "1"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason code",
+                    "value": "COUNT"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason",
+                    "value": "A07 ITM-042 double"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            },
+            {
+              "save": "release",
+              "gui": "/itm/stock-movement",
+              "actions": [
+                {
+                  "select": {
+                    "label": "Movement",
+                    "value": "RELEASE"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Item",
+                    "value": "NUT-M6-NYLOC"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Location",
+                    "value": "QUAR01"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "10"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason code",
+                    "value": "QCRELEASE"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Reason",
+                    "value": "A07 release"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "empty",
+              "text": "An item code and a quantity are required."
+            },
+            {
+              "on": "issue",
+              "text": "posted; balance now"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE Reason = 'A07 ITM-042 double'",
+              "equals": 1
+            },
+            {
+              "on": "release",
+              "text": "Reason code: STK0014"
+            }
+          ],
+          "derivation": "AC text with frmStockMovement.vb:80-103 (warning text, confirmation, 'Movement <id> posted; balance now <qty> <unit>.'), contracts 4.8 one Idempotency-Key per instruction (StockService.vb:77) and the facade RELEASE refusal STK0014 (STKMOVE.cob:1159-1164, SME-184); field captions frmStockMovement.vb:14-37.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-ITM-043",
+      "scenarios": [
+        {
+          "id": "FR-STERP-ITM-043-AC1",
+          "ac": 1,
+          "title": "Stock Count page: line F10 records 58, Enter count needs a line, Count sheet needs a reference and ends RC 8 *** ERROR",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "WHSE"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "enter",
+              "gui": "/itm/stock-count",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Count ref",
+                    "value": "CNT-2026-001"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "SCREW-M4X10-SS"
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "fill": {
+                    "label": "Counted quantity for SCREW-M4X10-SS",
+                    "value": "58"
+                  }
+                },
+                {
+                  "click": "OK"
+                }
+              ]
+            },
+            {
+              "save": "noline",
+              "gui": "/itm/stock-count",
+              "actions": [
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "noref",
+              "gui": "/itm/stock-count",
+              "actions": [
+                {
+                  "click": "Count sheet"
+                }
+              ]
+            },
+            {
+              "save": "sheet",
+              "gui": "/itm/stock-count",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Count ref",
+                    "value": "CNT-2026-001"
+                  }
+                },
+                {
+                  "click": "Count sheet"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "enter",
+              "json": "$.shown[*]",
+              "contains": "Counted quantity recorded for SCREW-M4X10-SS."
+            },
+            {
+              "sql": "SELECT l.CountedQty FROM inv.StockCountLine l JOIN inv.StockCount c ON c.CountId = l.CountId WHERE c.CountRef = 'CNT-2026-001' AND l.LineNum = 1",
+              "equals": 58
+            },
+            {
+              "on": "noline",
+              "text": "Select a count line first."
+            },
+            {
+              "on": "noref",
+              "text": "Enter the count reference first."
+            },
+            {
+              "on": "sheet",
+              "json": "$.shown[*]",
+              "contains": "COUNTADJ preview finished with return code 8."
+            },
+            {
+              "on": "sheet",
+              "json": "$.shown[*]",
+              "contains": "*** ERROR"
+            }
+          ],
+          "derivation": "AC text with frmStockCount.vb:37-102 (warnings, prompt, 'Counted quantity recorded for <item>.', 'COUNTADJ <mode> finished with return code <rc>.' with cue *** ERROR) and COUNTADJ rejecting MODE=PREVIEW with RC 8 STERP-E-0001 (FR-STERP-ITM-034, SME-1474) on the seeded count CNT-2026-001 line 1 SCREW-M4X10-SS (91-itm-demo.sql:171-195). Both messages are painted (BaseForm.vb:136-141) and then overwritten by the reload's '<n> record(s)' with an empty cue (frmStockCount.vb:64-71,90-100, ListForm.vb:111-114); the legacy COUNTADJ run with the page's arguments (COUNT=, MODE=PREVIEW) ends RC 8 STERP-E-0001 (isolated runtime on freshc). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-106: status texts are overwritten by the list reload]",
+          "confidence": "inferred"
+        }
+      ]
+    }
+  ]
+}

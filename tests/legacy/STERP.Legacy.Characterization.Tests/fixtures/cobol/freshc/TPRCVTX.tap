@@ -1,0 +1,5 @@
+# suite native RECEIPT transaction com
+ok 1 - native committed receipt proof # SKIP requires isolated STERP_QA_ database
+1..1
+# native RECEIPT transaction com passed 00001 failed 00000
+# exit 0

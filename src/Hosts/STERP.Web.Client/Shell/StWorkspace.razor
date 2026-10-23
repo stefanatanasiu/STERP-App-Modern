@@ -1,0 +1,8 @@
+@inherits ShellComponentBase
+@* The MDI client area: child windows in open order (stable DOM), stacked by z-order. *@
+<div class="st-workspace" id="@ShellService.WorkspaceId" role="main">
+    @foreach (var w in Shell.Windows)
+    {
+        <StWindowFrame @key="w.Id" Window="w" />
+    }
+</div>

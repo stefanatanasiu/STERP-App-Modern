@@ -1,0 +1,106 @@
+@using System.Text.Json.Nodes
+@using Sterp.Web.Framework.Format
+@* Legacy DataGridView (GridHelper.Style/Bind): row header, humanised captions, UK formats, full-row selection, last column
+   filling the width, "(no records - press F5 to refresh)" when empty (GridHelper.vb:44-70). *@
+<div class="st-gridbox st-sunken" id="@Id" style="@Style">
+    <table class="st-grid" role="grid" aria-rowcount="@(Data.Count + 1)" tabindex="0" @onkeydown="OnKeyDown">
+        <thead>
+            <tr role="row">
+                <th class="st-rowhead" role="columnheader"><span class="st-sr">Row</span></th>
+                @for (var c = 0; c < _visible.Count; c++)
+                {
+                    var col = _visible[c];
+                    var last = c == _visible.Count - 1;
+                    <th role="columnheader" class="@(last ? "st-fill" : null)" style="@(col.Width > 0 && !last ? $"min-width:{col.Width}px;width:{col.Width}px" : null)">@col.Caption</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @for (var r = 0; r < Data.Rows.Count; r++)
+            {
+                var index = r;
+                var row = Data.Rows[r];
+                var selected = index == Selected;
+                <tr role="row" @key="index" class="@(selected ? "st-sel" : null)" aria-selected="@(selected ? "true" : "false")" id="@($"{Id}-r{index}")"
+                    @onclick="() => SelectAsync(index)" @ondblclick="() => ActivateAsync(index)">
+                    <td class="st-rowhead" role="rowheader"></td>
+                    @for (var c = 0; c < _visible.Count; c++)
+                    {
+                        var col = _visible[c];
+                        var last = c == _visible.Count - 1;
+                        if (string.Equals(col.Kind, "BOOL", StringComparison.OrdinalIgnoreCase))
+                        {
+                            var flag = row[col.Name] is JsonValue v && v.TryGetValue<bool>(out var b) && b;
+                            <td role="gridcell" class="st-c @(last ? "st-fill" : null)"><input type="checkbox" checked="@flag" disabled tabindex="-1" /></td>
+                        }
+                        else
+                        {
+                            <td role="gridcell" class="@UkFormat.Alignment(col.Kind) @(last ? "st-fill" : null)">@Data.Cell(row, col)</td>
+                        }
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (Data.Rows.Count == 0)
+    {
+        <div class="st-empty">@(string.IsNullOrWhiteSpace(EmptyText) || EmptyText.StartsWith('$') ? "(no records - press F5 to refresh)" : EmptyText)</div>
+    }
+</div>
+
+@code {
+    private List<GridColumn> _visible = [];
+
+    [Parameter, EditorRequired] public GridData Data { get; set; } = GridData.Empty;
+
+    [Parameter] public int Selected { get; set; } = -1;
+
+    [Parameter] public EventCallback<int> SelectedChanged { get; set; }
+
+    /// <summary>Double-click or Enter on a row (Open, OK, View).</summary>
+    [Parameter] public EventCallback<int> OnActivate { get; set; }
+
+    [Parameter] public string Id { get; set; } = "grid-" + Guid.NewGuid().ToString("N")[..8];
+
+    [Parameter] public string Label { get; set; } = "List";
+
+    /// <summary>GridHelper empty notice override (the grid's Tag).</summary>
+    [Parameter] public string? EmptyText { get; set; }
+
+    [Parameter] public string? Style { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _visible = Data.Columns.Where(c => c.Visible).ToList();
+    }
+
+    private async Task SelectAsync(int index)
+    {
+        if (index == Selected) return;
+        Selected = index;
+        await SelectedChanged.InvokeAsync(index);
+    }
+
+    private async Task ActivateAsync(int index)
+    {
+        await SelectAsync(index);
+        await OnActivate.InvokeAsync(index);
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (Data.Rows.Count == 0) return;
+        var next = e.Key switch
+        {
+            "ArrowDown" => Math.Min(Data.Rows.Count - 1, Selected + 1),
+            "ArrowUp" => Math.Max(0, Selected - 1),
+            "Home" when e.CtrlKey => 0,
+            "End" when e.CtrlKey => Data.Rows.Count - 1,
+            _ => Selected,
+        };
+        if (next != Selected && next >= 0)
+        {
+            await SelectAsync(next);
+        }
+    }
+}

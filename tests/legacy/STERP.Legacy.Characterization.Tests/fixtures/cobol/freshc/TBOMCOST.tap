@@ -1,0 +1,21 @@
+# suite TBOMCOST
+ok 1 - B1 material total is 70.10
+ok 2 - B1 conversion plus setup is 30.00
+ok 3 - B1 frame setup for one run is 10.00
+ok 4 - B1 total for ten good frames is 100.10
+ok 5 - B1 cost per good frame is 10.01
+ok 6 - B1 unit denominator is the ten good frames
+ok 7 - B1 cost roll-up is complete
+ok 8 - B1 no rate is missing
+ok 9 - B1 brace branch rolls up to 75.10
+ok 10 - B1 brace branch unit value is 3.755
+ok 11 - B1 the other frame costs are 25.00
+ok 12 - B1 both presentations total 100.10
+ok 13 - Item standard cost gives the same 100.10
+ok 14 - The fallback route is named on the line
+ok 15 - A missing resource rate blocks a complete cost
+ok 16 - The missing rate is counted
+ok 17 - A by-product recovery is a positive credit
+1..17
+# TBOMCOST passed 00017 failed 00000
+# exit 0

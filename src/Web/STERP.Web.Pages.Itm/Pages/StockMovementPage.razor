@@ -1,0 +1,158 @@
+@inherits StPage
+@* frmStockMovement (page:itm/stock-movement, FR-STERP-ITM-042): one movement keyed in the legacy boxes and posted through
+   STKMOVE (itm_postStockMovement) with one Idempotency-Key per F10 instruction; the 90 days of movements below
+   (frmStockMovement.vb:1-113). Quantities are entered positive; the movement type gives the direction. *@
+<div class="st-page">
+    <div class="st-canvas" style="width:960px; height:256px">
+        <label class="st-cap" for="@Uid("type")" style="left:8px; top:11px; width:72px"><StMnemonic Text="&Movement:" /></label>
+        <select id="@Uid("type")" class="st-input" style="left:82px; top:6px; width:120px" aria-label="Movement" data-sterp-field="TYPE"
+                @onchange="e => _type = e.Value?.ToString() ?? Types[0]">
+            @foreach (var t in Types)
+            {
+                <option value="@t" selected="@(t == _type)">@t</option>
+            }
+        </select>
+        <span class="st-tick" style="left:212px; top:8px">
+            <input type="checkbox" id="@Uid("transit")" checked="@_transit" aria-label="Move via an in-transit location" data-sterp-field="TRANSIT"
+                   @onchange="e => _transit = e.Value is true" />
+            <label for="@Uid("transit")"><StMnemonic Text="Move via an in-&transit location" /></label>
+        </span>
+        @foreach (var f in Fields)
+        {
+            var field = f;
+            var id = Uid("f-" + field.Key);
+            <label class="st-cap" for="@id" style="left:@(field.X)px; top:@(field.Y + 3)px; width:86px"><StMnemonic Text="@field.Caption" /></label>
+            <input id="@id" class="st-input" style="left:@(field.X + 88)px; top:@(field.Y)px; width:@(field.Width)px" aria-label="@UkFormat.LabelText(field.Caption)"
+                   data-sterp-field="@field.Key" value="@_values[field.Key]" autocomplete="off" spellcheck="false"
+                   @oninput="e => _values[field.Key] = e.Value?.ToString() ?? string.Empty" />
+        }
+    </div>
+    <StGrid Id="@Uid("grid")" Data="_data" Selected="_selected" SelectedChanged="i => _selected = i" Label="@Window.Title" Style="margin:0 8px 8px" />
+</div>
+
+@code {
+    private sealed record FieldDef(string Key, string Caption, int Width, int X, int Y);
+
+    private static readonly string[] Types = ["RECEIPT", "ISSUE", "RETURN", "ADJUST", "SCRAP", "COMPLETE", "TRANSFER", "HOLD", "RELEASE"];
+
+    /// <summary>The 17 boxes of frmStockMovement._fields with the designer layout of frmStockMovement.New (columns of eight).</summary>
+    private static readonly IReadOnlyList<FieldDef> Fields = Layout(
+        ("ITEM", "&Item:", 200), ("REV", "&Revision:", 50), ("SITE", "&Site:", 60), ("WHS", "&Warehouse:", 80),
+        ("LOC", "&Location:", 90), ("LOT", "L&ot:", 120), ("SERIAL", "Se&rial:", 120), ("QTY", "&Quantity:", 90),
+        ("UOM", "&Unit:", 60), ("COST", "Unit &cost:", 90), ("DATE", "&Date:", 90), ("TOSITE", "To si&te:", 60),
+        ("TOWHS", "To ware&house:", 80), ("TOLOC", "To locatio&n:", 90), ("REASONCODE", "Reason cod&e:", 90),
+        ("REASON", "Reaso&n:", 260), ("DOCREF", "Document re&f:", 140));
+
+    private readonly Dictionary<string, string> _values = Fields.ToDictionary(f => f.Key, _ => "");
+    private string _type = Types[0];
+    private bool _transit;
+    private GridData _data = GridData.Empty;
+    private int _selected = -1;
+
+    private static List<FieldDef> Layout(params (string Key, string Caption, int Width)[] defs)
+    {
+        var list = new List<FieldDef>();
+        int x = 8, y = 34;
+        foreach (var (key, caption, width) in defs)
+        {
+            list.Add(new FieldDef(key, caption, width, x, y));
+            y += 25;
+            if (y > 230)
+            {
+                x += 310;
+                y = 34;
+            }
+        }
+        return list;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Window.SetTitle("Stock Movement Entry");
+        _values["SITE"] = Session.SiteCode;
+        _values["WHS"] = "MAIN";
+        _values["DATE"] = UkFormat.Date(Session.BusinessDate);
+        if (FormArgument != "") _values["ITEM"] = FormArgument;
+        await LoadDataAsync();
+        SetStatus("Complete the movement and press F10 to post it.  Quantities are entered positive; the type gives the direction.");
+    }
+
+    protected override Task OnRefreshKeyAsync() => LoadDataAsync();
+
+    /// <summary>frmStockMovement.OnLookup: F2 is always the item lookup.</summary>
+    protected override async Task OnLookupAsync(KeyInfo key)
+    {
+        var code = await Dialogs.LookupAsync("master", "ITM.ITEM", "Item");
+        if (code != "")
+        {
+            _values["ITEM"] = code;
+            await LoadDataAsync();
+        }
+    }
+
+    /// <summary>frmStockMovement.OnConfirm: F10 posts through STKMOVE with a correlation id, so a repeat is not a double posting.</summary>
+    protected override async Task OnConfirmAsync()
+    {
+        var func = _type;
+        if (_values["ITEM"].Trim() == "" || _values["QTY"].Trim() == "")
+        {
+            SetStatus("An item code and a quantity are required.", CueWarning);
+            return;
+        }
+        if (!await ConfirmAsync("Post this " + func.ToLowerInvariant() + " of " + _values["QTY"] + " " + _values["ITEM"].Trim() + "?")) return;
+        var instruction = Instruction.New();
+        await GuardAsync(async () =>
+        {
+            var v = Fields.ToDictionary(f => f.Key, f => _values[f.Key].Trim().ToUpperInvariant());
+            v["REASON"] = _values["REASON"].Trim();
+            var body = new JsonObject
+            {
+                ["function"] = func,
+                ["itemCode"] = v["ITEM"],
+                ["revision"] = v["REV"],
+                ["site"] = v["SITE"],
+                ["warehouse"] = v["WHS"],
+                ["location"] = v["LOC"],
+                ["toSite"] = v["TOSITE"],
+                ["toWarehouse"] = v["TOWHS"],
+                ["toLocation"] = v["TOLOC"],
+                ["lotCode"] = v["LOT"],
+                ["serialNo"] = v["SERIAL"],
+                ["condition"] = "",
+                ["toCondition"] = "",
+                ["uomCode"] = v["UOM"],
+                ["reasonCode"] = v["REASONCODE"],
+                ["reason"] = v["REASON"],
+                ["sourceDocType"] = "STOCKMOVE",
+                ["sourceDocRef"] = v["DOCREF"],
+                ["holdType"] = "",
+                ["holdOutcome"] = "",
+                ["quantity"] = Decimal(v["QTY"]),
+                ["unitCost"] = Decimal(v["COST"]),
+                ["movementDate"] = (ItmFormat.ParseDate(v["DATE"]) ?? Session.BusinessDate).ToString("yyyy-MM-dd", UkFormat.Culture),
+                ["viaTransit"] = _transit ? "Y" : "N",
+            };
+            var r = await Api.PostAsync("/api/itm/v1/stock-movements", body, instruction.Options());
+            if (!await ShowResultAsync(r)) return;
+            var result = LegacyResult.From(r);
+            SetStatus("Movement " + result.Str("movementId") + " posted; balance now " +
+                      UkFormat.Qty(result.Dec("qtyAfter"), _values["UOM"].Trim()) + ".", CueOk);
+            _values["QTY"] = "";
+            await LoadDataAsync();
+        });
+    }
+
+    /// <summary>StockService.D: a decimal, or 0 when the text is not a number.</summary>
+    private static decimal Decimal(string text) =>
+        decimal.TryParse(text, System.Globalization.NumberStyles.Number, UkFormat.Culture, out var d) ? d : 0m;
+
+    /// <summary>frmStockMovement.LoadData: 90 days of movements of the item at the site (grid only, no record count).</summary>
+    private Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/itm/v1/stock-movements" + Query.Build(
+            ("itemCode", _values["ITEM"].Trim().ToUpperInvariant()), ("siteCode", _values["SITE"].Trim().ToUpperInvariant()), ("days", "90")));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        _data = GridData.FromItems(r.Json);
+        _selected = _data.Count > 0 ? 0 : -1;
+    });
+}

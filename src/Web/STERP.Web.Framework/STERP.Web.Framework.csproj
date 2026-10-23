@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Framework</RootNamespace>
+    <AssemblyName>STERP.Web.Framework</AssemblyName>
+    <Description>STERP-WEB page framework shared by the shell and every slice page library: BaseForm/ListForm/GridHelper equivalents, dialogs, API client with context headers, page registry contracts (STERP-WEB.md FR-015..020).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+  </ItemGroup>
+</Project>

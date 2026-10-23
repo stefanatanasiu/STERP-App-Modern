@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Template</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Template</AssemblyName>
+    <Description>Empty example of a slice page library (docs/DEVELOPER-GUIDE.md section 10): copy it to src/Web/STERP.Web.Pages.&lt;Slice&gt; and register the module in STERP.Web.Client/PageModules.cs.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

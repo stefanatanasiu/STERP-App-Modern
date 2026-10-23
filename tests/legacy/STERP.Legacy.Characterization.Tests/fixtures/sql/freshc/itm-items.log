@@ -1,0 +1,17 @@
+# itm-items
+ok 1 - an item code with forbidden characters is refused -- REQ: ITM-001, D-21
+ok 2 - a code using the permitted characters is accepted -- REQ: ITM-001
+ok 3 - an unknown item class is refused -- REQ: ITM-004, ITM-003
+ok 4 - the current revision of ADHESIVE-EP420-250ML is a revision of record -- REQ: ITM-002
+ok 5 - the supplier part number SUP-VEEP420250ML-09 resolves to ADHESIVE-EP420-250ML and is reported as an alias -- REQ: ITM-009, D-21
+ok 6 - the full code ADHESIVE-EP420-250ML resolves to its own identity -- REQ: ITM-001, ITM-009
+ok 7 - category BEARING is still carried by 4 live items, so it is in use -- REQ: ITM-004
+ok 8 - a unit of measure still in use cannot be deleted -- REQ: ITM-004, ITM-005
+ok 9 - a VAT code still used by an item classification cannot be deleted -- REQ: ITM-025
+ok 10 - the VAT liability of BATTERY-36V-14AH changes by tax point, not retrospectively -- REQ: ITM-025, D-02
+ok 11 - a commodity code that is not numeric is refused -- REQ: ITM-026
+ok 12 - every item customs row carries an eight digit commodity code and a country of origin -- REQ: ITM-026
+ok 13 - the impact review shows ADHESIVE-EP420-250ML still holds stock, so it may not be deleted -- REQ: ITM-010, ITM-020, ITM-022
+ok 14 - the impact review counts the open reservation against ADHESIVE-EP420-250ML -- REQ: ITM-010, ITM-014, ITM-023
+ok 15 - a retired item keeps its identity and its history, and the change is audited -- REQ: ITM-020, ITM-022, COM-013
+# itm-items done

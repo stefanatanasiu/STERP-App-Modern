@@ -1,0 +1,95 @@
+# suite po purchasing coverage gaps
+ok 1 - PO-002 an approved source is accepted
+ok 2 - PO-002 the approval status is reported
+ok 3 - PO-002 the supplier part number is reported
+ok 4 - PO-002 the approved contract reference is given
+ok 5 - PO-002 the lead time of the source is 14 days
+ok 6 - PO-002 an approved source needs no authority
+ok 7 - PO-002 ordering below the supplier minimum warns
+ok 8 - PO-002 the minimum order quantity is 10
+ok 9 - PO-002 an unapproved source is held for authority
+ok 10 - PO-002 the unapproved source reason code is given
+ok 11 - PO-002 the unapproved source needs authorisation
+ok 12 - PO-002 an authorised unapproved source may be used
+ok 13 - PO-002 an authorised source needs no authority
+ok 14 - PO-002 an approval that has expired needs authority
+ok 15 - PO-002 an expired approval is held, not accepted
+ok 16 - PO-002 a suspended source is refused
+ok 17 - PO-002 the suspension reason code is given
+ok 18 - PO-002 a conditional source warns on restriction
+ok 19 - PO-002 the commercial restriction is shown
+ok 20 - PO-002 a sourcing event is opened for the line
+ok 21 - PO-002 the cheapest quotation is recorded
+ok 22 - PO-002 the approved source quotation is recorded
+ok 23 - PO-002 a quotation past its validity date warns
+ok 24 - PO-002 all three quotations are compared
+ok 25 - PO-002 the cheapest quotation is named
+ok 26 - PO-002 the cheapest quotation is 900.00
+ok 27 - PO-002 the approved source quotes 1000.00
+ok 28 - PO-002 the premium over the cheapest is 100.00
+ok 29 - PO-002 the approved source ranks second on price
+ok 30 - PO-002 a dearer choice without a reason is refused
+ok 31 - PO-002 the premium needs a justification
+ok 32 - PO-002 a refused selection changes nothing on file
+ok 33 - PO-002 a justified premium selection is accepted
+ok 34 - PO-002 the selection was not made on price
+ok 35 - PO-002 the chosen source and its reason are kept
+ok 36 - PO-002 exactly one quotation is marked as chosen
+ok 37 - PO-003 a complete order header is captured
+ok 38 - PO-003 a new order is a draft, not a commitment
+ok 39 - PO-003 delivery terms and ownership point are kept
+ok 40 - PO-003 agreed terms and destination are snapshot
+ok 41 - PO-003 free text cannot become a stocked line
+ok 42 - PO-003 the ungoverned stock line is rejected
+ok 43 - PO-003 an uncoded service line is rejected
+ok 44 - PO-003 a coded service line is accepted
+ok 45 - PO-003 the service obligation is 2000.00
+ok 46 - PO-003 the service line keeps its nominal coding
+ok 47 - PO-003 no catalogue item is created by the order
+ok 48 - PO-003 an item outside the catalogue is refused
+ok 49 - PO-003 the ungoverned item reason code is given
+ok 50 - PO-003 a governed catalogue item is accepted
+ok 51 - PO-003 10 at 5.00 is a 50.00 stock line
+ok 52 - PO-003 the stock line keeps item, unit and site
+ok 53 - PO-003 the first delivery schedule is accepted
+ok 54 - PO-003 the schedules total the ordered 10
+ok 55 - PO-003 schedules above the ordered quantity fail
+ok 56 - PO-021 a call-off within the blanket is accepted
+ok 57 - PO-021 40 of the 100 agreed units remain
+ok 58 - PO-021 the call-off draws down quantity and value
+ok 59 - PO-021 repeating the call-off is refused
+ok 60 - PO-021 the blanket balance reason code is given
+ok 61 - PO-021 no duplicate obligation reaches the blanket
+ok 62 - PO-021 the final call-off empties the blanket
+ok 63 - PO-021 an exhausted blanket is marked as such
+ok 64 - PO-021 an order may be copied to a new draft
+ok 65 - PO-021 both live lines are copied
+ok 66 - PO-021 the copy carries no approval or issue state
+ok 67 - PO-021 the copied lines carry no receipt state
+ok 68 - PO-021 the copy retains its source order reference
+ok 69 - PO-026 a supplier with no evidence is not clear
+ok 70 - PO-026 no evidence means no order may be issued
+ok 71 - PO-026 the four mandatory checks are listed
+ok 72 - PO-026 a blocking screening result is recorded
+ok 73 - PO-026 a sanctions hit blocks the supplier
+ok 74 - PO-026 the blocking reason code is given
+ok 75 - PO-026 the blocking check is named
+ok 76 - PO-026 a blocked supplier may not be ordered from
+ok 77 - PO-026 a sanctions block cannot be excepted
+ok 78 - PO-026 the unexceptable reason code is given
+ok 79 - PO-026 evidence out of date holds the supplier
+ok 80 - PO-026 the expired evidence reason code is given
+ok 81 - PO-026 one piece of evidence has expired
+ok 82 - PO-026 an expired check needs an exception
+ok 83 - PO-026 an exception needs an approver and a reason
+ok 84 - PO-026 an authorised exception is recorded
+ok 85 - PO-026 the authorised exception releases the order
+ok 86 - PO-026 the supplier may now be ordered from
+ok 87 - PO-026 the exception is counted, not forgotten
+ok 88 - PO-026 a blocked supplier cannot be issued an order
+ok 89 - PO-026 due diligence is the stated reason
+ok 90 - PO-026 the blocked order is held
+ok 91 - PO-026 a held order stays a draft, uncommitted
+1..91
+# po purchasing coverage gaps passed 00091 failed 00000
+# exit 0

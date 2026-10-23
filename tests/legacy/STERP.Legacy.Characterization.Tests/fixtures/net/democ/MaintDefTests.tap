@@ -1,0 +1,2 @@
+ok - maint: every registered maintenance definition loads its columns and rows  # REQ: COM-013,COM-016
+ok - maint: every registered maintenance definition names a permission that exists  # REQ: COM-002,COM-013 AC: AC-006

@@ -1,0 +1,42 @@
+# suite TRNDALL
+ok 1 - AC-006 round 1.005 to 2 dp gives 1.01
+ok 2 - AC-006 round -1.005 to 2 dp gives -1.01
+ok 3 - round 2.675 to 2 dp gives 2.68 (decimal, not binary)
+ok 4 - round 1.0049 to 2 dp stays 1.00
+ok 5 - round 0.5 to 0 dp gives 1 (half away from zero)
+ok 6 - round -0.5 to 0 dp gives -1
+ok 7 - round -2.5 to 0 dp gives -3, not banker's -2
+ok 8 - round 0.0000005 to 6 dp gives 0.000001
+ok 9 - truncate 1.009 to 2 dp gives 1.00
+ok 10 - truncate -1.009 to 2 dp gives -1.00 (toward zero)
+ok 11 - AC-006 100.00 over 7 gives unit price 14.285714
+ok 12 - AC-006 7 x 14.285714 rounds back to 100.00
+ok 13 - AC-006 extension keeps the unrounded working value
+ok 14 - prematurely rounded price 14.29 would give 100.03
+ok 15 - unit price 100.00 over 3 is 33.333333 at 6 dp
+ok 16 - AC-006 allocate 1.00 equally over 3 lines
+ok 17 - AC-006 the three parts total 1.00 exactly
+ok 18 - allocation residual is zero
+ok 19 - exactly one line takes the spare penny
+ok 20 - AC-006 allocate -1.00 equally over 3 lines
+ok 21 - AC-006 the negative parts total -1.00 exactly
+ok 22 - allocate 100.00 equally over 3 gives 33.34/33.33/33.33
+ok 23 - allocate 0.01 over 3 gives 0.01/0.00/0.00
+ok 24 - weighted allocation 10.00 over 1:2:3
+ok 25 - document discount 50.00 over 120.00/80.00/55.55
+ok 26 - zero weight line receives nothing
+ok 27 - allocate 100.00 over the full 500 line table
+ok 28 - allocate 1.23 over 500 lines still totals 1.23
+ok 29 - six decimal quantity allocation (D-09)
+ok 30 - too many decimal places is rejected with RND0001
+ok 31 - zero line count is rejected with RND0002
+ok 32 - unknown allocation mode is rejected with RND0003
+ok 33 - negative weight is rejected with RND0004
+ok 34 - all weights zero is rejected with RND0005
+ok 35 - zero divisor is not treated as one (RND0006)
+ok 36 - unknown function is rejected with RND0008
+ok 37 - FUNCTION ROUND-AWAY links under -fstatic-call
+ok 38 - FUNCTION SIGN-OF returns -1 / 0 / +1
+1..38
+# TRNDALL passed 00038 failed 00000
+# exit 0

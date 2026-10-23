@@ -1,0 +1,52 @@
+# suite TARCOLL collections and relief
+ok 1 - the June return is refused
+ok 2 - a blocked claim reports BDR0010
+ok 3 - the block says not yet six months
+ok 4 - no relief is offered when blocked
+ok 5 - relief is claimable from 31/07/2027
+ok 6 - three months overdue is not enough
+ok 7 - the September return is accepted
+ok 8 - the debt is eligible for relief
+ok 9 - the relief is the 200.00 VAT element
+ok 10 - the relief is reclaimed in Box 4
+ok 11 - a debt not written off is refused
+ok 12 - the block names the write off
+ok 13 - a factored debt cannot be relieved
+ok 14 - unpaid output VAT blocks the claim
+ok 15 - the earlier 200.00 claim is found
+ok 16 - relief is not claimed a second time
+ok 17 - and nothing more is offered
+ok 18 - nothing is repaid if nothing was claimed
+ok 19 - a repayment needs a positive receipt
+ok 20 - the 600.00 receipt is accepted
+ok 21 - 200.00 x 600.00 / 1,200.00 repays 100.00
+ok 22 - the repayment goes through Box 1
+ok 23 - a sorting code must be six digits
+ok 24 - an account must be eight digits
+ok 25 - the details must pass the modulus check
+ok 26 - the mandate waits to be lodged
+ok 27 - a new instruction is an AUDDIS 0N
+ok 28 - the baseline advance notice is 10 days
+ok 29 - a shorter notice needs written agreement
+ok 30 - the baseline notice is applied instead
+ok 31 - the Guarantee goes out before activation
+ok 32 - a lodged mandate is activated
+ok 33 - ten working days on gives 29/10/2026
+ok 34 - no collection without an advance notice
+ok 35 - a collection inside the notice is held
+ok 36 - an early collection is a hold, not an error
+ok 37 - the first collection is planned
+ok 38 - it is flagged as the first collection
+ok 39 - a first collection is Bacs code 01
+ok 40 - Bacs processes it on 03/11/2026
+ok 41 - the mandate has now been collected on
+ok 42 - a regular collection is Bacs code 17
+ok 43 - a cancellation needs a reason
+ok 44 - the instruction is now CANCELLED
+ok 45 - it is withdrawn as an AUDDIS 0C
+ok 46 - a cancelled mandate is not collected on
+ok 47 - a lapsed mandate is not collected on
+ok 48 - an unknown mandate is not found
+1..48
+# TARCOLL collections and relief passed 00048 failed 00000
+# exit 0

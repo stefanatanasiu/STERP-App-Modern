@@ -1,0 +1,11 @@
+ok - kit: a check pass reports an issue without posting it  # REQ: KIT-010,KIT-011
+ok - kit: a commercial kit parent may never be received as a stocked assembly  # REQ: KIT-001,KIT-024
+ok - kit: a line window is copied into the display table with its own types  # REQ: KIT-003,KIT-022
+ok - kit: costing reports planned, actual and variance by element  # REQ: KIT-020
+ok - kit: disassembly and commercial fulfilment reach their engines  # REQ: KIT-021,KIT-023
+not ok - kit: genealogy keeps the planned component distinct from the issued one  # REQ: KIT-019
+#   StAssertException: GENEALOG answered for KIT00001001: No genealogy is recorded for  .  (KIT0026)
+ok - kit: the COMMAREA layouts of every kit program parse and carry their windows  # REQ: KIT-003,KIT-019,KIT-020,KIT-021,KIT-023
+ok - kit: the module's menu, maintenance screens and reports are registered  # REQ: KIT-022,COM-019,RPT-013
+ok - kit: the readiness worklist answers for the seeded demo kits  # REQ: KIT-008,KIT-022
+ok - kit: trial kitting reports feasibility and commits nothing  # REQ: KIT-006

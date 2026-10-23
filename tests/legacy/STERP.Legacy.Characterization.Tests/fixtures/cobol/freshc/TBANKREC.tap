@@ -1,0 +1,48 @@
+# suite TBANKREC bank reconciliation
+ok 1 - FIN-013 the cash book bridges to the statement
+ok 2 - FIN-013 an unknown bank account is refused
+ok 3 - AC-014 the statement side of the match is 100.00
+ok 4 - AC-014 the book side totals 60.00 and 40.00
+ok 5 - AC-014 the grouped match leaves nothing outstanding
+ok 6 - AC-014 a many to many tie is a grouped match
+ok 7 - FIN-014 one to one is an exact match
+ok 8 - AC-014 unequal totals are not quietly reconciled
+ok 9 - AC-014 the unexplained residue of 40.00 is reported
+ok 10 - AC-014 the refusal is reported as BNK0021
+ok 11 - AC-014 a written explanation carries the residue
+ok 12 - FIN-014 a match needs entries on both sides
+ok 13 - FIN-014 the empty match is reported as BNK0020
+ok 14 - FIN-014 the VAT owner may not reconcile the bank
+ok 15 - AC-014 a bank fee is its own instruction, not a match
+ok 16 - AC-014 the fee does not change the matched amount
+ok 17 - FIN-015 a charge of nothing is refused
+ok 18 - AC-014 a transfer moves value and creates no revenue
+ok 19 - AC-014 a transfer across currencies is refused
+ok 20 - FIN-015 an account may not transfer to itself
+ok 21 - FIN-013 an unexplained difference blocks completion
+ok 22 - FIN-013 the bridge reports the 25.00 still adrift
+ok 23 - AC-014 the grouped match against real keys is taken
+ok 24 - AC-014 three entries are tied into the match group
+ok 25 - AC-014 one statement line to two book lines is group
+ok 26 - AC-014 the match group is given an identity
+ok 27 - AC-014 the statement line now carries the match
+ok 28 - AC-014 both sides of the group are written down
+ok 29 - AC-014 the book line is no longer outstanding
+ok 30 - AC-014 a statement line is not reconciled twice
+ok 31 - AC-014 a book entry is not reconciled twice either
+ok 32 - FIN-013 a bridged reconciliation can be completed
+ok 33 - FIN-013 nothing is left unexplained at completion
+ok 34 - FIN-013 the reconciliation is reported complete
+ok 35 - FIN-013 the completion is recorded with its author
+ok 36 - FIN-014 reopening a match needs a written reason
+ok 37 - FIN-014 a reasoned reversal is accepted
+ok 38 - FIN-014 the reversal keeps the reason on the group
+ok 39 - FIN-014 the statement line is free again, not gone
+ok 40 - FIN-014 the book entry is outstanding once more
+ok 41 - FIN-015 a bank charge posts to the ledger
+ok 42 - FIN-015 the fee is charged to bank charges, 6420
+ok 43 - FIN-015 a transfer between own accounts posts
+ok 44 - FIN-015 the transfer conserves value, it creates no
+1..44
+# TBANKREC bank reconciliation passed 00044 failed 00000
+# exit 0

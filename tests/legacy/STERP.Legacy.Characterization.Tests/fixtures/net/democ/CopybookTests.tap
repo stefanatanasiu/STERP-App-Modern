@@ -1,0 +1,5 @@
+ok - commarea: INITIALIZE leaves text as spaces and numbers as zero  # REQ: COM-011
+ok - commarea: INITIALIZE reaches every occurrence of an OCCURS group  # REQ: COM-011
+ok - commarea: subscripts and group qualification address the right bytes  # REQ: COM-011
+ok - copybook: PINGCA offsets, OCCURS and usage clauses  # REQ: COM-011
+ok - copybook: STCAHDR is the 400 byte standard header  # REQ: COM-011,COM-017

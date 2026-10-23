@@ -1,0 +1,102 @@
+{
+ "schema": "sterp-binding-contracts/1",
+ "agent06_attempt": "a06-20261020T112437Z-034eff00",
+ "lifecycle_run_id": "lr-20261017T115103Z-ee5732ce",
+ "files": [
+  {
+   "file": "application-requirements.csv",
+   "sha256": "04423880a2fe57f4951511f4ba89542c01db82791da882fbdd7dd3c2362f95f0",
+   "source": "memory/STERP-App/agent-06/application-requirements.csv",
+   "agent06_recorded_sha256": "33e4714ff1905be6b6b4138209429efc319d08a427e4a03c6d33262fd4aab20d"
+  },
+  {
+   "file": "gui-routes.json",
+   "sha256": "da0df327a290b31ebd9ef2f07ea4b0debf5e7cad3ab0bd05b4c28d8270dbdcb5",
+   "source": null
+  },
+  {
+   "file": "openapi/STERP-AP.openapi.yaml",
+   "sha256": "fbd9cb8ed00779faa8eac164c1a57cc12eca64c15720edea6a73966389851ec7",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-AP.openapi.yaml",
+   "agent06_recorded_sha256": "fbd9cb8ed00779faa8eac164c1a57cc12eca64c15720edea6a73966389851ec7"
+  },
+  {
+   "file": "openapi/STERP-API.openapi.yaml",
+   "sha256": "a12274c7deeae4e4d48ef49cd28dc2dc5467beb0f2dc9d7351ec1dd59ae58f9f",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-API.openapi.yaml",
+   "agent06_recorded_sha256": "a12274c7deeae4e4d48ef49cd28dc2dc5467beb0f2dc9d7351ec1dd59ae58f9f"
+  },
+  {
+   "file": "openapi/STERP-AR.openapi.yaml",
+   "sha256": "48389f8b0d809d698aca9c7b6abfda45f4d7035325766139aa2e27977f6483f4",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-AR.openapi.yaml",
+   "agent06_recorded_sha256": "48389f8b0d809d698aca9c7b6abfda45f4d7035325766139aa2e27977f6483f4"
+  },
+  {
+   "file": "openapi/STERP-BOM.openapi.yaml",
+   "sha256": "48beec05bc7ec29b15732f9a413b5484089ea5d9a025f65d5174dea0150b9371",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-BOM.openapi.yaml",
+   "agent06_recorded_sha256": "48beec05bc7ec29b15732f9a413b5484089ea5d9a025f65d5174dea0150b9371"
+  },
+  {
+   "file": "openapi/STERP-CST.openapi.yaml",
+   "sha256": "57641ca6ccc42db27e8179dc75182e924e5326e20e589984e2766af0d3665ab2",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-CST.openapi.yaml",
+   "agent06_recorded_sha256": "57641ca6ccc42db27e8179dc75182e924e5326e20e589984e2766af0d3665ab2"
+  },
+  {
+   "file": "openapi/STERP-FIN.openapi.yaml",
+   "sha256": "3e851affd810ae094f4a2db8394e393cefac4b2151f3fbac9de75aad69601bcd",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-FIN.openapi.yaml",
+   "agent06_recorded_sha256": "3e851affd810ae094f4a2db8394e393cefac4b2151f3fbac9de75aad69601bcd"
+  },
+  {
+   "file": "openapi/STERP-ITM.openapi.yaml",
+   "sha256": "81694c5c4eea052a78991fb304459434cd25e6bbdf11b04d3d723b3b27bc3fa3",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-ITM.openapi.yaml",
+   "agent06_recorded_sha256": "81694c5c4eea052a78991fb304459434cd25e6bbdf11b04d3d723b3b27bc3fa3"
+  },
+  {
+   "file": "openapi/STERP-JOBS.openapi.yaml",
+   "sha256": "c9af384fab3db25507219cc88a89c473dd18b170463df06ed66a18dc075ef624",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-JOBS.openapi.yaml",
+   "agent06_recorded_sha256": "c9af384fab3db25507219cc88a89c473dd18b170463df06ed66a18dc075ef624"
+  },
+  {
+   "file": "openapi/STERP-KIT.openapi.yaml",
+   "sha256": "2c876244c7848ee7adc0cff70b2ef3aa75192952eea5b4d5857ebb044e11497d",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-KIT.openapi.yaml",
+   "agent06_recorded_sha256": "2c876244c7848ee7adc0cff70b2ef3aa75192952eea5b4d5857ebb044e11497d"
+  },
+  {
+   "file": "openapi/STERP-PLATFORM.openapi.yaml",
+   "sha256": "71c53aa21eaf8a3ad55332b3fe9297b9d5943bd3217bb80b16ab28e59c61fc96",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-PLATFORM.openapi.yaml",
+   "agent06_recorded_sha256": "71c53aa21eaf8a3ad55332b3fe9297b9d5943bd3217bb80b16ab28e59c61fc96"
+  },
+  {
+   "file": "openapi/STERP-PO.openapi.yaml",
+   "sha256": "f705fe9e2a52080097c30cbbc45e739c27fb18f76f48ee5f8f09bb156680d771",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-PO.openapi.yaml",
+   "agent06_recorded_sha256": "f705fe9e2a52080097c30cbbc45e739c27fb18f76f48ee5f8f09bb156680d771"
+  },
+  {
+   "file": "openapi/STERP-SO.openapi.yaml",
+   "sha256": "11717ff07e98855e90cde83b30a4ead6897bfa7424d68602e01dbb016035e1d8",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-SO.openapi.yaml",
+   "agent06_recorded_sha256": "11717ff07e98855e90cde83b30a4ead6897bfa7424d68602e01dbb016035e1d8"
+  },
+  {
+   "file": "openapi/STERP-XMD.openapi.yaml",
+   "sha256": "97d4c1b2bfba8095dfc32e2f442e3a6bddc8ff5872af7e700d804cacfa6ac4c8",
+   "source": "memory/STERP-App/agent-06/application-specs/STERP-XMD.openapi.yaml",
+   "agent06_recorded_sha256": "97d4c1b2bfba8095dfc32e2f442e3a6bddc8ff5872af7e700d804cacfa6ac4c8"
+  },
+  {
+   "file": "sql-object-mapping.csv",
+   "sha256": "b839937b0b39e49abe2478791efe9651af1478350260786f48ab6c67f85d97dd",
+   "source": "memory/STERP-App/agent-06/sql-object-mapping.csv",
+   "agent06_recorded_sha256": "b839937b0b39e49abe2478791efe9651af1478350260786f48ab6c67f85d97dd"
+  }
+ ]
+}

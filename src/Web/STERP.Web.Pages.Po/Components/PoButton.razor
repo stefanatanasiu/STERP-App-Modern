@@ -1,0 +1,15 @@
+@* UiStyle.Push (UiStyle.vb): a 23-pixel push button at its legacy position and width; the text keeps the access key. *@
+<button type="button" class="st-button" style="@($"position:absolute;left:{X}px;top:{Y}px;width:{Width}px;min-width:0;padding:0 2px")"
+        @onclick="OnClick"><StMnemonic Text="@Text" /></button>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+
+    [Parameter] public int X { get; set; }
+
+    [Parameter] public int Y { get; set; }
+
+    [Parameter] public int Width { get; set; } = 80;
+
+    [Parameter] public EventCallback OnClick { get; set; }
+}

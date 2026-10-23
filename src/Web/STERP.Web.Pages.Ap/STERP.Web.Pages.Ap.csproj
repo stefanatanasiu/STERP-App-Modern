@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Ap</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Ap</AssemblyName>
+    <Description>STERP-AP pages (STERP-WEB section 7.2): Supplier Verification, Purchase Invoice Register, Payment Run and the keyed capture dialog.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>
+

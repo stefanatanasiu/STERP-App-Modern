@@ -1,0 +1,17 @@
+@inherits ShellComponentBase
+@* frmMain.RefreshStatus (frmMain.vb:208-221): message, User, Co, Site, Period, business date, Engine, CAPS, NUM. *@
+@{
+    var s = Shell.Session;
+    var period = s?.Period;
+}
+<div class="st-statusbar">
+    <div class="st-sb-msg st-sunken-outer" role="status" aria-live="polite">@Shell.Message</div>
+    <div class="st-sb-user st-sunken-outer">User: @(s?.Title)</div>
+    <div class="st-sb-co st-sunken-outer">Co: @(s?.CompanyCode)</div>
+    <div class="st-sb-site st-sunken-outer">Site: @(s?.SiteCode)</div>
+    <div class="st-sb-period st-sunken-outer">Period: @(period is null || period.PeriodText.Length == 0 ? "-" : period.PeriodText + " " + period.Status)</div>
+    <div class="st-sb-date st-sunken-outer">@(s is null ? "" : UkFormat.Date(s.BusinessDate))</div>
+    <div class="st-sb-engine st-sunken-outer">Engine: @Shell.EngineStatus</div>
+    <div class="st-sb-caps st-sunken-outer">@(Shell.CapsLock ? "CAPS" : "")</div>
+    <div class="st-sb-num st-sunken-outer">@(Shell.NumLock ? "NUM" : "")</div>
+</div>

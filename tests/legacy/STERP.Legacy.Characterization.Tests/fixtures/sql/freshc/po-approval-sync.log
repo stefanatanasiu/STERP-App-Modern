@@ -1,0 +1,5 @@
+# po-approval-sync
+  ERROR in tests\po-approval-sync.sql
+# po-approval-sync
+Msg 50021, Level 16, State 1, Server <isolated-server>, Procedure core.usp_DecideApproval, Line 8
+STERP-E-0021: That approval request does not exist.

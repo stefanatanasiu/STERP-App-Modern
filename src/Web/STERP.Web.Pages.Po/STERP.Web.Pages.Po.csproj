@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web.Pages.Po</RootNamespace>
+    <AssemblyName>STERP.Web.Pages.Po</AssemblyName>
+    <Description>STERP-PO pages (wave W6): Purchase Requisition, Purchase Order Entry and Approval, Goods Receipt and Inspection - the legacy frmRequisition, frmPurchaseOrder and frmGoodsReceipt (STERP-PO FR-010, FR-020, FR-030; section 7.2).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Framework\STERP.Web.Framework.csproj" />
+  </ItemGroup>
+</Project>

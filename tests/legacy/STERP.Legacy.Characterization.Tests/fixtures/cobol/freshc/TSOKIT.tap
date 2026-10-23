@@ -1,0 +1,38 @@
+# suite TSOKIT commercial kits
+ok 1 - AC-047 only one complete kit is possible
+ok 2 - AC-047 a complete despatch of two is refused
+ok 3 - AC-047 refusal carries reason KIT0003
+ok 4 - AC-047 the refusal flag is set
+ok 5 - AC-047 the pin is the limiting component
+ok 6 - AC-047 six pins are needed so one is short
+ok 7 - AC-047 the body could support two kits
+ok 8 - AC-047 five pins support only one kit
+ok 9 - AC-047 one complete kit is permitted
+ok 10 - AC-047 one kit is not refused
+ok 11 - AC-047 one kit consumes one body
+ok 12 - AC-047 one kit consumes three pins
+ok 13 - AC-047 no parent inventory is consumed
+ok 14 - AC-047 the parent holds no warehouse balance
+ok 15 - AC-130 allocation succeeds
+ok 16 - AC-130 first component is allocated 50.00
+ok 17 - AC-130 second component is allocated 50.00
+ok 18 - AC-130 VAT of 10.00 on the standard rated part
+ok 19 - AC-130 no VAT on the zero rated part
+ok 20 - AC-130 kit VAT totals 10.00
+ok 21 - AC-130 different liabilities make a MIXED supply
+ok 22 - AC-130 the supply kind is recorded
+ok 23 - AC-130 two VAT analysis rows
+ok 24 - one liability makes a SINGLE supply
+ok 25 - single supply VAT is 20.00
+ok 26 - an odd penny is allocated, never lost
+ok 27 - no residual is left behind
+ok 28 - the components re-add to the parent
+ok 29 - an unknown function is refused with 08
+ok 30 - an unknown function reports KIT0006
+ok 31 - a zero kit price cannot be allocated
+ok 32 - without standalone prices there is no basis
+ok 33 - CHECKDUP refuses demand on both parent and child
+ok 34 - CHECKDUP names the structure it could not find
+1..34
+# TSOKIT commercial kits passed 00034 failed 00000
+# exit 0

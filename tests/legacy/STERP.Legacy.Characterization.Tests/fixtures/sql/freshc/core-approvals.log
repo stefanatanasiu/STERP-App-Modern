@@ -1,0 +1,7 @@
+# core-approvals
+ok 1 - self approval is rejected -- REQ: COM-003, D-07
+ok 2 - segregation of duties blocks the approver -- REQ: COM-003, D-07
+ok 3 - an independent approver may approve -- REQ: COM-003, D-07
+ok 4 - a material change invalidates the approval -- REQ: COM-003, COM-022
+ok 5 - a named delegation is accepted and recorded -- REQ: COM-008, D-07
+ok 6 - approval authority is required -- REQ: COM-003, D-07

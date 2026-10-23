@@ -1,0 +1,13 @@
+# ar-ageing
+ok 1 - on its due date an invoice is not yet overdue -- REQ: AR-017
+ok 2 - one day past due ages into the 1-30 day bucket -- REQ: AR-017
+ok 3 - exactly thirty days past due stays in the 1-30 day bucket -- REQ: AR-017
+ok 4 - thirty one days past due ages into the 31-60 day bucket -- REQ: AR-017
+ok 5 - sixty one days past due ages into the 61-90 day bucket -- REQ: AR-017
+ok 6 - ninety one days past due ages into the over ninety day bucket -- REQ: AR-017
+ok 7 - an unapplied credit sits in the credits bucket and adds nothing to overdue debt -- REQ: AR-013, AR-017
+ok 8 - bucket totals reconcile to the receivables balance of 20,500.00 -- REQ: AR-017, AR-021
+ok 9 - as at twenty days ago the invoice still shows 1,000.00 in the 31-60 day bucket -- REQ: AR-017, AR-021
+ok 10 - as at today the same invoice shows the 600.00 left after the receipt -- REQ: AR-010, AR-017
+ok 11 - a fully applied receipt leaves no residual on the ledger -- REQ: AR-010
+# ar-ageing done

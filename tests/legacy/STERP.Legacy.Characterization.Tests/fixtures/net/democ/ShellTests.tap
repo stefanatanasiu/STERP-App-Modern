@@ -1,0 +1,7 @@
+ok - jobs: all stream exits preserve their maximum condition code  # REQ: XMD-005,XMD-007,COM-018
+ok - maint: the generic maintenance select returns the registered columns  # REQ: COM-013,COM-016
+ok - menu: every seeded FormClass resolves to a screen in STERP.exe  # REQ: COM-024
+ok - menu: the menu is filtered by permission, RESTRICT sees less than SYSADM  # REQ: COM-002,COM-024 AC: AC-006
+ok - report: a batch program is run with its arguments and its spool file is picked up  # REQ: COM-014 AC: AC-005
+ok - report: job streams inherit the application SQL target, not a shell default  # REQ: COM-014,XMD-005
+ok - report: the launcher builds KEY=VALUE arguments and reads the spool line  # REQ: COM-014

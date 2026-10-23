@@ -1,0 +1,13 @@
+# ap-gaps
+ok 1 - the creditors control reconciles to 2,280.00 across three residual open items -- REQ: AP-022
+ok 2 - 1,200.00 is registered but unposted and must be posted before the close -- REQ: AP-022
+ok 3 - the unposted invoice is still owed to the supplier, not a memorandum note -- REQ: AP-022
+ok 4 - 1,450.00 of owned receipts is uninvoiced and stays a visible liability -- REQ: AP-022
+ok 5 - a disputed match clears no accrual, so the receipt is not written off -- REQ: AP-022
+ok 6 - 1,800.00 over two documents is still waiting on a match -- REQ: AP-022
+ok 7 - 480.00 of supplier return is held in clearing until the credit arrives -- REQ: AP-022
+ok 8 - a settled and fully matched invoice gives the close nothing to do -- REQ: AP-022
+ok 9 - the period the documents sit in is hard closed -- REQ: AP-022
+ok 10 - the unresolved match did not disappear when the period closed -- REQ: AP-022
+ok 11 - the same 1,800.00 is carried forward for the next period to resolve -- REQ: AP-022
+ok 12 - uninvoiced owned receipts and the return clearing both survive the close -- REQ: AP-022

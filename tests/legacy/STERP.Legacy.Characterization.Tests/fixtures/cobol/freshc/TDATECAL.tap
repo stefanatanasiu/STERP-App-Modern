@@ -1,0 +1,63 @@
+# suite TDATECAL
+ok 1 - 29 February 2026 is rejected (not a leap year)
+ok 2 - 29 February 2028 is accepted (leap year)
+ok 3 - month 13 is rejected
+ok 4 - unknown function is rejected with DAT0010
+ok 5 - 28 February 2026 plus one day is 1 March 2026
+ok 6 - 28 February 2028 plus one day is 29 February 2028
+ok 7 - 30 days from 1 October 2026 is 31 October 2026
+ok 8 - subtracting days works (1 Jan 2027 minus 1 day)
+ok 9 - 31 Jan 2027 plus one month is 28 Feb 2027
+ok 10 - 31 Jan 2028 plus one month is 29 Feb 2028
+ok 11 - 31 Dec 2026 plus 14 months is 28 Feb 2028
+ok 12 - end of month of 5 October 2026 is 31 October
+ok 13 - end of month after 1 month from 15 Jan 2027 is 28 Feb
+ok 14 - days between 1 and 31 October 2026 is 30
+ok 15 - days between is negative when the dates reverse
+ok 16 - 5 October 2026 is a Monday
+ok 17 - 25 December 2026 is a Friday
+ok 18 - format 20261005 as dd/mm/yyyy
+ok 19 - format 20270403 as yyyy-mm-dd
+ok 20 - format names the month in words (April)
+ok 21 - parse 05/10/2026 as a UK date
+ok 22 - parse 2026-10-05 as an ISO date
+ok 23 - parse 31/02/2027 is rejected as not a real date
+ok 24 - parse of rubbish is rejected with DAT0004
+ok 25 - 25 December 2026 is not an ENG business day
+ok 26 - 28 December 2026 is the Boxing Day substitute
+ok 27 - 29 December 2026 is a business day
+ok 28 - 26 December 2026 is a Saturday, not a business day
+ok 29 - AC-112 4 January 2027 is a Scottish holiday
+ok 30 - AC-112 the Scottish holiday leaves ENG unaffected
+ok 31 - 2 January 2026 is a Scottish bank holiday
+ok 32 - 2 January 2026 is an ordinary English working Friday
+ok 33 - 6 April 2026 Easter Monday is not kept in Scotland
+ok 34 - 17 March 2026 St Patrick's Day is kept in NIR only
+ok 35 - 13 July 2026 is the Boyne substitute in NIR
+ok 36 - 30 November 2026 St Andrew's Day is kept in Scotland
+ok 37 - the holiday name is reported
+ok 38 - the default calendar is England and Wales
+ok 39 - AC-112 Bacs entry 25 Dec 2026 moves to 29 Dec 2026
+ok 40 - the move is reported as a warning, not silently
+ok 41 - AC-112 processing day is Thursday 24 December 2026
+ok 42 - AC-112 input day is Wednesday 23 December 2026
+ok 43 - previous business day before Christmas Day 2026
+ok 44 - direction NONE reports but does not move the date
+ok 45 - a date that is already a business day is not moved
+ok 46 - one business day after Fri 24 Dec 2027 is Wed 29 Dec
+ok 47 - new year 2028: ENG resumes on 4 Jan, Scotland on 5
+ok 48 - five business days from Mon 5 Oct 2026 is Mon 12 Oct
+ok 49 - the calendar cache can be cleared
+ok 50 - the first use of a calendar year loads it
+ok 51 - the second use of the same year is a cache hit
+ok 52 - another calendar for the same year loads again
+ok 53 - the built-in table holds eight ENG holidays for 2026
+ok 54 - FUNCTION IS-LEAP: 2028 yes, 2027 no
+ok 55 - FUNCTION IS-LEAP: 2000 yes, 1900 no (century rule)
+ok 56 - FUNCTION DAYS-IN-MONTH February 2028 is 29
+ok 57 - FUNCTION DAYS-IN-MONTH February 2027 is 28
+ok 58 - FUNCTION DAYS-IN-MONTH rejects month 13
+ok 59 - FUNCTION END-OF-MONTH of 1 Feb 2028 is 29 Feb 2028
+1..59
+# TDATECAL passed 00059 failed 00000
+# exit 0

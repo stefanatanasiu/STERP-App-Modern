@@ -1,0 +1,18 @@
+# com-gaps
+ok 1 - the posted invoice keeps the terms, bill-to address, VAT registration, unit, price and cost evidence it was confirmed with after the customer master changed -- REQ: COM-007 AC: AC-004
+ok 2 - the confirmed document recalculates to 125.00 net, 25.00 VAT and 150.00 gross from its own snapshotted inputs -- REQ: COM-007
+ok 3 - sales invoices, purchase invoices, sales orders, despatches and purchase orders all snapshot their commercial inputs -- REQ: COM-007
+ok 4 - a save made against a stale row version changes nothing and does not overwrite the other user's change, and the same save succeeds once the record is re-read -- REQ: COM-016 AC: AC-007
+ok 5 - the second demand is revalidated against the live free quantity and gets only the 2 units that are still free, not the 10 its view showed -- REQ: COM-016 AC: AC-007
+ok 6 - the conflict is reported as a shortfall of 8 units and the first demand keeps its promised 8 -- REQ: COM-016
+ok 7 - reserving against a stale free quantity is refused with "There is not enough free stock", not rounded down in silence -- REQ: COM-016 AC: AC-007
+ok 8 - blocking the item revalidates the standing reservation, marks it invalid and raises an exception naming the affected sales order and its own owner -- REQ: COM-016 AC: AC-007
+ok 9 - financial, VAT and customs records are retained for seven years from the financial year end and traceability for eleven, matching the D-17 parameters -- REQ: COM-027
+ok 10 - every statutory retention class disposes by review, so expiry proposes a disposal instead of deleting silently -- REQ: COM-027
+ok 11 - contact data whose six-year retention ran out in 2025 is proposed for anonymisation, while the 2023 trader is retained until 2029 and is not proposed -- REQ: COM-027, COM-028 AC: AC-113
+ok 12 - a record under an active legal hold is left out of the disposal proposal even though its retention class expired in 2023 -- REQ: COM-027 AC: AC-113
+ok 13 - only the financial controller may apply or release a legal hold, and the permission is flagged sensitive -- REQ: COM-027 AC: AC-113
+ok 14 - the sole traders are flagged as personal data under a personal-data retention class with a recorded contact purpose and restriction, and the change is audited as sensitive -- REQ: COM-028
+ok 15 - an access request returns the individual's contact, address and sales-ledger records together, within the one-month response time D-17 sets -- REQ: COM-028 AC: AC-113
+ok 16 - erasure anonymises the contact data that expired on 2025-12-31 and leaves the 2019 sales-ledger document, which is retained to 2027-03-31 under FIN7, untouched -- REQ: COM-027, COM-028 AC: AC-113
+ok 17 - the erasure records the reason the remaining records are retained, naming the retention class and the date the obligation ends -- REQ: COM-028 AC: AC-113

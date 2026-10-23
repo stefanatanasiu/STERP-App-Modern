@@ -1,0 +1,182 @@
+@* frmLogin (page:platform/sign-on, FR-STERP-PLATFORM-031/032): the Windows login, the STERP user, Continue as (SYSADM only),
+   the company/site list 'CO/SITE  name' and the business date; OK signs on (period load and SIGNON audit note), Cancel
+   leaves the session as it was. The page works on a candidate context; the shell applies it (FR-STERP-WEB-014). *@
+<div class="st-dialog st-raised" role="dialog" aria-modal="true" aria-labelledby="@($"{Dialog.Id}-t")" style="width:436px">
+    <div class="st-titlebar"><span class="st-title" id="@($"{Dialog.Id}-t")">STERP - Sign On</span></div>
+    <div style="padding:2px 4px">
+        <fieldset class="st-group">
+            <legend>Operator</legend>
+            <StValueField Caption="&Windows login:" Value="@_login" LabelWidth="104" Width="290" />
+            <StValueField Caption="STERP &user:" Value="@_userText" LabelWidth="104" Width="290" />
+            <StSelectField Caption="Continue &as:" Id="@($"{Dialog.Id}-runas")" Items="_runAsItems" Value="@_runAs" ValueChanged="RunAsChangedAsync"
+                           Disabled="!_runAsEnabled" LabelWidth="104" Width="140" />
+        </fieldset>
+        <fieldset class="st-group">
+            <legend>Company, site and business date</legend>
+            <div><label for="@($"{Dialog.Id}-access")">Company / <u>s</u>ite:</label></div>
+            <select id="@($"{Dialog.Id}-access")" class="st-input" aria-label="Company / site" size="6" style="width:396px; height:auto; font-family:var(--st-font)"
+                    @onchange="AccessChanged" @ondblclick="OkAsync">
+                @foreach (var a in _candidate?.Access ?? [])
+                {
+                    <option value="@a.Key" selected="@(a.Key == _access)">@a.Display</option>
+                }
+            </select>
+            <StTextField Caption="&Business date:" Id="@($"{Dialog.Id}-date")" @bind-Value="_date" LabelWidth="110" Width="104" />
+        </fieldset>
+        <div class="st-value" style="margin:4px 4px 0; white-space:pre-wrap" role="status">@_message</div>
+        <div class="st-dialog-buttons" style="justify-content:flex-end; padding-right:2px">
+            <button type="button" class="st-button" id="@($"{Dialog.Id}-OK")" disabled="@(!_okEnabled)" @onclick="OkAsync"><u>O</u>K</button>
+            <button type="button" class="st-button" id="@($"{Dialog.Id}-Cancel")" @onclick="Cancel"><u>C</u>ancel</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private SessionContext? _candidate;
+    private string _login = "";
+    private string _userText = "";
+    private string _runAs = "";
+    private bool _runAsEnabled;
+    private IReadOnlyList<(string Value, string Text)> _runAsItems = [];
+    private string _access = "";
+    private string _date = "";
+    private string _preferred = "";
+    private string _message = "";
+    private bool _okEnabled;
+    private bool _busy;
+
+    [CascadingParameter] public DialogInstance Dialog { get; set; } = default!;
+
+    [Inject] private ApiClient Api { get; set; } = default!;
+
+    [Inject] private BrowserInterop Browser { get; set; } = default!;
+
+    /// <summary>The signed-on context when re-opened from File > Select Company / Site or Continue as User.</summary>
+    [Parameter] public SessionContext? Current { get; set; }
+
+    /// <summary>The start-up sign-on failed (no mapped user, ...): the message is shown and only Cancel remains.</summary>
+    [Parameter] public string? StartupError { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Dialog.KeyHandler = key =>
+        {
+            if (key.Is("Escape")) { Cancel(); return true; }
+            if (key.Is("Enter") && key.TargetTag != "button" && key.TargetTag != "select") { _ = OkAsync(); return true; }
+            return key.Key.StartsWith('F') && key.Key.Length <= 3;
+        };
+        if (StartupError is not null || Current is null)
+        {
+            _message = "*** " + (StartupError ?? "Sign-on failed.");
+            _runAsEnabled = false;
+            _okEnabled = false;
+            return;
+        }
+        _login = Current.WindowsLogin;
+        _date = UkFormat.Date(Current.BusinessDate);
+        _preferred = Current.CompanyCode + "/" + Current.SiteCode;
+        _candidate = Current;
+        await ShowContextAsync();
+    }
+
+    /// <summary>frmLogin.ShowContext (frmLogin.vb:40-70).</summary>
+    private async Task ShowContextAsync()
+    {
+        var s = _candidate!;
+        _userText = s.UserCode + "   " + s.DisplayName;
+        _runAsEnabled = string.Equals(s.RealUserCode, "SYSADM", StringComparison.Ordinal);
+        if (_runAsEnabled && _runAsItems.Count == 0)
+        {
+            var users = await Api.GetAsync("/api/platform/v1/session/run-as-users", new ApiCallOptions { NoContext = true });
+            if (users.IsSuccess)
+            {
+                _runAsItems = users.Items.Select(u => Json.Str(u?["userCode"]).Trim()).Select(c => (c, c)).ToList();
+            }
+        }
+        _runAs = s.UserCode;
+        var access = s.Access;
+        _access = access.Count > 0 ? access[0].Key : "";
+        var preferred = access.FirstOrDefault(a => a.CompanyCode + "/" + a.SiteCode == _preferred);
+        if (preferred is not null) _access = preferred.Key;
+        _message = access.Count == 0
+            ? "*** No company or site has been granted to this user."
+            : access.Count + " company/site combination(s) available.";
+        _okEnabled = access.Count > 0;
+        StateHasChanged();
+    }
+
+    /// <summary>frmLogin.cboRunAs_SelectedIndexChanged: SYSADM continues as the chosen user (platform_continueAsUser).</summary>
+    private async Task RunAsChangedAsync(string code)
+    {
+        if (!_runAsEnabled || string.IsNullOrEmpty(code) || _candidate is null) return;
+        _runAs = code;
+        if (code == _candidate.UserCode) return;
+        _busy = true;
+        try
+        {
+            var r = await Api.PostAsync("/api/platform/v1/session/run-as", new JsonObject { ["userCode"] = code },
+                new ApiCallOptions { NoContext = true, IdempotencyKey = Guid.NewGuid().ToString() });
+            if (!r.IsSuccess || r.Json is null)
+            {
+                _message = "*** " + r.Problem!.Detail;
+                return;
+            }
+            var ctx = SessionContext.FromJson(r.Json);
+            _candidate = ctx with { BusinessDate = _candidate.BusinessDate, RealUserCode = string.IsNullOrEmpty(ctx.RealUserCode) ? "SYSADM" : ctx.RealUserCode };
+            await ShowContextAsync();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void AccessChanged(ChangeEventArgs e) => _access = e.Value?.ToString() ?? "";
+
+    /// <summary>frmLogin.btnOk_Click: the chosen company/site, the period of the business date and the SIGNON note (platform_signOn).</summary>
+    private async Task OkAsync()
+    {
+        if (!_okEnabled || _candidate is null || _busy) return;
+        var cs = _candidate.Access.FirstOrDefault(a => a.Key == _access);
+        if (cs is null)
+        {
+            _message = "*** Select the company and site to work in.";
+            return;
+        }
+        var date = UkFormat.ParseDate(_date) ?? _candidate.BusinessDate;
+        var headers = new Dictionary<string, string>();
+        if (_candidate.IsImpersonating) headers["X-STERP-Run-As"] = _candidate.UserCode;
+        _busy = true;
+        try
+        {
+            var r = await Api.PostAsync("/api/platform/v1/session/sign-on", new JsonObject
+            {
+                ["companyCode"] = cs.CompanyCode,
+                ["siteCode"] = cs.SiteCode,
+                ["businessDate"] = date.ToString("yyyy-MM-dd", UkFormat.Culture),
+            }, new ApiCallOptions { NoContext = true, Headers = headers, IdempotencyKey = Guid.NewGuid().ToString() });
+            if (!r.IsSuccess || r.Json is null)
+            {
+                _message = "*** " + r.Problem!.Detail;
+                return;
+            }
+            var ctx = SessionContext.FromJson(r.Json);
+            if (string.IsNullOrEmpty(ctx.RealUserCode) || ctx.RealUserCode == ctx.UserCode)
+            {
+                ctx = ctx with { RealUserCode = _candidate.RealUserCode };
+            }
+            Dialog.Close(ctx);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void Cancel() => Dialog.Close(null);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.FocusAsync($"{Dialog.Id}-access");
+    }
+}

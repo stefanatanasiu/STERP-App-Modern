@@ -1,0 +1,11 @@
+@inherits StPage
+@* Contracts 9.2: the page of a slice that is not yet delivered points the user to the legacy client. *@
+<div class="st-page">
+    <div class="st-placeholder st-sunken" role="note">
+        Not yet available in the modernized application - use the legacy client (slice @(Route?.TargetApplication ?? "STERP-WEB"), wave @(Route?.Wave ?? "W0"))
+    </div>
+</div>
+
+@code {
+    [Parameter] public GuiRoute? Route { get; set; }
+}

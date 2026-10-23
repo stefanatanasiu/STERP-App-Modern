@@ -1,0 +1,84 @@
+@inherits StPage
+@* frmEngineDiag -> Service diagnostics (page:platform/service-diagnostics, FR-STERP-PLATFORM-056, contracts 10): the 'Engine and
+   database' group (PING-equivalent probe of the online service), the slices the services deliver, status line
+   'Engine <severity>'; Ping (F5), Close (F3). The COMMAREA test, program directory and copybook map have no target. *@
+<div class="st-page">
+    <div class="st-pagetools" role="toolbar">
+        <StToolButton Text="Ping (F5)" Glyph="ENGINE" OnClick="PingAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Close (F3)" Glyph="CLOSE" OnClick="CloseAsync" />
+    </div>
+    <div style="display:flex; gap:6px; padding:2px 6px; overflow:auto; flex:1 1 auto; min-height:0">
+        <div style="flex:1 1 auto; min-width:0">
+            <fieldset class="st-group">
+                <legend>Engine and database</legend>
+                <StValueField Caption="Service:" Value="@_service" LabelWidth="118" Width="400" />
+                <StValueField Caption="Database:" Value="@_db" LabelWidth="118" Width="400" />
+                <StValueField Caption="Server time:" Value="@_time" LabelWidth="118" Width="400" />
+                <StValueField Caption="Database version:" Value="@_dbVersion" LabelWidth="118" Width="400" />
+                <StValueField Caption="Return code:" Value="@_rc" LabelWidth="118" Width="400" />
+                <StValueField Caption="Message:" Value="@_message" LabelWidth="118" Width="400" />
+            </fieldset>
+            <fieldset class="st-group">
+                <legend>Service status</legend>
+                <StValueField Caption="Status:" Value="@_status" LabelWidth="118" Width="400" />
+                <StValueField Caption="Readiness:" Value="@_readiness" LabelWidth="118" Width="400" />
+                <StValueField Caption="Schema drift:" Value="@_drift" LabelWidth="118" Width="400" />
+                <StValueField Caption="Health:" Value="@_health" LabelWidth="118" Width="400" />
+            </fieldset>
+        </div>
+        <fieldset class="st-group" style="width:210px; flex:0 0 210px; display:flex; flex-direction:column">
+            <legend>Delivered slices</legend>
+            <pre class="st-pre st-sunken" style="font-size:11px">@_slices</pre>
+            <div style="margin-top:4px">@_count</div>
+        </fieldset>
+    </div>
+</div>
+
+@code {
+    private string _service = "";
+    private string _db = "";
+    private string _time = "";
+    private string _dbVersion = "";
+    private string _rc = "";
+    private string _message = "";
+    private string _status = "";
+    private string _readiness = "";
+    private string _drift = "";
+    private string _health = "";
+    private string _slices = "";
+    private string _count = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Window.SetTitle("Service diagnostics");
+        await PingAsync();
+    }
+
+    protected override Task OnRefreshKeyAsync() => PingAsync();
+
+    /// <summary>frmEngineDiag.PingClicked: probe, values and the status line 'Engine &lt;severity&gt;' (cue OK or "!").</summary>
+    private Task PingAsync() => GuardAsync(async () =>
+    {
+        var r = await Api.GetAsync("/api/platform/v1/service-diagnostics");
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        var d = r.Json!;
+        var db = d["database"];
+        _service = Json.Str(d["serviceName"]) + "   " + Json.Str(d["serviceVersion"]);
+        _db = Json.Str(db?["dbName"]);
+        _time = Json.Str(db?["dbServerTime"]);
+        _dbVersion = Json.Str(db?["dbVersion"]);
+        var rc = Json.Int(db?["returnCode"]);
+        var severity = rc == 0 ? "OK" : rc <= 4 ? "WARNING" : "ERROR";
+        _rc = rc.ToString("00", UkFormat.Culture) + "  " + severity;
+        _message = Json.Str(db?["message"]);
+        _status = Json.Str(d["status"]);
+        _readiness = Json.Str(d["readiness"]);
+        _drift = Json.Str(d["driftCheck"]?["status"]);
+        _health = Json.Str(d["healthText"]);
+        var slices = (d["deliveredSlices"] as JsonArray ?? []).ToList();
+        _slices = string.Join("\n", slices.Select(s => Json.Str(s?["targetApplicationId"]).PadRight(16) + Json.Str(s?["wave"]).PadRight(5) + (Json.Bool(s?["delivered"]) ? "delivered" : "planned")));
+        _count = slices.Count(s => Json.Bool(s?["delivered"])) + " of " + slices.Count + " slice(s) delivered";
+        SetStatus("Engine " + severity, rc == 0 ? CueOk : "!");
+    });
+}

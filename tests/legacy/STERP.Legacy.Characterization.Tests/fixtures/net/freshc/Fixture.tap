@@ -1,0 +1,3 @@
+ok - po: historical unlinked receipts do not reverse unapplied quantities  # REQ: PO-009
+ok - po: receipt delivery cannot cross site boundaries  # REQ: PO-009,COM-001
+ok - po: receipt delivery quantities, identity and replay are consistent  # REQ: PO-009,PO-024

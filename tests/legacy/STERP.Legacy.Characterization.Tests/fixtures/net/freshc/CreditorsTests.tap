@@ -1,0 +1,11 @@
+ok - ap: a Confirmation of Payee mismatch is recorded as evidence, not as a payment  # REQ: AP-002,D-19
+ok - ap: a bank change stays unusable until somebody other than the preparer approves it  # REQ: AP-002,AP-027,D-19
+ok - ap: approving your own bank change is refused by the engine  # REQ: AP-027,D-07,D-19
+ok - ap: open items are aged and the overdue ones are visible  # REQ: AP-016,AP-019
+ok - ap: the completed payment run carries remittances and an excluded line  # REQ: AP-011,AP-013,AP-016
+ok - ap: the match tolerance test answers without touching the database  # REQ: AP-006,AP-007
+not ok - ap: the module's forms and reports are registered for the shell  # REQ: AP-023,COM-019
+#   StAssertException: the three AP forms are on the menu: expected <3> but was <6>
+ok - ap: the purchase ledger agrees with the creditors control account  # REQ: AP-021,AP-022
+ok - ap: the register shows why a blocked invoice cannot be paid  # REQ: AP-003,AP-008,AP-023
+ok - ap: the supplier enquiry reports the ledger balance and the unverified banks  # REQ: AP-001,AP-002

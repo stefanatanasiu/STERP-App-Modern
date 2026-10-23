@@ -1,0 +1,38 @@
+# suite TTERMCAL
+ok 1 - AC-005 day 31 of next month, Jan 2027 invoice
+ok 2 - AC-005 day 31 of next month, Jan 2028 invoice
+ok 3 - AC-005 the last day of January gives the same answer
+ok 4 - day 15 of next month from 20 Oct 2026 is 15 Nov 2026
+ok 5 - day 31 of next month from December crosses the year
+ok 6 - the resolved terms are described for the document
+ok 7 - 30 days from 5 October 2026 is 4 November 2026
+ok 8 - the term length is reported as 30 days
+ok 9 - 30 days end of month from 5 Oct 2026 is 30 Nov 2026
+ok 10 - end of month terms describe themselves
+ok 11 - 0 days end of month is the month end itself
+ok 12 - the due date is also returned as dd/mm/yyyy
+ok 13 - no terms: 30 days from the invoice date
+ok 14 - no terms: the source is recorded as STATUTORY
+ok 15 - no terms: the Act is named in the description
+ok 16 - no terms: a later invoice receipt moves the due date
+ok 17 - no terms: a later supply date moves the due date
+ok 18 - an unknown terms code falls back to the statute
+ok 19 - 2.5 per cent of net 1,000.00 is 25.00
+ok 20 - the discount deadline is 15 October 2026
+ok 21 - 2.5 per cent of gross 1,200.00 is 30.00
+ok 22 - a discount of 1.5 per cent of 33.33 rounds to 0.50
+ok 23 - no discount days means no discount deadline
+ok 24 - D-25 90 day terms are flagged for review
+ok 25 - D-25 60 day terms are within the limit
+ok 26 - the term limit can be tightened to 45 days
+ok 27 - AC-112 a Bacs due date of 25 Dec 2026 moves to the 29
+ok 28 - the unadjusted due date is kept for the audit trail
+ok 29 - a Bacs due date can move backwards instead
+ok 30 - without the Bacs option the calendar date stands
+ok 31 - an invalid invoice date is rejected with TRM0003
+ok 32 - an unsupported basis is rejected with TRM0004
+ok 33 - day of month 0 is rejected with TRM0005
+ok 34 - an unknown function is rejected with TRM0009
+1..34
+# TTERMCAL passed 00034 failed 00000
+# exit 0

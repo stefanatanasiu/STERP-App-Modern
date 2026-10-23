@@ -1,0 +1,60 @@
+# suite TARCRED credit exposure
+ok 1 - exposure is computed
+ok 2 - open invoice residuals are 800.00
+ok 3 - eligible open credits are 100.00
+ok 4 - firm unshipped orders are 350.00
+ok 5 - despatched unbilled goods are 150.00
+ok 6 - eligible deposits are 50.00
+ok 7 - exposure is 1,150.00
+ok 8 - the approved limit is 1,100.00
+ok 9 - headroom is minus 50.00
+ok 10 - the excess is 50.00
+ok 11 - the limit is 104.55% utilised
+ok 12 - a credit check over the limit holds
+ok 13 - the decision is a hold, not a block
+ok 14 - the limit rule is quoted
+ok 15 - the decision text states the excess
+ok 16 - a zero limit is not an unlimited limit
+ok 17 - a zero limit still holds release
+ok 18 - a credit check needs a customer
+ok 19 - an unknown account is not found
+ok 20 - a negative commitment is refused
+ok 21 - a foreign commitment needs a stated rate
+ok 22 - the missing rate rule is quoted
+ok 23 - 1,270 USD at 1.27 is 1,000.00 sterling
+ok 24 - a sanctions match blocks release
+ok 25 - a sanctions block is an error, not a hold
+ok 26 - the sanctions rule is quoted
+ok 27 - a suspended account cannot take new demand
+ok 28 - an explicit credit hold holds release
+ok 29 - a credit hold needs authority, code 06
+ok 30 - a new account trades on pro forma until approved
+ok 31 - overdue debt holds release at despatch
+ok 32 - the overdue hold rule is quoted
+ok 33 - the overdue debt is 800.00
+ok 34 - the oldest item is <n> days past due
+ok 35 - the oldest due date is 01/09/2026
+ok 36 - the trigger is the D-06 default of 30 days
+ok 37 - an override without a reason is refused
+ok 38 - a reasoned override is requested
+ok 39 - the override covers the 50.00 excess
+ok 40 - it is scoped to the order
+ok 41 - the credit manager may grant it
+ok 42 - it expires after five working days
+ok 43 - it is not usable until approved
+ok 44 - an excess over 50,000 needs the controller
+ok 45 - the requester cannot approve his own override
+ok 46 - an independent authority approves it
+ok 47 - the override becomes active
+ok 48 - the order releases under the override
+ok 49 - the release is a warning, with the override quoted
+ok 50 - an expired override does not release new demand
+ok 51 - despatching empties the unshipped order leg
+ok 52 - the value arrives in the unbilled leg
+ok 53 - exposure after despatch is still 1,150.00
+ok 54 - billing moves the value into open debt
+ok 55 - the unbilled leg falls back to 150.00
+ok 56 - exposure after invoicing is still 1,150.00
+1..56
+# TARCRED credit exposure passed 00056 failed 00000
+# exit 0

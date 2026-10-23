@@ -1,0 +1,12 @@
+@* A toolbar button with a 16x16 glyph and its legacy caption (UiStyle.Tool). *@
+<button type="button" class="st-tool" disabled="@(!Enabled)" title="@Text" @onclick="OnClick">@if (!string.IsNullOrEmpty(Glyph)) {<StGlyph Kind="@Glyph" />}<span>@Text</span></button>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+
+    [Parameter] public string? Glyph { get; set; }
+
+    [Parameter] public bool Enabled { get; set; } = true;
+
+    [Parameter] public EventCallback OnClick { get; set; }
+}

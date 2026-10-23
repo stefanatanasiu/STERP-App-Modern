@@ -1,0 +1,118 @@
+@inherits StListPage
+@* frmBomWhereUsed (page:bom/where-used-enquiry, FR-STERP-BOM-022; frmBomWhereUsed.vb:12-115): every bill that uses a component,
+   direct and indirect (bom.usp_BomWhereUsed); Levels and Include re-run the enquiry; Explode parent opens the explosion
+   enquiry on the selected parent. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Component:" Inline="true" Width="170" @bind-Value="_item" Id="@Uid("item")" />
+        <StTextField Caption="&As at:" Inline="true" Width="80" @bind-Value="_asAt" Id="@Uid("asat")" />
+        <StSelectField Caption="&Levels:" Inline="true" Width="90" Items="LevelItems" Value="@_levels" ValueChanged="LevelsChangedAsync" Id="@Uid("levels")" />
+        <StSelectField Caption="&Include:" Inline="true" Width="150" Items="IncludeItems" Value="@_include" ValueChanged="IncludeChangedAsync" Id="@Uid("include")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Where used (F10)" Glyph="FIND" OnClick="FindAsync" />
+        <StToolButton Text="Explode parent" Glyph="ENGINE" OnClick="ExplodeParent" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> LevelItems = StSelectField.Of("ALL", "1", "2", "3", "5", "10");
+    private static readonly IReadOnlyList<(string Value, string Text)> IncludeItems = StSelectField.Of("RELEASED AND DRAFT", "RELEASED ONLY");
+    private string _item = "";
+    private string _asAt = "";
+    private string _levels = "ALL";
+    private string _include = "RELEASED AND DRAFT";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Where Used Enquiry");
+        _asAt = Fmt.Date(Session.BusinessDate);
+        if (FormArgument != "") _item = FormArgument;
+    }
+
+    private string Item() => _item.Trim().ToUpperInvariant();
+
+    /// <summary>"ALL" or anything that is not a whole number means 25 levels.</summary>
+    private int Levels() => _levels == "ALL" || !int.TryParse(_levels, out var n) ? 25 : n;
+
+    private bool IncludeDraft() => _include != "RELEASED ONLY";
+
+    protected override Task LoadDataAsync()
+    {
+        if (Item() == "")
+        {
+            Populate(GridData.Empty);
+            SetStatus("Enter the component code and press F10 to see every bill that uses it.");
+            return Task.CompletedTask;
+        }
+        return FindAsync();
+    }
+
+    protected override Task OnConfirmAsync() => FindAsync();
+
+    private Task LevelsChangedAsync(string value)
+    {
+        _levels = value;
+        return LoadDataAsync();
+    }
+
+    private Task IncludeChangedAsync(string value)
+    {
+        _include = value;
+        return LoadDataAsync();
+    }
+
+    private async Task FindAsync()
+    {
+        Populate(GridData.Empty);
+        if (Item() == "")
+        {
+            SetStatus("Enter a component item code first.", CueWarning);
+            return;
+        }
+        var asAt = Fmt.ParseDate(_asAt);
+        if (asAt is null)
+        {
+            SetStatus("Enter a valid as-at date in dd/MM/yyyy form.", CueWarning);
+            return;
+        }
+        await GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/bom/v1/items/" + Query.Path(Item()) + "/where-used" +
+                                       Query.Build(("asOf", Fmt.Iso(asAt.Value)), ("maxLevels", Levels().ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                                                   ("includeDraft", IncludeDraft() ? "true" : "false")));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            var rows = GridData.FromItems(r.Json);
+            Populate(rows);
+            var direct = 0;
+            var deepest = 0;
+            foreach (var row in rows.Rows)
+            {
+                var level = Fmt.Int(Value(row, "level"));
+                if (level > deepest) deepest = level;
+                if (Fmt.Bool(Value(row, "isDirect"))) direct++;
+            }
+            SetStatus(Item() + " is used by " + rows.Count + " parent bill(s) - " + direct + " direct, " + deepest + " level(s) up.",
+                      rows.Count > 0 ? CueOk : CueWarning);
+        });
+    }
+
+    private static JsonNode? Value(JsonObject row, string name) =>
+        row.FirstOrDefault(p => string.Equals(p.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
+
+    /// <summary>Open the explosion enquiry on the parent the engineer selected.</summary>
+    private void ExplodeParent()
+    {
+        var parent = SelectedText("parentItemCode").Trim();
+        if (parent == "") parent = SelectedText("topLevelItemCode").Trim();
+        if (parent == "")
+        {
+            SetStatus("Select a parent row first.", CueWarning);
+            return;
+        }
+        OpenForm("frmBomExplosion", parent);
+    }
+}

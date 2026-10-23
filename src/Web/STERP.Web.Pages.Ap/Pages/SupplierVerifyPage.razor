@@ -1,0 +1,252 @@
+@inherits StListPage
+@* frmSupplierVerify (page:ap/supplier-verification, FR-STERP-AP-018): whether a supplier may be ordered from or paid, and the
+   state of its bank records. A bank change always needs a second pair of eyes: approving a change you prepared yourself is
+   refused by the engine and shown as an error, never swallowed (frmSupplierVerify.vb:11-204). *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="S&upplier:" Inline="true" Width="150" Field="SUPPLIER" @bind-Value="_supplier" Id="@Uid("supplier")" />
+        <StSelectField Caption="&View:" Inline="true" Width="120" Items="Views" Value="@_view" ValueChanged="ViewChangedAsync" Id="@Uid("view")" />
+    </Filters>
+    <Tools>
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Verify (F10)" Glyph="ENGINE" OnClick="VerifyAsync" />
+        <StToolButton Text="Payable?" Glyph="FIND" OnClick="PayableAsync" />
+        <span class="st-toolsep" role="separator"></span>
+        <StToolButton Text="Bank records" Glyph="FIND" OnClick="BanksAsync" />
+        <StToolButton Text="Change bank" Glyph="EDIT" OnClick="ChangeAsync" />
+        <StToolButton Text="CoP check" Glyph="RUN" OnClick="CopAsync" />
+        <StToolButton Text="Record callback" Glyph="RUN" OnClick="CallbackAsync" />
+        <StToolButton Text="Approve bank" Glyph="POST" OnClick="ApproveAsync" />
+        <span class="st-toolsep" role="separator"></span>
+    </Tools>
+</StListLayout>
+
+@code {
+    private static readonly IReadOnlyList<(string Value, string Text)> Views = StSelectField.Of("ALL", "HOLD", "UNVERIFIED");
+
+    private string _supplier = "";
+    private string _view = "ALL";
+    private bool _showingBanks;
+    private string _bankSupplier = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Supplier Verification");
+        if (FormArgument != "") _supplier = FormArgument;
+    }
+
+    private string Supplier => _supplier.Trim().ToUpperInvariant();
+
+    /// <summary>frmSupplierVerify.LoadData: SupplierService.Suppliers (ap.usp_SupplierEnquiry).</summary>
+    protected override Task LoadDataAsync()
+    {
+        _showingBanks = false;
+        return GuardAsync(async () =>
+        {
+            var r = await Api.GetAsync("/api/ap/v1/suppliers" + Query.Build(("filter", Supplier), ("mode", _view)));
+            if (!r.IsSuccess) throw new ApiFailure(r);
+            Populate(GridData.FromItems(r.Json));
+            SetStatus(Data.Count + " supplier(s).", "");
+        });
+    }
+
+    private async Task ViewChangedAsync(string value)
+    {
+        _view = value;
+        await LoadDataAsync();
+    }
+
+    protected override Task OnConfirmAsync() => VerifyAsync();
+
+    /// <summary>frmSupplierVerify.VerifyClicked: APSUPVAL VALIDATE owns the answer; the screen only reports it.</summary>
+    private async Task VerifyAsync()
+    {
+        var code = Chosen();
+        if (code == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/suppliers/{Query.Path(code)}/validate", new JsonObject());
+            if (!await ShowResultAsync(r)) return;
+            var s = LegacyResult.From(r);
+            var canPurchase = s.Str("canPurchase") == "Y";
+            var canPay = s.Str("canPay") == "Y";
+            SetStatus(code + ": balance " + UkFormat.Money(s.Dec("openBalanceGbp")) + " over " + s.Int("openItemCount") +
+                      " open item(s) | terms " + s.Int("termDays") + " days | purchase " + (canPurchase ? "ALLOWED" : "BLOCKED") +
+                      " | payment " + (canPay ? "ALLOWED" : "BLOCKED"), canPurchase && canPay ? CueOk : CueHold);
+        });
+    }
+
+    /// <summary>frmSupplierVerify.PayableClicked: APSUPVAL CANPAY.</summary>
+    private async Task PayableAsync()
+    {
+        var code = Chosen();
+        if (code == "") return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/suppliers/{Query.Path(code)}/can-pay", new JsonObject());
+            if (!await ShowResultAsync(r)) return;
+            var s = LegacyResult.From(r);
+            var canPay = s.Str("canPay") == "Y";
+            SetStatus(code + " may " + (canPay ? "be paid. " : "NOT be paid. ") + s.Str("note").TrimEnd(), canPay ? CueOk : CueHold);
+        });
+    }
+
+    /// <summary>frmSupplierVerify.BanksClicked: every bank record of the supplier (ap.usp_ListSupplierBanks).</summary>
+    private async Task BanksAsync()
+    {
+        var code = Chosen();
+        if (code == "") return;
+        await GuardAsync(async () =>
+        {
+            _bankSupplier = code;
+            _showingBanks = true;
+            await PopulateBanksAsync(code);
+            SetStatus("Bank records for " + code + ". A change stays unusable until an independent approver accepts it.", "");
+        });
+    }
+
+    private async Task PopulateBanksAsync(string supplier)
+    {
+        var r = await Api.GetAsync($"/api/ap/v1/suppliers/{Query.Path(supplier)}/banks");
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json));
+    }
+
+    /// <summary>frmSupplierVerify.CopClicked: record the Confirmation of Payee evidence on the selected bank record.</summary>
+    private async Task CopAsync()
+    {
+        if (!RequireBankRow()) return;
+        var id = BankId();
+        var v = await ApInput.CollectAsync(Dialogs, "Record Confirmation of Payee",
+            new ApInputField("RESULT", "Result (MATCH/CLOSEMATCH/NOMATCH/UNAVAILABLE)", "", 12),
+            new ApInputField("REFERENCE", "CoP evidence reference", "", 60),
+            new ApInputField("DECISION", "Authorised decision (required unless MATCH)", "", 200));
+        if (v is null) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/suppliers/{Query.Path(_bankSupplier)}/banks/{id}/cop", new JsonObject
+            {
+                ["copResult"] = v["RESULT"].ToUpperInvariant(),
+                ["copReference"] = v["REFERENCE"],
+                ["copDecision"] = v["DECISION"],
+            }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            var b = LegacyResult.From(r);
+            var cop = b.Str("copResult").TrimEnd();
+            SetStatus("Confirmation of Payee: " + cop + ". " + b.Str("note").TrimEnd(), cop == "MATCH" ? CueOk : CueWarning);
+            await PopulateBanksAsync(_bankSupplier);
+        });
+    }
+
+    /// <summary>frmSupplierVerify.ChangeClicked: prepare a GB / GBP Bacs bank change (APBANKVR PREPARE).</summary>
+    private async Task ChangeAsync()
+    {
+        var code = Chosen();
+        if (code == "") return;
+        var v = await ApInput.CollectAsync(Dialogs, "Prepare GB / GBP Bacs bank change",
+            new ApInputField("BANKREF", "New unique bank reference (maximum 10 characters)", "", 10),
+            new ApInputField("BENEFICIARY", "Beneficiary name", "", 120),
+            new ApInputField("SORTCODE", "Sort code (six digits)", "", 6),
+            new ApInputField("ACCOUNT", "Account number (eight digits)", "", 8),
+            new ApInputField("BANKNAME", "Bank name", "", 60),
+            new ApInputField("SOURCE", "Request source (EMAIL/PORTAL/LETTER/CALLBACK)", "", 30));
+        if (v is null) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/suppliers/{Query.Path(code)}/banks/prepare", new JsonObject
+            {
+                ["bankRef"] = v["BANKREF"].ToUpperInvariant(),
+                ["beneficiary"] = v["BENEFICIARY"],
+                ["sortCode"] = v["SORTCODE"],
+                ["accountNo"] = v["ACCOUNT"],
+                ["bankName"] = v["BANKNAME"],
+                ["requestSource"] = v["SOURCE"].ToUpperInvariant(),
+            }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            var b = LegacyResult.From(r);
+            _bankSupplier = code;
+            _showingBanks = true;
+            await PopulateBanksAsync(code);
+            SetStatus("Bank change " + b.Int("supplierBankId") + " is " + b.Str("status").TrimEnd() +
+                      ". Record CoP and an independent callback, then obtain independent approval.", "!  PENDING");
+        });
+    }
+
+    /// <summary>frmSupplierVerify.CallbackClicked: the independent call-back by the signed-on user.</summary>
+    private async Task CallbackAsync()
+    {
+        if (!RequireBankRow()) return;
+        var id = BankId();
+        var v = await ApInput.CollectAsync(Dialogs, "Record independent callback",
+            new ApInputField("CONTACT", "Contact already held on record (not change request)", "", 120),
+            new ApInputField("ONFILE", "Contact was already on file? Enter Y or N", "", 1),
+            new ApInputField("NOTE", "Independent callback evidence / outcome", "", 300));
+        if (v is null) return;
+        if (!await ConfirmAsync("Record an independent callback by " + Session.UserCode +
+                                "? Do not use a contact supplied with the change request.")) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/suppliers/{Query.Path(_bankSupplier)}/banks/{id}/callback", new JsonObject
+            {
+                ["callbackSource"] = v["CONTACT"],
+                ["callbackOnFile"] = v["ONFILE"].ToUpperInvariant() == "Y" ? "Y" : "N",
+                ["callbackNote"] = v["NOTE"],
+            }, Instruction.New().Options());
+            if (!await ShowResultAsync(r)) return;
+            var b = LegacyResult.From(r);
+            await PopulateBanksAsync(_bankSupplier);
+            SetStatus("Callback recorded; bank status " + b.Str("status").TrimEnd() + ". Independent approval is still required.", CueOk);
+        });
+    }
+
+    /// <summary>
+    /// frmSupplierVerify.ApproveClicked: approval is the engine's decision; approving your own change comes back as an error
+    /// and is shown as one (AP-027, D-19).
+    /// </summary>
+    private async Task ApproveAsync()
+    {
+        if (!RequireBankRow()) return;
+        if (!await ConfirmAsync("Approve this bank change for " + _bankSupplier + "?")) return;
+        await GuardAsync(async () =>
+        {
+            var r = await Api.PostAsync($"/api/ap/v1/suppliers/{Query.Path(_bankSupplier)}/banks/{BankId()}/approve",
+                new JsonObject { ["decision"] = "APPROVE" }, Instruction.New().Options());
+            if (!await ShowResultAsync(r))
+            {
+                SetStatus("Approval refused: " + LegacyResult.From(r).Display, CueError);
+                return;
+            }
+            var b = LegacyResult.From(r);
+            await PopulateBanksAsync(_bankSupplier);
+            SetStatus("Bank record approved, status " + b.Str("status").TrimEnd() + ".", CueOk);
+        });
+    }
+
+    private bool RequireBankRow()
+    {
+        if (!_showingBanks || _bankSupplier == "")
+        {
+            SetStatus("Show the bank records of a supplier first.", CueWarning);
+            return false;
+        }
+        if (BankId() == 0)
+        {
+            SetStatus("Select a bank record first.", CueWarning);
+            return false;
+        }
+        return true;
+    }
+
+    private int BankId() => Json.Int(SelectedValue("supplierBankId"));
+
+    /// <summary>frmSupplierVerify.Chosen: the bank list's supplier, the selected row's supplier, or the filter.</summary>
+    private string Chosen()
+    {
+        if (_showingBanks) return _bankSupplier;
+        var code = Json.Str(SelectedValue("supplierCode")).TrimEnd();
+        if (code == "") code = Supplier;
+        if (code == "") SetStatus("Select a supplier first.", CueWarning);
+        return code;
+    }
+}

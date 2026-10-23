@@ -1,0 +1,37 @@
+# suite TSTFUNC
+ok 1 - ROUND-AWAY 1.005 to 2 places is 1.01 (AC-006)
+ok 2 - ROUND-AWAY -1.005 to 2 places is -1.01 (AC-006)
+ok 3 - ROUND-AWAY 2.675 to 2 places is 2.68
+ok 4 - ROUND-AWAY leaves a value already exact
+ok 5 - ROUND-AWAY to whole units rounds 0.5 up
+ok 6 - ROUND-AWAY to whole units rounds -0.5 down
+ok 7 - ROUND-AWAY treats negative places as none
+ok 8 - ROUND-AWAY rounds a rate to 6 places
+ok 9 - SIGN-OF of a credit is -1
+ok 10 - SIGN-OF of zero is 0
+ok 11 - SIGN-OF of a debit is +1
+ok 12 - IS-LEAP 2028 is a leap year
+ok 13 - IS-LEAP 2027 is not a leap year
+ok 14 - IS-LEAP 2000 is a leap year (divisible by 400)
+ok 15 - IS-LEAP 1900 is not a leap year (century rule)
+ok 16 - DAYS-IN-MONTH February 2028 is 29
+ok 17 - DAYS-IN-MONTH February 2027 is 28
+ok 18 - DAYS-IN-MONTH September 2026 is 30
+ok 19 - DAYS-IN-MONTH December 2026 is 31
+ok 20 - DAYS-IN-MONTH rejects month 13 with 0
+ok 21 - END-OF-MONTH of 1 Feb 2028 is 29 Feb 2028
+ok 22 - END-OF-MONTH of 15 Feb 2027 is 28 Feb 2027
+ok 23 - END-OF-MONTH of a month end stays put
+ok 24 - END-OF-MONTH pulls 30 Feb 2026 back to 28 Feb 2026
+ok 25 - END-OF-MONTH rejects an impossible month with 0
+ok 26 - WEEKDAY-OF 15 Oct 2026 is a Thursday
+ok 27 - WEEKDAY-OF 18 Oct 2026 is a Sunday
+ok 28 - WEEKDAY-OF Christmas Day 2026 is a Friday
+ok 29 - WEEKDAY-OF 29 Feb 2028 is a Tuesday
+ok 30 - WEEKDAY-OF rejects an impossible date with 0
+ok 31 - RNDALLOC reaches ROUND-AWAY inside the engine
+ok 32 - DATECALC reaches END-OF-MONTH inside the engine
+ok 33 - DATECALC reaches WEEKDAY-OF inside the engine
+1..33
+# TSTFUNC passed 00033 failed 00000
+# exit 0

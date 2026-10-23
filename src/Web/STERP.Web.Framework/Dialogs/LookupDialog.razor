@@ -1,0 +1,102 @@
+@using Sterp.Web.Framework.Api
+@using Sterp.Web.Framework.Format
+@using Sterp.Web.Framework.Shell
+@inject ApiClient Api
+@inject BrowserInterop Browser
+@* frmLookup (page:platform/lookup, FR-STERP-PLATFORM-035): title 'Lookup - <caption>', Find + Search (Enter), grid, count
+   line, OK (double-click / Enter) and Cancel. Only registered lookups are called: a master-file MaintCode
+   (platform_lookupMasterFile) or a named lookup (platform_lookupNamed); Cancel returns "" so the field keeps its value. *@
+<div class="st-dialog st-raised" role="dialog" aria-modal="true" aria-labelledby="@($"{Dialog.Id}-t")" style="width:556px">
+    <div class="st-titlebar"><span class="st-title" id="@($"{Dialog.Id}-t")">@WindowTitle</span></div>
+    <div style="display:flex; flex-direction:column; padding:6px 8px; height:300px">
+        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px">
+            <label for="@($"{Dialog.Id}-find")"><u>F</u>ind:</label>
+            <input id="@($"{Dialog.Id}-find")" class="st-input" style="width:214px" aria-label="Find" value="@_search" @oninput="e => _search = e.Value?.ToString() ?? string.Empty" />
+            <button type="button" class="st-button" style="min-width:70px" @onclick="SearchAsync"><u>S</u>earch</button>
+        </div>
+        <StGrid Id="@($"{Dialog.Id}-grid")" Data="_data" Selected="_selected" SelectedChanged="i => _selected = i" OnActivate="_ => Ok()" Label="@WindowTitle" Style="flex:1 1 auto" />
+        <div style="display:flex; align-items:center; margin-top:4px; gap:6px">
+            <span style="flex:1 1 auto; white-space:pre-wrap" role="status">@_count</span>
+            <button type="button" class="st-button" id="@($"{Dialog.Id}-OK")" @onclick="Ok"><u>O</u>K</button>
+            <button type="button" class="st-button" id="@($"{Dialog.Id}-Cancel")" @onclick="Cancel"><u>C</u>ancel</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string _search = "";
+    private GridData _data = GridData.Empty;
+    private int _selected = -1;
+    private string _count = "";
+
+    [CascadingParameter] public DialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>"master" (MaintCode lookups, LookupProc core.usp_UiLookup) or "named" (AR.CUSTOMER, SO.ORDER ...).</summary>
+    [Parameter] public string Source { get; set; } = "master";
+
+    /// <summary>MaintCode (master) or lookup code (named): core.MaintColumn.LookupArg.</summary>
+    [Parameter] public string Code { get; set; } = "";
+
+    /// <summary>@Argument of a named lookup (an order number for SO.PICKLIST ...).</summary>
+    [Parameter] public string Argument { get; set; } = "";
+
+    /// <summary>Caption of the field the lookup serves.</summary>
+    [Parameter] public string Caption { get; set; } = "";
+
+    private string WindowTitle => Caption.Length > 0 ? "Lookup - " + Caption : "Lookup";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Dialog.KeyHandler = key =>
+        {
+            if (key.Is("Escape")) { Cancel(); return true; }
+            if (key.Is("Enter"))
+            {
+                if (key.TargetId == $"{Dialog.Id}-find") { _ = SearchAsync(); return true; }
+                if (key.TargetTag == "button") return false;
+                Ok();
+                return true;
+            }
+            return key.Key.StartsWith('F') && key.Key.Length <= 3;
+        };
+        await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        if (Code.Length == 0)
+        {
+            _data = GridData.Empty;
+            _selected = -1;
+            _count = "0 record(s).  Double-click or press Enter to select.";
+            return;
+        }
+        var path = string.Equals(Source, "named", StringComparison.OrdinalIgnoreCase)
+            ? $"/api/platform/v1/lookups/named/{Query.Path(Code)}" + Query.Build(("search", _search.Trim()), ("argument", Argument))
+            : $"/api/platform/v1/lookups/master-files/{Query.Path(Code)}" + Query.Build(("search", _search.Trim()));
+        var r = await Api.GetAsync(path);
+        if (!r.IsSuccess)
+        {
+            _count = "*** " + r.Problem!.Detail;
+            StateHasChanged();
+            return;
+        }
+        _data = GridData.FromResultSet(r.Json);
+        _selected = _data.Count > 0 ? 0 : -1;
+        _count = _data.Count + " record(s).  Double-click or press Enter to select.";
+        StateHasChanged();
+    }
+
+    private void Ok()
+    {
+        if (_selected < 0 || _data.Columns.Count == 0) return;
+        Dialog.Close(_data.Text(_selected, _data.Columns[0].Name).Trim());
+    }
+
+    private void Cancel() => Dialog.Close("");
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) await Browser.FocusAsync($"{Dialog.Id}-find");
+    }
+}

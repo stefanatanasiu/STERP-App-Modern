@@ -1,0 +1,2 @@
+ok - A posted invoice is produced as a structured e-invoice carrying the same values  # REQ: AR-029 AC: AC-120
+ok - Re-issuing an e-invoice does not create a second invoice  # REQ: AR-029 AC: AC-120

@@ -1,0 +1,15 @@
+# bom-release
+ok 1 - release without a validation is refused -- REQ: BOM-004
+ok 2 - a failed validation blocks release and names the path -- REQ: BOM-004, BOM-029
+ok 3 - stale validation evidence blocks the release -- REQ: BOM-004, BOM-005
+ok 4 - the author may not sign the engineering review of their own bill -- REQ: BOM-003, BOM-004
+ok 5 - a reviewer without engineering review authority is refused -- REQ: BOM-003, BOM-004
+ok 6 - a releaser without BOM.RELEASE is refused -- REQ: BOM-003, BOM-004
+ok 7 - a validated revision with an independent review is released and stamped -- REQ: BOM-004, BOM-005
+ok 8 - a released revision cannot be released again -- REQ: BOM-004
+ok 9 - a repeated release instruction returns the first outcome and changes nothing -- REQ: BOM-030
+ok 10 - the usage on a released revision may not be changed -- REQ: BOM-004, BOM-028
+ok 11 - a line may not be deleted from a released revision -- REQ: BOM-004, BOM-028
+ok 12 - rewriting the identical engineering content on a released revision is permitted -- REQ: BOM-004
+ok 13 - the superseded revision is kept as history and closed at the new date -- REQ: BOM-028
+# bom-release done

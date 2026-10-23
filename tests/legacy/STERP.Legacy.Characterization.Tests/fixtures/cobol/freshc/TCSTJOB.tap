@@ -1,0 +1,50 @@
+# suite TCSTJOB jobs, budgets and WIP
+ok 1 - JOBCOST refuses an enquiry with no job reference
+ok 2 - A refused enquiry forecasts nothing
+ok 3 - WIPCALC refuses a roll-forward with nothing to roll
+ok 4 - WIPCALC refuses a roll-forward with no period
+ok 5 - A refused roll-forward closes at nothing
+ok 6 - The contract, its sub-job and its costs were built
+ok 7 - The enquiry answers the contract
+ok 8 - The approved budget of 5,000.00 is the baseline
+ok 9 - The draft version of 9,000.00 is not the baseline
+ok 10 - The contract has one sub-job
+ok 11 - Actual cost is 2,100.00 - the sub-job counted once
+ok 12 - Commitments of 900.00 are not actual cost
+ok 13 - The sub-job carries its own 600.00 only
+ok 14 - The sub-job has no budget of its own
+ok 15 - The parent alone carries 1,500.00
+ok 16 - A third job level is refused
+ok 17 - A cost posting of nothing is refused
+ok 18 - JOBCOST refuses an unknown function
+ok 19 - An enquiry on a job that does not exist is refused
+ok 20 - C5 the forecast at completion is 3,000.00
+ok 21 - C5 the forecast variance is 2,000.00 favourable
+ok 22 - C5 a favourable forecast is not flagged adverse
+ok 23 - C5 the four parts of the forecast add up
+ok 24 - A labour cost of 2,400.00 is posted to the job
+ok 25 - Actual cost has risen to 4,500.00
+ok 26 - The forecast at completion is now 5,400.00
+ok 27 - The overrun of 400.00 is reported as adverse
+ok 28 - An overrun is flagged, never silently blocked
+ok 29 - C6 the roll-forward is calculated
+ok 30 - C6 the opening balance is last period's closing
+ok 31 - C6 material issues of 800.00 went in
+ok 32 - C6 material returns of 100.00 came back out
+ok 33 - C6 labour of 300.00 was absorbed
+ok 34 - C6 overhead of 150.00 was absorbed
+ok 35 - C6 subcontract of 50.00 was absorbed
+ok 36 - C6 the completion transfer of 900.00 left WIP
+ok 37 - C6 scrap of 60.00 left WIP
+ok 38 - C6 the write-off of 40.00 left WIP
+ok 39 - C6 additions are 1,300.00
+ok 40 - C6 deductions are 1,100.00
+ok 41 - C6 the closing balance is 1,200.00
+ok 42 - C6 the roll-forward identity holds
+ok 43 - C6 the balance is posted
+ok 44 - C6 the stored balance reads back at 1,200.00
+ok 45 - C6 a closure now would strand 1,200.00
+ok 46 - C6 the residual is held, not quietly discarded
+1..46
+# TCSTJOB jobs, budgets and WIP passed 00046 failed 00000
+# exit 0

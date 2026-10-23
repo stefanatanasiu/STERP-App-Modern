@@ -1,0 +1,34 @@
+# suite po POAPPRV
+ok 1 - PO-006 the order content is reduced to a hash
+ok 2 - PO-006 the order value is read from the order
+ok 3 - PO-006 the live line is counted
+ok 4 - PO-006 the same content hashes the same way
+ok 5 - PO-006 an unapproved order is not a commitment
+ok 6 - PO-006 the check holds the order (06)
+ok 7 - PO-006 and carries reason APV0011
+ok 8 - PO-006 the request awaits a decision
+ok 9 - PO-006 an approval request is recorded
+ok 10 - D-07 the matrix names the required permission
+ok 11 - PO-006 the order is now awaiting approval
+ok 12 - D-07 a decision needs a named approver
+ok 13 - D-07 and an explicit approve or reject
+ok 14 - D-07 the preparer cannot approve their own order
+ok 15 - D-07 self approval carries reason APV0007
+ok 16 - D-07 the order is still awaiting approval
+ok 17 - D-07 an independent approver can approve it
+ok 18 - PO-006 an approved order returns 00
+ok 19 - PO-006 the order status becomes APPROVED
+ok 20 - PO-006 the check now answers APPROVED
+ok 21 - PO-007 a note does not invalidate the approval
+ok 22 - PO-007 and the content hash is unchanged
+ok 23 - PO-007 a changed value needs approving again
+ok 24 - PO-007 the check holds the order (06)
+ok 25 - PO-007 and carries reason APV0006
+ok 26 - PO-007 the old approval is marked invalidated
+ok 27 - PO-007 the hash of the changed order differs
+ok 28 - PO-007 re-requesting invalidates the old approval
+ok 29 - PO-006 an order that does not exist is not found
+ok 30 - PO-006 an unsupported function is refused
+1..30
+# po POAPPRV passed 00030 failed 00000
+# exit 0

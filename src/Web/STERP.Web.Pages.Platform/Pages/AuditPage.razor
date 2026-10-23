@@ -1,0 +1,44 @@
+@inherits StListPage
+@* frmAudit (page:platform/audit, FR-STERP-PLATFORM-040): Entity, Key, User, From and To (dd/MM/yyyy; the business date minus
+   one month and the business date); a date that does not parse falls back to today minus five years / today. *@
+<StListLayout Title="@Window.Title" Data="Data" Selected="Selected" SelectedChanged="OnSelectedChanged" OnRefresh="RefreshAsync" OnClose="CloseFromToolbarAsync">
+    <Filters>
+        <StTextField Caption="&Entity:" Inline="true" Width="110" @bind-Value="_entity" Id="@Uid("entity")" />
+        <StTextField Caption="&Key:" Inline="true" Width="110" @bind-Value="_key" Id="@Uid("key")" />
+        <StTextField Caption="&User:" Inline="true" Width="80" @bind-Value="_user" Id="@Uid("user")" />
+        <StTextField Caption="Fro&m:" Inline="true" Width="80" @bind-Value="_from" Id="@Uid("from")" />
+        <StTextField Caption="&To:" Inline="true" Width="80" @bind-Value="_to" Id="@Uid("to")" />
+    </Filters>
+</StListLayout>
+
+@code {
+    private string _entity = "";
+    private string _key = "";
+    private string _user = "";
+    private string _from = "";
+    private string _to = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Window.SetTitle("Audit Enquiry");
+        _from = Date(Session.BusinessDate.AddMonths(-1));
+        _to = Date(Session.BusinessDate);
+    }
+
+    protected override Task LoadDataAsync() => GuardAsync(async () =>
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var d1 = UkFormat.ParseDate(_from) ?? today.AddYears(-5);
+        var d2 = UkFormat.ParseDate(_to) ?? today;
+        var r = await Api.GetAsync("/api/platform/v1/audit-entries" + Query.Build(
+            ("entityType", _entity.Trim()), ("entityKey", _key.Trim()),
+            ("fromDate", d1.ToString("yyyy-MM-dd", UkFormat.Culture)), ("toDate", d2.ToString("yyyy-MM-dd", UkFormat.Culture)),
+            ("userCode", _user.Trim())));
+        if (!r.IsSuccess) throw new ApiFailure(r);
+        Populate(GridData.FromItems(r.Json,
+            new GridColumn("eventTime", kind: "STAMP"), new GridColumn("userCode"), new GridColumn("companyCode"),
+            new GridColumn("entityType"), new GridColumn("entityKey"), new GridColumn("action"), new GridColumn("fieldName"),
+            new GridColumn("oldValue"), new GridColumn("newValue"), new GridColumn("reason"), new GridColumn("source")));
+    });
+}

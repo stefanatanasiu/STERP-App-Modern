@@ -1,0 +1,3870 @@
+{
+  "schema": "sterp-parity-cases/1",
+  "target_application_id": "STERP-BOM",
+  "requirements": [
+    {
+      "requirement_id": "FR-STERP-BOM-001",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-001-AC1",
+          "ac": 1,
+          "title": "bom contract: drift check clean; released header change refused E-BOM0413; retiring with pending impact E-BOM0414",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "ready",
+              "call": "api_getReadiness"
+            },
+            {
+              "save": "frozen",
+              "call": "platform_saveMaintenanceRow",
+              "path": {
+                "maintCode": "BOM.HEADER"
+              },
+              "body": {
+                "mode": "CHANGE",
+                "values": {
+                  "CompanyCode": "STC",
+                  "BomRef": "BOM-DEMO-FRAME",
+                  "BomRevision": "A",
+                  "Description": "A07 edited description"
+                }
+              }
+            },
+            {
+              "sql": "INSERT bom.BomChangeImpact (CompanyCode, ChangeRef, ImpactType, BomHeaderId, ParentItemCode, DocumentType, DocumentRef, Decision) SELECT 'STC', 'ECO-BOMDEMO-001', 'KIT', h.BomHeaderId, h.ParentItemCode, 'KIT', 'A07-KIT-IMPACT', 'PENDING' FROM bom.BomHeader h WHERE h.CompanyCode = 'STC' AND h.BomRef = 'BOM-DEMO-B4TC' AND h.BomRevision = 'A'"
+            },
+            {
+              "save": "retire",
+              "call": "platform_saveMaintenanceRow",
+              "path": {
+                "maintCode": "BOM.HEADER"
+              },
+              "body": {
+                "mode": "CHANGE",
+                "values": {
+                  "CompanyCode": "STC",
+                  "BomRef": "BOM-DEMO-B4TC",
+                  "BomRevision": "A",
+                  "Status": "RETIRED"
+                }
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ready",
+              "status": 200
+            },
+            {
+              "on": "ready",
+              "json": "$.checks[*].name",
+              "equals": "schema-drift"
+            },
+            {
+              "on": "ready",
+              "json": "$.driftDifferences",
+              "count": 0
+            },
+            {
+              "on": "frozen",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-BOM0413",
+                "detailContains": "a released bill revision is immutable"
+              }
+            },
+            {
+              "sql": "SELECT Description FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BOM-DEMO-FRAME' AND BomRevision = 'A'",
+              "equals": "B1 frame assembly, ten gross frames per batch"
+            },
+            {
+              "on": "retire",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-BOM0414",
+                "detailContains": "cannot be retired"
+              }
+            },
+            {
+              "sql": "SELECT Status FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BOM-DEMO-B4TC' AND BomRevision = 'A'",
+              "equals": "DRAFT"
+            }
+          ],
+          "derivation": "AC text with the frozen-contract drift check (contracts 6.11) and db/triggers/bom/tr_BomReleasedImmutable.sql (tr_BomHeaderReleasedImmutable THROW 51431 'STERP-E-BOM0413: a released bill revision is immutable...', tr_BomHeaderRetireCheck THROW 51432 'STERP-E-BOM0414: ... cannot be retired' for a PENDING bom.BomChangeImpact row) reached through the generic BOM.HEADER save (33-bom-maintdef.sql) on the RELEASED BOM-DEMO-FRAME/A and the DRAFT BOM-DEMO-B4TC/A (31-bom-structures.sql); component rows have no target write surface (the editor has no edit facility and previews roll back), so the component half of the clause is pinned by the same trigger family only through the header.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-002",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-002-AC1",
+          "ac": 1,
+          "title": "Bills of Material menu: nine items and Ctrl+E for a full holder, ENGINEER without Engineering Changes, six routings",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "navigation",
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "menu",
+              "gui": "/",
+              "actions": [
+                {
+                  "click": "Bills of Material"
+                }
+              ]
+            },
+            {
+              "save": "cmp",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Revision Comparison..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "hdr",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Bill Headers (list)..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "chg",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Engineering Changes..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "r010",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Indented Parts List..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "r020",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Costed Explosion..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "engmenu",
+              "call": "platform_getMenu",
+              "as": "ENGINEER"
+            },
+            {
+              "save": "engperm",
+              "call": "platform_checkPermissions",
+              "body": {
+                "permissionCodes": [
+                  "BOM.CHANGE.APPROVE"
+                ]
+              },
+              "as": "ENGINEER"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "menu",
+              "text": "Bill Maintenance..."
+            },
+            {
+              "on": "menu",
+              "text": "Bill Headers (list)..."
+            },
+            {
+              "on": "menu",
+              "text": "Explosion Enquiry..."
+            },
+            {
+              "on": "menu",
+              "text": "Ctrl+E"
+            },
+            {
+              "on": "menu",
+              "text": "Where Used Enquiry..."
+            },
+            {
+              "on": "menu",
+              "text": "Revision Comparison..."
+            },
+            {
+              "on": "menu",
+              "text": "Engineering Changes..."
+            },
+            {
+              "on": "menu",
+              "text": "Bulk Change Preview..."
+            },
+            {
+              "on": "menu",
+              "text": "Indented Parts List..."
+            },
+            {
+              "on": "menu",
+              "text": "Costed Explosion..."
+            },
+            {
+              "on": "cmp",
+              "text": "Bill Revision Comparison"
+            },
+            {
+              "on": "hdr",
+              "text": "Bill of material headers"
+            },
+            {
+              "on": "hdr",
+              "text": "[BOM.HEADER]"
+            },
+            {
+              "on": "chg",
+              "text": "Engineering changes"
+            },
+            {
+              "on": "chg",
+              "text": "[BOM.CHANGE]"
+            },
+            {
+              "on": "r010",
+              "text": "Indented explosion (parts list)"
+            },
+            {
+              "on": "r020",
+              "text": "Costed explosion roll-up"
+            },
+            {
+              "on": "engmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "BOM.EDIT"
+            },
+            {
+              "on": "engmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "BOM.HEADERS"
+            },
+            {
+              "on": "engmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "BOM.EXPLODE"
+            },
+            {
+              "on": "engmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "BOM.WHEREUSED"
+            },
+            {
+              "on": "engmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "BOM.COMPARE"
+            },
+            {
+              "on": "engmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "BOM.CHANGE.PREVIEW"
+            },
+            {
+              "on": "engmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "BOM.RPT.INDENT"
+            },
+            {
+              "on": "engmenu",
+              "json": "$.items[*].menuCode",
+              "equals": "BOM.RPT.COSTED"
+            },
+            {
+              "on": "engmenu",
+              "notText": "\"BOM.CHANGE\""
+            },
+            {
+              "on": "engperm",
+              "json": "$.items[0].allowed",
+              "equals": false
+            }
+          ],
+          "derivation": "AC text with db/seed/32-bom-menu.sql:18-27 (nine rows, SortOrder 10-100, Ctrl+E on BOM.EXPLODE, arguments COMPARE, BOM.HEADER, BOM.CHANGE, BOMRP010, BOMRP020), the comparison title of frmBomExplosion (STERP-BOM.md FR-STERP-BOM-021), the generic page title '<Title>  [<MaintCode>]' with the 33-bom-maintdef.sql titles, the report launcher narrowed to one catalogue row (ReportService.vb:29-41; 32-bom-menu.sql:45-50 titles) and the ENGINEER grants of 03-core-roles-users.sql:52 (no BOM.CHANGE.APPROVE); SYSADM holds all seven BOM permissions (03-core-roles-users.sql:27).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-010",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-010-AC1",
+          "ac": 1,
+          "title": "Explosion: commuter bike INDENTED/SINGLE/LEAF, unknown item and negative quantity refused, INCOMPLETE outcome masking",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "ind",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "single",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "view": "SINGLE",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "leaf",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "view": "LEAF",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "unknown",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "A07-NO-SUCH-ITEM"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "negative",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": -1,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "multi",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 2
+              }
+            },
+            {
+              "save": "onewin",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-DEEP-00"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 3
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ind",
+              "status": 200
+            },
+            {
+              "on": "ind",
+              "json": "$.data.occurrences",
+              "equals": 95
+            },
+            {
+              "on": "ind",
+              "json": "$.data.depthReached",
+              "equals": 4
+            },
+            {
+              "on": "ind",
+              "json": "$.data.completeness",
+              "equals": "COMPLETE"
+            },
+            {
+              "on": "ind",
+              "json": "$.data.lines[*].required",
+              "equals": 11
+            },
+            {
+              "on": "ind",
+              "json": "$.data.lines[0].level",
+              "equals": 0
+            },
+            {
+              "on": "ind",
+              "json": "$.data.lines[0].kind",
+              "equals": "INTERMED"
+            },
+            {
+              "on": "ind",
+              "json": "$.data.lines[0].stopReason",
+              "equals": "ROOT"
+            },
+            {
+              "on": "single",
+              "json": "$.data.lines",
+              "count": 30
+            },
+            {
+              "on": "single",
+              "json": "$.data.lines[0].level",
+              "equals": 1
+            },
+            {
+              "on": "single",
+              "json": "$.data.lines[29].level",
+              "equals": 1
+            },
+            {
+              "on": "leaf",
+              "json": "$.data.lines[0].level",
+              "equals": 0
+            },
+            {
+              "on": "unknown",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "BOM0504"
+              }
+            },
+            {
+              "on": "negative",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "BOM0503",
+                "detailContains": "Required good output cannot be negative"
+              }
+            },
+            {
+              "on": "multi",
+              "status": 200
+            },
+            {
+              "on": "multi",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "multi",
+              "json": "$.data.completeness",
+              "equals": "INCOMPLETE"
+            },
+            {
+              "on": "multi",
+              "json": "$.data.lines[25].level",
+              "exists": true
+            },
+            {
+              "on": "onewin",
+              "status": 200
+            },
+            {
+              "on": "onewin",
+              "outcome": {
+                "returnCode": 4,
+                "reasonCode": "BOM0520"
+              }
+            },
+            {
+              "on": "onewin",
+              "json": "$.data.completeness",
+              "equals": "INCOMPLETE"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomExplosion",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with BomService.vb:138-195 and BOMLEAF/BOMEXPL (root occurrence level 0 INTERMED ROOT, BOMEXPL.cob:370-416; SINGLE = level-1 occurrences; FLATTEN leaves at level 0; BOM0504/BOM0503 'Required good output cannot be negative'; DEPTHLIMIT BOM0520; outcome of the last engine call) on BK-COMMUTE-M (30 direct lines, 90-bom-showcase.sql:226-255; 97 % frame yield, demo 95 occurrences, depth 4, 11 frames for 10 bikes, docs/DEMO-WORKFLOWS.md:69) and the DEMO-DEEP chain (31-bom-structures.sql:47-50,117-121); STORE is never sent, so bom.BomExplosion stays empty.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-BOM-010-EDGE-NUMERIC-SCALE",
+          "ac": null,
+          "title": "A quantity with seven decimals is rounded half away from zero to the six-decimal COMMAREA scale of the root",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "numeric-scale"
+          ],
+          "steps": [
+            {
+              "save": "scale",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 2.0000005,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "scale",
+              "status": 200
+            },
+            {
+              "on": "scale",
+              "json": "$.data.lines[0].stopReason",
+              "equals": "ROOT"
+            },
+            {
+              "on": "scale",
+              "json": "$.data.lines[0].required",
+              "equals": 2.000001
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-with-scale rule (CobolCodec.cs:24-29 half away from zero) on BL-REQ-QTY PIC S9(15)V9(6) (BOMLEAFCA.cpy:34), which BOMEXPL copies unchanged into the root occurrence's required quantity (BOMEXPL.cob:370-395).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-BOM-010-EDGE-NUMERIC-MAGNITUDE",
+          "ac": null,
+          "title": "A 16-digit quantity keeps its low-order 15 integer digits in the COMMAREA and in the root occurrence",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "numeric-magnitude"
+          ],
+          "steps": [
+            {
+              "save": "big",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-DEEP-19"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1234567890123456,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "big",
+              "status": 200
+            },
+            {
+              "on": "big",
+              "json": "$.data.lines[0].required",
+              "equals": 234567890123456
+            }
+          ],
+          "derivation": "Contracts 4.4 numeric-too-large rule (CobolCodec.cs:76-79 high-order truncation) on BL-REQ-QTY PIC S9(15)V9(6) (BOMLEAFCA.cpy:34) copied to the root occurrence (BOMEXPL.cob:370-395); DEMO-DEEP-19 has one purchased child at usage two, so the explosion stays within the field sizes.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-BOM-010-EDGE-RECORD-WINDOWS",
+          "ac": null,
+          "title": "An explosion larger than the 25-line GETLINE window is returned complete in one response: 95 lines for the bike",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "edge-record"
+          ],
+          "steps": [
+            {
+              "save": "all",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "all",
+              "status": 200
+            },
+            {
+              "on": "all",
+              "json": "$.data.lines",
+              "count": 95
+            },
+            {
+              "on": "all",
+              "json": "$.data.lines[94].level",
+              "exists": true
+            }
+          ],
+          "derivation": "Edge record of the explosion result (STERP-BOM.md section 10: more than 25 lines): the facade pages BOMLEAF GETLINE windows of 25 and the API returns every line in engine order (bom_explodeBill description; BomService.vb:138-195), 95 displayed occurrences for ten FG-BIKE-COMMUTE-M (docs/DEMO-WORKFLOWS.md:69).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-011",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-011-AC1",
+          "ac": 1,
+          "title": "Costed roll-up: bike 568.25 and cake 50.20 per unit, ten DEMO-FRAME 100.10/10.01 with conversion 40.00, missing rate",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "bike",
+              "call": "bom_costBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "costSet": "BOMDEMO"
+              }
+            },
+            {
+              "save": "cake",
+              "call": "bom_costBill",
+              "path": {
+                "parentItemCode": "FG-CAKE-CELEB-8IN"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 12,
+                "effectiveDate": "2026-10-07",
+                "costSet": "BOMDEMO"
+              }
+            },
+            {
+              "save": "frame",
+              "call": "bom_costBill",
+              "path": {
+                "parentItemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "costSet": "BOMDEMO"
+              }
+            },
+            {
+              "save": "norate",
+              "call": "bom_costBill",
+              "path": {
+                "parentItemCode": "DEMO-OPT-TOP"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "costSet": "BOMDEMO"
+              }
+            },
+            {
+              "save": "unknown",
+              "call": "bom_costBill",
+              "path": {
+                "parentItemCode": "A07-NO-SUCH-ITEM"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "costSet": "BOMDEMO"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "bike",
+              "status": 200
+            },
+            {
+              "on": "bike",
+              "json": "$.data.unitCost",
+              "gte": 568.245
+            },
+            {
+              "on": "bike",
+              "json": "$.data.unitCost",
+              "lte": 568.255
+            },
+            {
+              "on": "cake",
+              "status": 200
+            },
+            {
+              "on": "cake",
+              "json": "$.data.unitCost",
+              "gte": 50.195
+            },
+            {
+              "on": "cake",
+              "json": "$.data.unitCost",
+              "lte": 50.205
+            },
+            {
+              "on": "frame",
+              "status": 200
+            },
+            {
+              "on": "frame",
+              "json": "$.data.materialCost",
+              "equals": 70.1
+            },
+            {
+              "on": "frame",
+              "json": "$.data.conversionCost",
+              "equals": 40.0
+            },
+            {
+              "on": "frame",
+              "json": "$.data.totalCost",
+              "equals": 100.1
+            },
+            {
+              "on": "frame",
+              "json": "$.data.unitCost",
+              "equals": 10.01
+            },
+            {
+              "on": "norate",
+              "status": 200
+            },
+            {
+              "on": "norate",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "norate",
+              "json": "$.data.completeness",
+              "equals": "INCOMPLETE"
+            },
+            {
+              "on": "norate",
+              "json": "$.data.missingRates",
+              "gte": 1
+            },
+            {
+              "on": "unknown",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "BOM0504"
+              }
+            }
+          ],
+          "derivation": "AC text with BOMCOST.cob:114-298 and BomService.vb:247-308 (conversion reported as conversion + setup, SME-640; BOM0810 masked by the last GETLINE), TBOMCOST B1 (material 70.10, conversion 30.00, setup 10.00, total 100.10, unit 10.01; cobol/tests/bom/TBOMCOST.cob:90-122) on the BOMDEMO rates of db/seed/90-bom-demo.sql, the COSTONLY DEMO-OVERHEAD line without a rate (31-bom-structures.sql:112) and the demo unit costs 568.25 and 50.20 (docs/DEMO-WORKFLOWS.md:69-70), compared at the two decimals the demo shows.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-012",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-012-AC1",
+          "ac": 1,
+          "title": "Netted plan: bike not buildable, B2 frames short of plate with the five stocked braces used once, cycle 422 BOM0710",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "bike",
+              "call": "bom_netBillRequirement",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "quantity": 10,
+                "effectiveDate": "2026-10-07"
+              }
+            },
+            {
+              "sql": "SET NOCOUNT ON; UPDATE inv.StockBalance SET QtyOnHand = 0 WHERE CompanyCode = 'STC' AND SiteCode = 'RDG' AND Revision = 'A' AND ItemCode IN ('DEMO-FRAME', 'DEMO-BRACE', 'DEMO-PLATE', 'DEMO-PIN', 'DEMO-RESIN', 'DEMO-CLEAN', 'DEMO-LABEL');"
+            },
+            {
+              "save": "b2",
+              "call": "bom_netBillRequirement",
+              "path": {
+                "parentItemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "quantity": 10,
+                "effectiveDate": "2026-10-07"
+              }
+            },
+            {
+              "save": "cycle",
+              "call": "bom_netBillRequirement",
+              "path": {
+                "parentItemCode": "DEMO-B6-CYC"
+              },
+              "body": {
+                "quantity": 1,
+                "effectiveDate": "2026-10-07"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "bike",
+              "status": 200
+            },
+            {
+              "on": "bike",
+              "json": "$.data.maxBuildable",
+              "equals": 0
+            },
+            {
+              "on": "b2",
+              "status": 200
+            },
+            {
+              "on": "b2",
+              "outcome": {
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "b2",
+              "json": "$.data.shortages",
+              "gte": 1
+            },
+            {
+              "on": "b2",
+              "json": "$.data.maxBuildable",
+              "equals": 0
+            },
+            {
+              "on": "b2",
+              "json": "$.data.lines[*].stockUsed",
+              "equals": 5
+            },
+            {
+              "on": "b2",
+              "json": "$.data.lines[*].shortage",
+              "equals": 0.36
+            },
+            {
+              "on": "cycle",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "BOM0710",
+                "detailContains": "The netted plan could not be completed"
+              }
+            },
+            {
+              "on": "cycle",
+              "bodyContains": "returns to DEMO-B6-CYC"
+            }
+          ],
+          "derivation": "AC text with BOMNET.cob:230-381 (finished-parent stock first, NET explosion taking eligible supply once through BOMSUPPL, maximum buildable 0, BOM0711 masked by the last GETLINE, BOM0710 'The netted plan could not be completed: <error path>') and TBOMNET B2 (ten frames: five stocked braces used, plate 8.36 kg short by 0.36; cobol/tests/bom/TBOMNET.cob:109-152) on the B2 live balances of db/seed/90-bom-demo.sql:56-75 and the B6 cycle DEMO-B6-CYC -> DEMO-B6-LOOP -> DEMO-B6-CYC (BOMEXPL.cob:1147-1172 '<path>/<item> returns to <item>'); fresh holds 18 revision-A DEMO-FRAME and revision-A component balances besides the B2 trial-sized blank-revision balances, and BOMSUPPL LIVE sums every revision (BOMSUPPL.cob:134-183), so the frames were taken from parent stock and nothing was exploded; the arrangement sets the RDG revision-A balances of the seven B2 items to 0, leaving exactly the TBOMNET B2 supply (no frame, 5 braces, 8.000 kg plate, 60 pins, 0.400 l resin, 0.500 l cleaner, 12 labels), on which the legacy route BomService.NettedPlan observed b2 RC 0, maxBuildable 0, one shortage, DEMO-BRACE stockUsed 5 and DEMO-PLATE shortage 0.36, the bike maxBuildable 0 and the cycle RC 8 BOM0710 '...DEMO-B6-LOOP/DEMO-B6-CYC returns to DEMO-B6-CYC' (amendment evidence p4/runs/rg015-bom012-amended-legacy-route.txt; as authored: rg015-bom012-authored-legacy-route.txt); every bike line equals the legacy oracle only after capture. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-015: arrange the TBOMNET B2 supply on the live balances; the fresh parent stock covered the demand]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-013",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-013-AC1",
+          "ac": 1,
+          "title": "Where used DEMO-PIN: nine rows, six direct, deepest 2; released only six rows; maxLevels 0 and 30 apply 12 levels",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "all",
+              "call": "bom_getWhereUsed",
+              "path": {
+                "componentItemCode": "DEMO-PIN"
+              },
+              "query": {
+                "asOf": "2026-10-07",
+                "maxLevels": 25,
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "rel",
+              "call": "bom_getWhereUsed",
+              "path": {
+                "componentItemCode": "DEMO-PIN"
+              },
+              "query": {
+                "asOf": "2026-10-07",
+                "maxLevels": 25,
+                "includeDraft": false
+              }
+            },
+            {
+              "save": "deep",
+              "call": "bom_getWhereUsed",
+              "path": {
+                "componentItemCode": "DEMO-DEEP-20"
+              },
+              "query": {
+                "asOf": "2026-10-07",
+                "maxLevels": 25,
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "zero",
+              "call": "bom_getWhereUsed",
+              "path": {
+                "componentItemCode": "DEMO-DEEP-20"
+              },
+              "query": {
+                "asOf": "2026-10-07",
+                "maxLevels": 0,
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "thirty",
+              "call": "bom_getWhereUsed",
+              "path": {
+                "componentItemCode": "DEMO-DEEP-20"
+              },
+              "query": {
+                "asOf": "2026-10-07",
+                "maxLevels": 30,
+                "includeDraft": true
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "all",
+              "status": 200
+            },
+            {
+              "on": "all",
+              "json": "$.count",
+              "equals": 9
+            },
+            {
+              "on": "all",
+              "json": "$.items[5].level",
+              "equals": 1
+            },
+            {
+              "on": "all",
+              "json": "$.items[5].isDirect",
+              "equals": true
+            },
+            {
+              "on": "all",
+              "json": "$.items[6].level",
+              "equals": 2
+            },
+            {
+              "on": "all",
+              "json": "$.items[6].isDirect",
+              "equals": false
+            },
+            {
+              "on": "all",
+              "json": "$.items[8].level",
+              "equals": 2
+            },
+            {
+              "on": "rel",
+              "json": "$.count",
+              "equals": 6
+            },
+            {
+              "on": "rel",
+              "json": "$.items[2].bomRef",
+              "equals": "BOM-DEMO-OPT"
+            },
+            {
+              "on": "rel",
+              "json": "$.items[3].parentItemCode",
+              "equals": "DEMO-PACK"
+            },
+            {
+              "on": "deep",
+              "json": "$.count",
+              "equals": 20
+            },
+            {
+              "on": "zero",
+              "json": "$.count",
+              "equals": 12
+            },
+            {
+              "on": "zero",
+              "json": "$.items[11].level",
+              "equals": 12
+            },
+            {
+              "on": "thirty",
+              "json": "$.count",
+              "equals": 12
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomExplosion",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with db/procs/bom/usp_BomWhereUsed.sql:16-66 (level 1 = bills quoting the item, drafts only when @IncludeDraft = 1, half-open effectivity, @MaxLevels outside 1..25 -> 12, ORDER BY Level, ParentItemCode, BomRef, BomRevision, first result set only) on the DEMO-PIN users of 31-bom-structures.sql (BRACE, FRAME, NOBOM draft, OPT-TOP via BDY/B draft and OPT/A, PACK; level 2 ERR-TOP and FRAME twice; demo six direct, nine rows, two levels, docs/DEMO-WORKFLOWS.md:71) and the 20-edge DEMO-DEEP chain.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-014",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-014-AC1",
+          "ac": 1,
+          "title": "Revision comparison A/B at BOMDEMO lists DEMO-PIN CHANGED with cost impact 0.25; missing and identical revisions refused",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "ab",
+              "call": "bom_compareBillRevisions",
+              "path": {
+                "bomRef": "BOM-DEMO-BDY"
+              },
+              "query": {
+                "fromRevision": "A",
+                "toRevision": "B",
+                "costSetCode": "BOMDEMO"
+              }
+            },
+            {
+              "save": "missing",
+              "call": "bom_compareBillRevisions",
+              "path": {
+                "bomRef": "BOM-DEMO-BDY"
+              },
+              "query": {
+                "fromRevision": "A",
+                "toRevision": "Z",
+                "costSetCode": "BOMDEMO"
+              }
+            },
+            {
+              "save": "same",
+              "call": "bom_compareBillRevisions",
+              "path": {
+                "bomRef": "BOM-DEMO-BDY"
+              },
+              "query": {
+                "fromRevision": "A",
+                "toRevision": "A",
+                "costSetCode": "BOMDEMO"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ab",
+              "status": 200
+            },
+            {
+              "on": "ab",
+              "json": "$.count",
+              "equals": 1
+            },
+            {
+              "on": "ab",
+              "json": "$.items[0].changeType",
+              "equals": "CHANGED"
+            },
+            {
+              "on": "ab",
+              "json": "$.items[0].componentItemCode",
+              "equals": "DEMO-PIN"
+            },
+            {
+              "on": "ab",
+              "json": "$.items[0].qtyDifference",
+              "equals": 1
+            },
+            {
+              "on": "ab",
+              "json": "$.items[0].unitCost",
+              "equals": 0.25
+            },
+            {
+              "on": "ab",
+              "json": "$.items[0].costImpact",
+              "equals": 0.25
+            },
+            {
+              "on": "missing",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-BOM0901"
+              }
+            },
+            {
+              "on": "missing",
+              "outcome": {
+                "severity": "E"
+              }
+            },
+            {
+              "on": "same",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-BOM0902"
+              }
+            }
+          ],
+          "derivation": "AC text with db/procs/bom/usp_BomCompareRevisions.sql:14-91 (THROW 51421 E-BOM0901, 51422 E-BOM0902, cost impact = unit cost x quantity difference) on the AC-086 boundary bill BOM-DEMO-BDY (revision A one DEMO-PIN, revision B two; 31-bom-structures.sql:44-45,114-115) and the BOMDEMO DEMO-PIN rate 0.25 (90-bom-demo.sql), matching the bom_compareBillRevisions example row.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-015",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-015-AC1",
+          "ac": 1,
+          "title": "Bill reads: BK-COMMUTE-M blank revision is A RELEASED frozen; revisions newest first; empty filters; ordered lines",
+          "layer": "component",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "hdr",
+              "call": "bom_getBillHeader",
+              "path": {
+                "bomRef": "BK-COMMUTE-M"
+              },
+              "query": {
+                "revision": "",
+                "asOf": "2026-10-19"
+              }
+            },
+            {
+              "save": "revs",
+              "call": "bom_listBillRevisions",
+              "query": {
+                "bomRef": "",
+                "parentItemCode": "DEMO-OPT-TOP",
+                "asOf": "2026-10-19"
+              }
+            },
+            {
+              "save": "none",
+              "call": "bom_listBillRevisions",
+              "query": {
+                "bomRef": "",
+                "parentItemCode": "",
+                "asOf": "2026-10-19"
+              }
+            },
+            {
+              "save": "unknown",
+              "call": "bom_getBillHeader",
+              "path": {
+                "bomRef": "A07-NO-SUCH-BILL"
+              },
+              "query": {
+                "revision": "",
+                "asOf": "2026-10-19"
+              }
+            },
+            {
+              "save": "lines",
+              "call": "bom_listBillComponents",
+              "path": {
+                "bomRef": "BOM-DEMO-FRAME"
+              },
+              "query": {
+                "revision": "A",
+                "asOf": "2026-10-19"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "hdr",
+              "status": 200
+            },
+            {
+              "on": "hdr",
+              "json": "$.count",
+              "equals": 1
+            },
+            {
+              "on": "hdr",
+              "json": "$.items[0].bomRevision",
+              "equals": "A"
+            },
+            {
+              "on": "hdr",
+              "json": "$.items[0].status",
+              "equals": "RELEASED"
+            },
+            {
+              "on": "hdr",
+              "json": "$.items[0].isFrozen",
+              "equals": true
+            },
+            {
+              "on": "hdr",
+              "json": "$.items[0].parentDescription",
+              "equals": "Complete bicycle, commuter, medium"
+            },
+            {
+              "on": "hdr",
+              "json": "$.items[0].stockUom",
+              "equals": "EA"
+            },
+            {
+              "on": "revs",
+              "json": "$.count",
+              "equals": 3
+            },
+            {
+              "on": "revs",
+              "json": "$.items[0].bomRef",
+              "equals": "BOM-DEMO-BDY"
+            },
+            {
+              "on": "revs",
+              "json": "$.items[0].bomRevision",
+              "equals": "B"
+            },
+            {
+              "on": "revs",
+              "json": "$.items[1].bomRevision",
+              "equals": "A"
+            },
+            {
+              "on": "revs",
+              "json": "$.items[2].bomRef",
+              "equals": "BOM-DEMO-OPT"
+            },
+            {
+              "on": "none",
+              "json": "$.count",
+              "equals": 0
+            },
+            {
+              "on": "unknown",
+              "json": "$.count",
+              "equals": 0
+            },
+            {
+              "on": "lines",
+              "json": "$.count",
+              "equals": 4
+            },
+            {
+              "on": "lines",
+              "json": "$.items[0].lineNum",
+              "equals": 10
+            },
+            {
+              "on": "lines",
+              "json": "$.items[3].lineNum",
+              "equals": 40
+            },
+            {
+              "on": "lines",
+              "json": "$.items[0].lineKind",
+              "equals": "Manufactured subassembly"
+            },
+            {
+              "on": "lines",
+              "json": "$.items[0].stockUnitQty",
+              "equals": 2
+            },
+            {
+              "on": "lines",
+              "json": "$.items[0].qtyPerNominalUnit",
+              "equals": 2
+            },
+            {
+              "on": "lines",
+              "json": "$.items[1].lineKind",
+              "equals": "Phantom group"
+            }
+          ],
+          "derivation": "AC text with db/procs/bom/usp_BomStructure.sql (REVISIONS ordered by BomRef, EffectiveFrom DESC, BomRevision DESC and empty without a filter; HEADER resolving a blank revision released first; LINES by LineNum from bom.vw_BomComponentUsage, db/views/bom/vw_BomEnquiry.sql LineKind/StockUnitQty/QtyPerNominalUnit) on BK-COMMUTE-M/A (90-bom-showcase.sql:147,172; item 21-itm-items-b.sql:48), the DEMO-OPT-TOP bills BOM-DEMO-BDY A/B and BOM-DEMO-OPT A and the four BOM-DEMO-FRAME lines (31-bom-structures.sql:82-85).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-BOM-015-EDGE-DATE-BOUNDARY",
+          "ac": null,
+          "title": "Half-open effectivity: BOM-DEMO-BDY resolves to revision A on 2026-06-30 and to draft revision B on 2026-07-01",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "date-boundary"
+          ],
+          "steps": [
+            {
+              "save": "before",
+              "call": "bom_getBillHeader",
+              "path": {
+                "bomRef": "BOM-DEMO-BDY"
+              },
+              "query": {
+                "revision": "",
+                "asOf": "2026-06-30"
+              }
+            },
+            {
+              "save": "on",
+              "call": "bom_getBillHeader",
+              "path": {
+                "bomRef": "BOM-DEMO-BDY"
+              },
+              "query": {
+                "revision": "",
+                "asOf": "2026-07-01"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "before",
+              "json": "$.items[0].bomRevision",
+              "equals": "A"
+            },
+            {
+              "on": "before",
+              "json": "$.items[0].status",
+              "equals": "RELEASED"
+            },
+            {
+              "on": "on",
+              "json": "$.items[0].bomRevision",
+              "equals": "B"
+            },
+            {
+              "on": "on",
+              "json": "$.items[0].isFrozen",
+              "equals": false
+            }
+          ],
+          "derivation": "Date boundary of the AC-086 bill (revision A effective 2026-01-01 to 2026-07-01, revision B DRAFT from 2026-07-01; 31-bom-structures.sql:41-45) under usp_BomStructure's blank-revision resolution EffectiveFrom <= @AsOf AND (EffectiveTo IS NULL OR EffectiveTo > @AsOf), released first (usp_BomStructure.sql:62-72).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-016",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-016-AC1",
+          "ac": 1,
+          "title": "Editor validation of BK-COMMUTE-M revision A answers 404 RC 16 BOM0303 and writes no validation rows",
+          "layer": "contract",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "error-mapping"
+          ],
+          "steps": [
+            {
+              "save": "val",
+              "call": "bom_validateBill",
+              "path": {
+                "bomRef": "BK-COMMUTE-M"
+              },
+              "body": {
+                "bomRevision": "A",
+                "effectiveDate": "2026-10-19"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "val",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "BOM0303",
+                "detailContains": "No bill of materials holds that identity"
+              }
+            },
+            {
+              "on": "val",
+              "outcome": {
+                "returnCode": 16
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomValidation",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomValidationFinding",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT Status FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BK-COMMUTE-M' AND BomRevision = 'A'",
+              "equals": "RELEASED"
+            }
+          ],
+          "derivation": "AC text with the bom_validateBill description (BV-BOM-ID never set, BOMVALID reads the bill by id only, BOMVALID.cob:123-156; BomService.vb:311-340) and BOMREAD 'No bill of materials holds that identity' RC 16 BOM0303; the seed holds no bom.BomValidation rows; the oracle confirmation of the editor path (SME-629) is still open, so the expected answer is unknown until captured.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-017",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-017-AC1",
+          "ac": 1,
+          "title": "Release gate: ENGINEER E-BOM0403, unvalidated E-BOM0406, author/releaser reviewer E-BOM0410, release then REPEAT",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07"
+          },
+          "covers": [
+            "idempotency",
+            "audit",
+            "permission"
+          ],
+          "steps": [
+            {
+              "save": "eng",
+              "call": "bom_releaseBillRevision",
+              "path": {
+                "bomRef": "BOM-DEMO-FRAME",
+                "bomRevision": "A"
+              },
+              "body": {
+                "reviewerUser": "ENGMGR",
+                "effectiveFrom": "2026-10-19",
+                "supersedeRevision": "",
+                "reason": "Engineering release"
+              },
+              "as": "ENGINEER",
+              "idempotencyKey": "A07-BOM-017-ENG"
+            },
+            {
+              "save": "noval",
+              "call": "bom_releaseBillRevision",
+              "path": {
+                "bomRef": "BOM-DEMO-B4TC",
+                "bomRevision": "A"
+              },
+              "body": {
+                "reviewerUser": "ENGMGR",
+                "effectiveFrom": "2026-10-19",
+                "supersedeRevision": "",
+                "reason": "Engineering release"
+              },
+              "idempotencyKey": "A07-BOM-017-NOVAL"
+            },
+            {
+              "sql": "INSERT bom.BomValidation (CompanyCode, BomHeaderId, ValidationRef, EffectiveDate, ValidatedBy, Outcome, ErrorCount, WarningCount, ComponentCount) SELECT 'STC', h.BomHeaderId, 'A07-VAL-B4TC', '2026-10-07', 'ENGINEER', 'PASS', 0, 0, 2 FROM bom.BomHeader h WHERE h.CompanyCode = 'STC' AND h.BomRef = 'BOM-DEMO-B4TC' AND h.BomRevision = 'A'"
+            },
+            {
+              "save": "author",
+              "call": "bom_releaseBillRevision",
+              "path": {
+                "bomRef": "BOM-DEMO-B4TC",
+                "bomRevision": "A"
+              },
+              "body": {
+                "reviewerUser": "ENGINEER",
+                "effectiveFrom": "2026-10-19",
+                "supersedeRevision": "",
+                "reason": "Engineering release"
+              },
+              "idempotencyKey": "A07-BOM-017-AUTH"
+            },
+            {
+              "save": "self",
+              "call": "bom_releaseBillRevision",
+              "path": {
+                "bomRef": "BOM-DEMO-B4TC",
+                "bomRevision": "A"
+              },
+              "body": {
+                "reviewerUser": "SYSADM",
+                "effectiveFrom": "2026-10-19",
+                "supersedeRevision": "",
+                "reason": "Engineering release"
+              },
+              "idempotencyKey": "A07-BOM-017-SELF"
+            },
+            {
+              "save": "ok",
+              "call": "bom_releaseBillRevision",
+              "path": {
+                "bomRef": "BOM-DEMO-B4TC",
+                "bomRevision": "A"
+              },
+              "body": {
+                "reviewerUser": "ENGMGR",
+                "effectiveFrom": "2026-10-19",
+                "supersedeRevision": "",
+                "reason": "Engineering release"
+              },
+              "idempotencyKey": "A07-BOM-017-REL"
+            },
+            {
+              "save": "again",
+              "call": "bom_releaseBillRevision",
+              "path": {
+                "bomRef": "BOM-DEMO-B4TC",
+                "bomRevision": "A"
+              },
+              "body": {
+                "reviewerUser": "ENGMGR",
+                "effectiveFrom": "2026-10-19",
+                "supersedeRevision": "",
+                "reason": "Engineering release"
+              },
+              "idempotencyKey": "A07-BOM-017-REL"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "eng",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-BOM0403",
+                "detailContains": "user is not authorised to release bills of material"
+              }
+            },
+            {
+              "sql": "SELECT ReleasedBy FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BOM-DEMO-FRAME' AND BomRevision = 'A'",
+              "equals": "ENGMGR"
+            },
+            {
+              "on": "noval",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-BOM0406"
+              }
+            },
+            {
+              "on": "author",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-BOM0410"
+              }
+            },
+            {
+              "on": "self",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "E-BOM0410"
+              }
+            },
+            {
+              "on": "ok",
+              "status": 200
+            },
+            {
+              "on": "ok",
+              "json": "$.count",
+              "equals": 1
+            },
+            {
+              "on": "ok",
+              "json": "$.items[0].outcome",
+              "equals": "RELEASED"
+            },
+            {
+              "on": "ok",
+              "json": "$.items[0].releasedBy",
+              "equals": "SYSADM"
+            },
+            {
+              "on": "ok",
+              "json": "$.items[0].reviewerUser",
+              "equals": "ENGMGR"
+            },
+            {
+              "on": "again",
+              "status": 200
+            },
+            {
+              "on": "again",
+              "json": "$.items[0].outcome",
+              "equals": "REPEAT"
+            },
+            {
+              "sql": "SELECT Status FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BOM-DEMO-B4TC' AND BomRevision = 'A'",
+              "equals": "RELEASED"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'bom.BomHeader' AND EntityKey = 'BOM-DEMO-B4TC' AND Action = 'RELEASE'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.IdempotencyKey WHERE CorrelationId = 'A07-BOM-017-REL' AND Operation = 'BOM.RELEASE' AND Status = 'COMPLETED'",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC text with db/procs/bom/usp_ReleaseBom.sql:17-130 (REPEAT for a stored correlation id; refusal order E-BOM0403 permission, E-BOM0406 no validation, E-BOM0410 reviewer = ISNULL(AuthorUser, CreatedBy) or the caller; one transaction updating the header, core.usp_WriteAudit EntityKey = BomRef Action RELEASE and core.IdempotencyKey BOM.RELEASE COMPLETED) on BOM-DEMO-FRAME/A and the DRAFT BOM-DEMO-B4TC/A (author ENGINEER, reviewer ENGMGR; 31-bom-structures.sql) with an arranged PASS validation; SYSADM is the releaser because ENGMGR lacks BOM.MAINT, the screen gate of bom_releaseBillRevision (contracts 5.4; 03-core-roles-users.sql:53), so ENGMGR is the authorised reviewer.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-018",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-018-AC1",
+          "ac": 1,
+          "title": "ECO-BOMDEMO-001 preview refused BOM1411 7/1/0, unknown replacement BOM1435, no bill changed, PRM0006, no-scope 404",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "permission",
+            "coexistence"
+          ],
+          "steps": [
+            {
+              "save": "notitem",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-BOMDEMO-001"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-NOT-AN-ITEM",
+                "effectiveDate": "2026-11-01",
+                "scope": "BOMREF",
+                "scopeItem": "BOM-DEMO-FRAME",
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "eco",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-BOMDEMO-001"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-PIN-HD",
+                "effectiveDate": "2026-11-01",
+                "scope": "ITEM",
+                "scopeItem": "",
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "noview",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-A07-NOVIEW"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-PIN-HD",
+                "effectiveDate": "2026-11-01",
+                "scope": "ITEM",
+                "scopeItem": "",
+                "includeDraft": true
+              },
+              "as": "SALESREP"
+            },
+            {
+              "save": "noscope",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-A07-NOSCOPE"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-PIN-HD",
+                "effectiveDate": "2026-11-01",
+                "scope": "BOMREF",
+                "scopeItem": "A07-NO-SUCH-BILL",
+                "includeDraft": true
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "notitem",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "BOM1411"
+              }
+            },
+            {
+              "on": "notitem",
+              "json": "$.data.lines[0].outcome",
+              "equals": "FAILED"
+            },
+            {
+              "on": "notitem",
+              "json": "$.data.lines[0].reason",
+              "equals": "BOM1435"
+            },
+            {
+              "on": "eco",
+              "problem": {
+                "status": 422,
+                "type": "business-rule",
+                "reasonCode": "BOM1411"
+              }
+            },
+            {
+              "on": "eco",
+              "outcome": {
+                "returnCode": 8
+              }
+            },
+            {
+              "on": "eco",
+              "json": "$.data.targetCount",
+              "equals": 7
+            },
+            {
+              "on": "eco",
+              "json": "$.data.failedCount",
+              "equals": 1
+            },
+            {
+              "on": "eco",
+              "json": "$.data.appliedCount",
+              "equals": 0
+            },
+            {
+              "on": "eco",
+              "json": "$.data.mayApply",
+              "equals": false
+            },
+            {
+              "on": "eco",
+              "json": "$.data.summary",
+              "equals": "7 bill(s) in scope; 6 to change (4 as a new revision, 2 as a draft amendment); 0 skipped; 1 failed validation"
+            },
+            {
+              "on": "eco",
+              "json": "$.data.lines",
+              "count": 7
+            },
+            {
+              "on": "eco",
+              "json": "$.data.lines[*].detail",
+              "matches": "BOM0326"
+            },
+            {
+              "on": "eco",
+              "json": "$.data.lines[*].detail",
+              "matches": "BOM0331"
+            },
+            {
+              "on": "noview",
+              "bodyContains": "PRM0006"
+            },
+            {
+              "on": "noview",
+              "bodyContains": "SALESREP does not hold BOM.VIEW"
+            },
+            {
+              "on": "noscope",
+              "problem": {
+                "status": 404,
+                "type": "not-found",
+                "reasonCode": "BOM1409"
+              }
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef IN ('BOM-DEMO-FRAME', 'BOM-DEMO-BRACE', 'BOM-DEMO-PACK', 'BOM-DEMO-OPT', 'BOM-DEMO-BDY', 'BOM-DEMO-NOBOM')",
+              "equals": 7
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomComponent WHERE ComponentItemCode = 'DEMO-PIN-HD'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT Status FROM bom.BomChange WHERE CompanyCode = 'STC' AND ChangeRef = 'ECO-BOMDEMO-001'",
+              "equals": "PREVIEW"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomChangeLine l JOIN bom.BomChange c ON c.ChangeId = l.ChangeId WHERE c.CompanyCode = 'STC' AND c.ChangeRef = 'ECO-BOMDEMO-001'",
+              "equals": 7
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomChangeLine l JOIN bom.BomChange c ON c.ChangeId = l.ChangeId WHERE c.CompanyCode = 'STC' AND c.ChangeRef = 'ECO-BOMDEMO-001' AND l.Outcome = 'FAILED'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomChange WHERE CompanyCode = 'STC' AND ChangeRef = 'ECO-A07-NOSCOPE'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with STERP-BOM.md FR-STERP-BOM-018 steps 1-9 (BOMBULK.cob:101-891, BOMBREV: targets, proposals rolled back, BomChangeLine rows deleted and re-inserted, header PREVIEW, BOM1411/BOM1435/BOM1409, failed detail '<message> [<reason>]') on ECO-BOMDEMO-001 (90-bom-demo.sql) and the seven DEMO-PIN bills of 31-bom-structures.sql (demo docs/DEMO-WORKFLOWS.md:72); the BOM.VIEW refusal is pinned by reason and wording only, because the binding screen gate of the operation (BOM.VIEW, contracts 5.4) answers SALESREP before BOMBULK's PERMCHK, so the criterion's 202 HOLD and the gate's 403 cannot both hold.",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-BOM-018-EDGE-DEMO-JOURNEY",
+          "ac": null,
+          "title": "BOM demo journey (workflow 2 steps 1-5): explosion and roll-ups, where used, ECO refusals, frozen revision, release",
+          "layer": "e2e",
+          "runner": "api",
+          "dataset": "demo",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "journey"
+          ],
+          "steps": [
+            {
+              "save": "s1",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "s1c",
+              "call": "bom_costBill",
+              "path": {
+                "parentItemCode": "FG-BIKE-COMMUTE-M"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "costSet": "BOMDEMO"
+              }
+            },
+            {
+              "save": "s2",
+              "call": "bom_costBill",
+              "path": {
+                "parentItemCode": "FG-CAKE-CELEB-8IN"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 12,
+                "effectiveDate": "2026-10-07",
+                "costSet": "BOMDEMO"
+              }
+            },
+            {
+              "save": "s3",
+              "call": "bom_getWhereUsed",
+              "path": {
+                "componentItemCode": "DEMO-PIN"
+              },
+              "query": {
+                "asOf": "2026-10-07",
+                "maxLevels": 25,
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "s4",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-BOMDEMO-001"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-PIN-HD",
+                "effectiveDate": "2026-11-01",
+                "scope": "ITEM",
+                "scopeItem": "",
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "s4b",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-BOMDEMO-001"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-NOT-AN-ITEM",
+                "effectiveDate": "2026-11-01",
+                "scope": "BOMREF",
+                "scopeItem": "BOM-DEMO-FRAME",
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "s5edit",
+              "call": "platform_saveMaintenanceRow",
+              "path": {
+                "maintCode": "BOM.HEADER"
+              },
+              "body": {
+                "mode": "CHANGE",
+                "values": {
+                  "CompanyCode": "STC",
+                  "BomRef": "BOM-DEMO-FRAME",
+                  "BomRevision": "A",
+                  "Description": "A07 demo edit"
+                }
+              }
+            },
+            {
+              "save": "s5rel",
+              "call": "bom_releaseBillRevision",
+              "path": {
+                "bomRef": "BOM-DEMO-FRAME",
+                "bomRevision": "A"
+              },
+              "body": {
+                "reviewerUser": "ENGMGR",
+                "effectiveFrom": "2026-10-19",
+                "supersedeRevision": "",
+                "reason": "Engineering release"
+              },
+              "idempotencyKey": "A07-BOM-DEMO-REL"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "s1",
+              "json": "$.data.occurrences",
+              "equals": 95
+            },
+            {
+              "on": "s1",
+              "json": "$.data.depthReached",
+              "equals": 4
+            },
+            {
+              "on": "s1",
+              "json": "$.data.lines[*].item",
+              "equals": "PH-CABLE-SET-INT"
+            },
+            {
+              "on": "s1",
+              "json": "$.data.lines[*].required",
+              "equals": 11
+            },
+            {
+              "on": "s1c",
+              "json": "$.data.unitCost",
+              "gte": 568.245
+            },
+            {
+              "on": "s1c",
+              "json": "$.data.unitCost",
+              "lte": 568.255
+            },
+            {
+              "on": "s2",
+              "json": "$.data.unitCost",
+              "gte": 50.195
+            },
+            {
+              "on": "s2",
+              "json": "$.data.unitCost",
+              "lte": 50.205
+            },
+            {
+              "on": "s3",
+              "json": "$.count",
+              "equals": 9
+            },
+            {
+              "on": "s3",
+              "json": "$.items[5].isDirect",
+              "equals": true
+            },
+            {
+              "on": "s3",
+              "json": "$.items[6].isDirect",
+              "equals": false
+            },
+            {
+              "on": "s3",
+              "json": "$.items[8].level",
+              "equals": 2
+            },
+            {
+              "on": "s4",
+              "problem": {
+                "status": 422,
+                "reasonCode": "BOM1411"
+              }
+            },
+            {
+              "on": "s4",
+              "json": "$.data.targetCount",
+              "equals": 7
+            },
+            {
+              "on": "s4",
+              "json": "$.data.failedCount",
+              "equals": 1
+            },
+            {
+              "on": "s4",
+              "json": "$.data.appliedCount",
+              "equals": 0
+            },
+            {
+              "on": "s4",
+              "json": "$.data.summary",
+              "equals": "7 bill(s) in scope; 6 to change (4 as a new revision, 2 as a draft amendment); 0 skipped; 1 failed validation"
+            },
+            {
+              "on": "s4",
+              "json": "$.data.lines[*].detail",
+              "matches": "BOM0326"
+            },
+            {
+              "on": "s4",
+              "json": "$.data.lines[*].detail",
+              "matches": "BOM0331"
+            },
+            {
+              "on": "s4b",
+              "problem": {
+                "status": 422,
+                "reasonCode": "BOM1411"
+              }
+            },
+            {
+              "on": "s4b",
+              "json": "$.data.lines[0].reason",
+              "equals": "BOM1435"
+            },
+            {
+              "on": "s5edit",
+              "problem": {
+                "status": 422,
+                "reasonCode": "E-BOM0413"
+              }
+            },
+            {
+              "on": "s5rel",
+              "problem": {
+                "status": 422,
+                "reasonCode": "E-BOM0403"
+              }
+            },
+            {
+              "sql": "SELECT Description FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BOM-DEMO-FRAME' AND BomRevision = 'A'",
+              "equals": "B1 frame assembly, ten gross frames per batch"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef IN ('BOM-DEMO-FRAME', 'BOM-DEMO-BRACE', 'BOM-DEMO-PACK', 'BOM-DEMO-OPT', 'BOM-DEMO-BDY', 'BOM-DEMO-NOBOM')",
+              "equals": 7
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomComponent WHERE ComponentItemCode = 'DEMO-PIN-HD'",
+              "equals": 0
+            },
+            {
+              "sql": "SELECT Status FROM bom.BomChange WHERE CompanyCode = 'STC' AND ChangeRef = 'ECO-BOMDEMO-001'",
+              "equals": "PREVIEW"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomChangeLine l JOIN bom.BomChange c ON c.ChangeId = l.ChangeId WHERE c.CompanyCode = 'STC' AND c.ChangeRef = 'ECO-BOMDEMO-001'",
+              "equals": 1
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomChangeLine l JOIN bom.BomChange c ON c.ChangeId = l.ChangeId WHERE c.CompanyCode = 'STC' AND c.ChangeRef = 'ECO-BOMDEMO-001' AND l.Outcome = 'FAILED' AND l.FailureReason LIKE 'STERP-E-BOM1435%'",
+              "equals": 1
+            }
+          ],
+          "derivation": "STERP-BOM.md section 10 demo-workflow journey (workflow 2 steps 1-5, docs/DEMO-WORKFLOWS.md:62-73) as ENGINEER on the demonstration dataset: 95 occurrences, depth 4, phantom cable set and 11 frames for 10 bikes, unit costs 568.25 and 50.20, DEMO-PIN six direct of nine rows on two levels, ECO-BOMDEMO-001 seven targets and one failed (BOM1411, BOM0326/BOM0331), the DEMO-NOT-AN-ITEM refusal BOM1435, released content immutable (BOM0413) and release refused (BOM0403); the bom.BomChange/BomChangeLine rows left by step 4 are those of its second preview (lines deleted and re-inserted per preview, FR-STERP-BOM-018 step 8).",
+          "confidence": "inferred"
+        },
+        {
+          "id": "FR-STERP-BOM-018-EDGE-TEXT-NORMALIZATION",
+          "ac": null,
+          "title": "A 47-character scope key is right-truncated to its 40-character field and selects bill BOM-DEMO-FRAME",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "text-normalization"
+          ],
+          "steps": [
+            {
+              "save": "txt",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-A07-TEXTNORM"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-PIN-HD",
+                "effectiveDate": "2026-11-01",
+                "scope": "BOMREF",
+                "scopeItem": "BOM-DEMO-FRAME                          IGNORED",
+                "includeDraft": true
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "txt",
+              "status": 200
+            },
+            {
+              "on": "txt",
+              "outcome": {
+                "reasonCode": "BOM1415"
+              }
+            },
+            {
+              "on": "txt",
+              "json": "$.data.targetCount",
+              "equals": 1
+            },
+            {
+              "on": "txt",
+              "json": "$.data.lines[0].bill",
+              "equals": "BOM-DEMO-FRAME"
+            },
+            {
+              "sql": "SELECT Status FROM bom.BomChange WHERE CompanyCode = 'STC' AND ChangeRef = 'ECO-A07-TEXTNORM'",
+              "equals": "PREVIEW"
+            }
+          ],
+          "derivation": "Contracts 4.4 alphanumeric rule (CobolCodec.cs:15,37-43 right truncation and space padding) on BB-SCOPE-ITEM PIC X(40) (x-sterp-length 40 of BomBulkPreviewRequest.scopeItem): the kept 40 characters are BOM-DEMO-FRAME plus spaces, so the BOMREF scope selects the released BOM-DEMO-FRAME/A whose DEMO-PIN -> DEMO-PIN-HD proposal passes (one of the six changes of the ECO demo), giving reason BOM1415 and a PREVIEW change header (FR-STERP-BOM-018 steps 4-9).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-020",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-020-AC1",
+          "ac": 1,
+          "title": "Bill Maintenance: frozen status with cue OK, local release refusal, ENGINEER release error E-BOM0403, Validate BOM0303",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "load",
+              "gui": "/bom/bom-editor",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Bill reference",
+                    "value": "BK-COMMUTE-M"
+                  }
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "local",
+              "gui": "/bom/bom-editor",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Bill reference",
+                    "value": "BK-COMMUTE-M"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Release..."
+                }
+              ]
+            },
+            {
+              "save": "eng",
+              "gui": "/bom/bom-editor",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Bill reference",
+                    "value": "BOM-DEMO-B4TC"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Revision",
+                    "value": "A"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "click": "Release..."
+                },
+                {
+                  "fill": {
+                    "label": "Reviewer who approved revision A of BOM-DEMO-B4TC.",
+                    "value": "ENGMGR"
+                  }
+                },
+                {
+                  "click": "OK"
+                },
+                {
+                  "click": "OK"
+                },
+                {
+                  "click": "Yes"
+                }
+              ]
+            },
+            {
+              "save": "val",
+              "gui": "/bom/bom-editor",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Bill reference",
+                    "value": "BK-COMMUTE-M"
+                  }
+                },
+                {
+                  "press": "F5"
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "load",
+              "text": "Bill of Material Maintenance"
+            },
+            {
+              "on": "load",
+              "text": "Status RELEASED - frozen, a change needs a new revision (BOM-004)."
+            },
+            {
+              "on": "load",
+              "text": "OK"
+            },
+            {
+              "on": "load",
+              "text": "Components"
+            },
+            {
+              "on": "load",
+              "text": "By-products"
+            },
+            {
+              "on": "load",
+              "text": "Revisions"
+            },
+            {
+              "on": "load",
+              "text": "Validation"
+            },
+            {
+              "on": "load",
+              "text": "Find (F2)"
+            },
+            {
+              "on": "load",
+              "text": "Load (F5)"
+            },
+            {
+              "on": "load",
+              "text": "Validate (F10)"
+            },
+            {
+              "on": "load",
+              "text": "Release..."
+            },
+            {
+              "on": "local",
+              "text": "Revision A is already released - supersede it with a new revision."
+            },
+            {
+              "on": "eng",
+              "text": "E-BOM0403"
+            },
+            {
+              "on": "eng",
+              "text": "user is not authorised to release bills of material"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE EntityType = 'bom.BomHeader' AND Action = 'RELEASE'",
+              "equals": 0
+            },
+            {
+              "on": "val",
+              "text": "BOM0303"
+            }
+          ],
+          "derivation": "AC text with frmBomEditor.vb:18-210 (title, captions, tabs, push buttons, load status 'Status <s> - frozen, a change needs a new revision (BOM-004).' with cue OK for RELEASED, local refusal 'Revision <rev> is already released - supersede it with a new revision.', reviewer/reason prompts and confirmation, Guard error dialog) with usp_ReleaseBom E-BOM0403 for ENGINEER and the FR-STERP-BOM-016 not-found answer for Validate; the complete screen comparison is the legacy GUI regression capture.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-021",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-021-AC1",
+          "ac": 1,
+          "title": "Explosion page: INDENTED status 95 occurrences depth 4, COSTED unit 568.25 and 50.20, quantity 0 warning, comparison",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "ind",
+              "gui": "/bom/bom-explosion",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Parent item",
+                    "value": "FG-BIKE-COMMUTE-M"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "10"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "bike",
+              "gui": "/bom/bom-explosion",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Parent item",
+                    "value": "FG-BIKE-COMMUTE-M"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "10"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "View",
+                    "value": "COSTED"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "cake",
+              "gui": "/bom/bom-explosion",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Parent item",
+                    "value": "FG-CAKE-CELEB-8IN"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "12"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "View",
+                    "value": "COSTED"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "zero",
+              "gui": "/bom/bom-explosion",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Parent item",
+                    "value": "FG-BIKE-COMMUTE-M"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Quantity",
+                    "value": "0"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "cmp",
+              "gui": "/",
+              "actions": [
+                {
+                  "menu": [
+                    "Bills of Material",
+                    "Revision Comparison..."
+                  ]
+                }
+              ]
+            },
+            {
+              "save": "onerev",
+              "gui": "/bom/bom-explosion",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Parent item",
+                    "value": "FG-BIKE-COMMUTE-M"
+                  }
+                },
+                {
+                  "click": "Compare revisions"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "ind",
+              "text": "INDENTED explosion COMPLETE | 95 occurrence(s), depth 4"
+            },
+            {
+              "on": "bike",
+              "text": "unit £568.25"
+            },
+            {
+              "on": "cake",
+              "text": "unit £50.20"
+            },
+            {
+              "on": "zero",
+              "text": "Enter a positive numeric quantity before exploding the bill."
+            },
+            {
+              "on": "cmp",
+              "text": "Bill Revision Comparison"
+            },
+            {
+              "on": "cmp",
+              "text": "INDENTED"
+            },
+            {
+              "on": "onerev",
+              "text": "Bill BK-COMMUTE-M has only one revision - nothing to compare."
+            }
+          ],
+          "derivation": "AC text with STERP-BOM.md FR-STERP-BOM-021 (frmBomExplosion.vb:30-165: status lines '<view> explosion <completeness> | <n> occurrence(s), depth <d>' and 'Costed roll-up ... | unit <GBP>', local quantity warning without a call, COMPARE title and INDENTED view, one-revision message) with the demo values of docs/DEMO-WORKFLOWS.md:69-70 (per the legacy oracle) and the single revision A of BK-COMMUTE-M (90-bom-showcase.sql:147). The COSTED status prints 'unit ' + Fmt.Money(UnitCost, \"GBP\") (frmBomExplosion.vb:109-110), which for GBP is '£#,##0.00' (STERP.Common/Fmt.cs:57,60-63); the unit figures are unchanged. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-105: legacy Fmt.Money prints the pound sign]",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-022",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-022-AC1",
+          "ac": 1,
+          "title": "Where Used page: DEMO-PIN used by 9 parent bills (6 direct, 2 levels), RELEASED ONLY re-run, Explode parent",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "all",
+              "gui": "/bom/bom-where-used",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Component",
+                    "value": "DEMO-PIN"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "rel",
+              "gui": "/bom/bom-where-used",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Component",
+                    "value": "DEMO-PIN"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "select": {
+                    "label": "Include",
+                    "value": "RELEASED ONLY"
+                  }
+                }
+              ]
+            },
+            {
+              "save": "parent",
+              "gui": "/bom/bom-where-used",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Component",
+                    "value": "DEMO-PIN"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "click": "DEMO-BRACE"
+                },
+                {
+                  "click": "Explode parent"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "all",
+              "text": "DEMO-PIN is used by 9 parent bill(s) - 6 direct, 2 level(s) up."
+            },
+            {
+              "on": "rel",
+              "text": "DEMO-PIN is used by 6 parent bill(s) - 4 direct, 2 level(s) up."
+            },
+            {
+              "on": "parent",
+              "text": "Bill of Material Explosion"
+            },
+            {
+              "on": "parent",
+              "text": "DEMO-BRACE"
+            }
+          ],
+          "derivation": "AC text with frmBomWhereUsed.vb:26-113 (status '<item> is used by <n> parent bill(s) - <d> direct, <deepest> level(s) up.' counting IsDirect rows and the highest Level, Include re-run, Explode parent opening the explosion page for the selected ParentItemCode) and the usp_BomWhereUsed rows of DEMO-PIN on the seed (nine with drafts as docs/DEMO-WORKFLOWS.md:71 states; six, four direct, without the drafts BOM-DEMO-BDY/B and BOM-DEMO-NOBOM/A).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-023",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-023-AC1",
+          "ac": 1,
+          "title": "Bulk Change Preview page: ECO status '7 target(s), 1 failed, 0 applied. BOM1411' *** REFUSED, F5 clears, bad date",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "keys"
+          ],
+          "steps": [
+            {
+              "save": "prev",
+              "gui": "/bom/bom-bulk-preview",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Change reference",
+                    "value": "ECO-BOMDEMO-001"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Old component",
+                    "value": "DEMO-PIN"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Replacement",
+                    "value": "DEMO-PIN-HD"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Effective date",
+                    "value": "01/11/2026"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "Scope",
+                    "value": "ITEM"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "Include",
+                    "value": "RELEASED AND DRAFT"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "clear",
+              "gui": "/bom/bom-bulk-preview",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Change reference",
+                    "value": "ECO-BOMDEMO-001"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Old component",
+                    "value": "DEMO-PIN"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Replacement",
+                    "value": "DEMO-PIN-HD"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Effective date",
+                    "value": "01/11/2026"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "Scope",
+                    "value": "ITEM"
+                  }
+                },
+                {
+                  "select": {
+                    "label": "Include",
+                    "value": "RELEASED AND DRAFT"
+                  }
+                },
+                {
+                  "press": "F10"
+                },
+                {
+                  "press": "F5"
+                }
+              ]
+            },
+            {
+              "save": "bad",
+              "gui": "/bom/bom-bulk-preview",
+              "actions": [
+                {
+                  "fill": {
+                    "label": "Change reference",
+                    "value": "ECO-A07-BADDATE"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Old component",
+                    "value": "DEMO-PIN"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Replacement",
+                    "value": "DEMO-PIN-HD"
+                  }
+                },
+                {
+                  "fill": {
+                    "label": "Effective date",
+                    "value": "31/02/2026"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            }
+          ],
+          "assertions": [
+            {
+              "on": "prev",
+              "text": "PREVIEW ONLY - 7 target(s), 1 failed, 0 applied. BOM1411"
+            },
+            {
+              "on": "prev",
+              "text": "*** REFUSED"
+            },
+            {
+              "on": "prev",
+              "text": "7 bill(s) in scope; 6 to change (4 as a new revision, 2 as a draft amendment); 0 skipped; 1 failed validation"
+            },
+            {
+              "on": "prev",
+              "text": "STERP-E-BOM1411"
+            },
+            {
+              "on": "prev",
+              "text": "BOM-DEMO-BDY"
+            },
+            {
+              "on": "prev",
+              "text": "BOM-DEMO-BRACE"
+            },
+            {
+              "on": "prev",
+              "text": "BOM-DEMO-FRAME"
+            },
+            {
+              "on": "prev",
+              "text": "BOM-DEMO-NOBOM"
+            },
+            {
+              "on": "prev",
+              "text": "BOM-DEMO-OPT"
+            },
+            {
+              "on": "prev",
+              "text": "BOM-DEMO-PACK"
+            },
+            {
+              "on": "clear",
+              "text": "Enter the change reference, source and replacement. F10 previews only; no bills are changed."
+            },
+            {
+              "on": "clear",
+              "notText": "BOM1411"
+            },
+            {
+              "on": "clear",
+              "notText": "BOM-DEMO-OPT"
+            },
+            {
+              "on": "bad",
+              "text": "Enter a valid effective date in dd/MM/yyyy form."
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM bom.BomChange WHERE ChangeRef = 'ECO-A07-BADDATE'",
+              "equals": 0
+            }
+          ],
+          "derivation": "AC text with frmBomBulkPreview.vb:20-72 (filters, grid of every returned line, answer box with summary, refusal and display, status 'PREVIEW ONLY - <t> target(s), <f> failed, <a> applied. <reason>' with cue *** REFUSED when RC > 4, F5 text, local date check without a call) and the ECO-BOMDEMO-001 preview of FR-STERP-BOM-018 (seven lines over BDY A/B, BRACE, FRAME, NOBOM, OPT and PACK); the GUI DSL has no row counter, so the seven grid rows are pinned by the status count and the six bill references.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-024",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-024-AC1",
+          "ac": 1,
+          "title": "Bill Headers (list): ENGINEER's edit of released BOM-DEMO-FRAME/A refused E-BOM0413; columns equal core.MaintColumn",
+          "layer": "ui-journey",
+          "runner": "gui",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "edit",
+              "gui": "/platform/generic-maint/BOM.HEADER",
+              "actions": [
+                {
+                  "click": "BOM-DEMO-FRAME"
+                },
+                {
+                  "fill": {
+                    "label": "Description",
+                    "value": "A07 edited description"
+                  }
+                },
+                {
+                  "press": "F10"
+                }
+              ]
+            },
+            {
+              "save": "hdrdef",
+              "call": "platform_getMaintenanceDefinition",
+              "path": {
+                "maintCode": "BOM.HEADER"
+              }
+            },
+            {
+              "save": "chgdef",
+              "call": "platform_getMaintenanceDefinition",
+              "path": {
+                "maintCode": "BOM.CHANGE"
+              },
+              "as": "SYSADM"
+            }
+          ],
+          "assertions": [
+            {
+              "on": "edit",
+              "text": "Bill of material headers"
+            },
+            {
+              "on": "edit",
+              "text": "[BOM.HEADER]"
+            },
+            {
+              "on": "edit",
+              "text": "Bill reference"
+            },
+            {
+              "on": "edit",
+              "text": "E-BOM0413"
+            },
+            {
+              "sql": "SELECT Description FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BOM-DEMO-FRAME' AND BomRevision = 'A'",
+              "equals": "B1 frame assembly, ten gross frames per batch"
+            },
+            {
+              "on": "hdrdef",
+              "json": "$.columns",
+              "count": 26
+            },
+            {
+              "on": "hdrdef",
+              "json": "$.columns[1].columnName",
+              "equals": "BomRef"
+            },
+            {
+              "on": "hdrdef",
+              "json": "$.columns[1].caption",
+              "equals": "Bill reference"
+            },
+            {
+              "on": "hdrdef",
+              "json": "$.columns[1].width",
+              "equals": 150
+            },
+            {
+              "on": "hdrdef",
+              "json": "$.columns[21].columnName",
+              "equals": "ReleasedBy"
+            },
+            {
+              "on": "hdrdef",
+              "json": "$.columns[21].isReadOnly",
+              "equals": true
+            },
+            {
+              "on": "chgdef",
+              "json": "$.columns",
+              "count": 15
+            },
+            {
+              "on": "chgdef",
+              "json": "$.columns[1].caption",
+              "equals": "Change reference"
+            },
+            {
+              "on": "chgdef",
+              "json": "$.columns[1].width",
+              "equals": 140
+            },
+            {
+              "on": "chgdef",
+              "json": "$.columns[9].columnName",
+              "equals": "AffectedBills"
+            },
+            {
+              "on": "chgdef",
+              "json": "$.columns[9].isReadOnly",
+              "equals": true
+            }
+          ],
+          "derivation": "AC text with db/seed/33-bom-maintdef.sql:18-89 (BOM.HEADER 26 and BOM.CHANGE 15 MaintColumn rows in SortOrder: BomRef 'Bill reference' 150, ReleasedBy read-only, ChangeRef 'Change reference' 140, AffectedBills read-only), frmGenericMaint (title '<Title>  [<MaintCode>]', F10 save) and tr_BomHeaderReleasedImmutable E-BOM0413 on BOM-DEMO-FRAME/A (docs/DEMO-WORKFLOWS.md:73); the BOM.CHANGE definition is read as SYSADM because ENGINEER lacks BOM.CHANGE.APPROVE.",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-030",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-030-AC1",
+          "ac": 1,
+          "title": "BOMRP010: costed bike listing written (95 lines), missing ITEM ends RC 12 FAILED BOM1001, incomplete run ends RC 0",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "costed",
+              "job": "bom_submitBomrp010Run",
+              "body": {
+                "CO": "STC",
+                "ITEM": "FG-BIKE-COMMUTE-M",
+                "QTY": "10",
+                "ASAT": "20261019",
+                "MODE": "COSTED",
+                "COSTSET": "BOMDEMO",
+                "USER": "ENGINEER",
+                "reportCode": "BOMRP020"
+              }
+            },
+            {
+              "save": "costedFiles",
+              "call": "jobs_listSpoolFiles",
+              "query": {
+                "filter": "lst",
+                "folder": "spool"
+              }
+            },
+            {
+              "save": "costedListing",
+              "call": "jobs_getSpoolFile",
+              "query": {
+                "path": "${costedFiles:$.items[0].path}"
+              }
+            },
+            {
+              "save": "noitem",
+              "job": "bom_submitBomrp010Run",
+              "body": {
+                "CO": "STC",
+                "QTY": "10",
+                "USER": "ENGINEER",
+                "reportCode": "BOMRP010"
+              }
+            },
+            {
+              "save": "partial",
+              "job": "bom_submitBomrp010Run",
+              "body": {
+                "CO": "STC",
+                "ITEM": "DEMO-DEEP-00",
+                "QTY": "1",
+                "LEVELS": "3",
+                "ASAT": "20261007",
+                "USER": "ENGINEER",
+                "reportCode": "BOMRP010"
+              }
+            },
+            {
+              "save": "partialFiles",
+              "call": "jobs_listSpoolFiles",
+              "query": {
+                "filter": "lst",
+                "folder": "spool"
+              }
+            },
+            {
+              "save": "partialListing",
+              "call": "jobs_getSpoolFile",
+              "query": {
+                "path": "${partialFiles:$.items[0].path}"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "costed",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "costed",
+              "run": {
+                "messageContains": "STERP-I-BOM1000 BOMRP010 explosion listing for FG-BIKE-COMMUTE-M"
+              }
+            },
+            {
+              "on": "costed",
+              "run": {
+                "messageContains": "STERP-I-BOM1004 000000095+ lines written to"
+              }
+            },
+            {
+              "on": "costedFiles",
+              "json": "$.items[0].fileName",
+              "matches": "^BOMRP010-STC-[0-9]{14}\\.lst$"
+            },
+            {
+              "on": "noitem",
+              "run": {
+                "status": "FAILED",
+                "returnCode": 12,
+                "messageContains": "STERP-E-BOM1001 ITEM= is required"
+              }
+            },
+            {
+              "on": "partial",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "partial",
+              "run": {
+                "messageContains": "STERP-I-BOM1004 000000004+ lines written to"
+              }
+            },
+            {
+              "on": "partialFiles",
+              "json": "$.items[0].fileName",
+              "matches": "^BOMRP010-STC-[0-9]{14}\\.lst$"
+            },
+            {
+              "on": "costedListing",
+              "status": 200
+            },
+            {
+              "on": "costedListing",
+              "bodyContains": "Occurrences printed            95      of which leaf demand:       0       lines rounded up:             0"
+            },
+            {
+              "on": "costedListing",
+              "bodyContains": "Material value                    4851.92      Conversion:            832.10   Recovery credit:               1.49"
+            },
+            {
+              "on": "costedListing",
+              "bodyContains": "Total value of the run            5682.53      Unit cost:           568.253000"
+            },
+            {
+              "on": "costedListing",
+              "bodyContains": "Completeness: COMPLETE"
+            },
+            {
+              "on": "partialListing",
+              "status": 200
+            },
+            {
+              "on": "partialListing",
+              "bodyContains": "Occurrences printed             4      of which leaf demand:       0       lines rounded up:             0"
+            },
+            {
+              "on": "partialListing",
+              "bodyContains": "Total value of the run               0.00      Unit cost:             0.000000"
+            },
+            {
+              "on": "partialListing",
+              "bodyContains": "Completeness: INCOMPLETE     Stopped: purchased 0, use stock 0, depth limit 1, no child b"
+            }
+          ],
+          "derivation": "AC text with cobol/batch/bom/BOMRP010.cob (arguments :240-300, ITEM check :293-296 after which 0200-JOB-START still registers the run :312-320, console STERP-I-BOM1000 and 'STERP-I-BOM1004 <n> lines written to <spool>' :297,413, no STERP-I-SPOOL line, return code 0 also for incomplete calculations) and binding BE-BOM-18 (a catalogue launch reports no spool file, SME-1735): the launcher row keeps SpoolFile NULL (ReportService.vb:169,206-214) and the program's own JOBLOG row stays RUNNING without a spool because its END is refused (JL-STATUS never set, BOMRP010.cob:418-424, JOBLOG.cob:100-120), so the listing is reached only through the spool viewer list jobs_listSpoolFiles (newest first), not through /runs/{id}/spool; the legacy route ReportService.Run on freshc observed the costed run OK RC 0 with 'STERP-I-BOM1004 000000095+ lines written to' and listing BOMRP010-STC-<stamp>.lst (14889 bytes; footing 'Total value of the run 5682.53', 'Unit cost: 568.253000', 'Completeness: COMPLETE'), the run without ITEM FAILED RC 12 with 'STERP-E-BOM1001 ITEM= is required', and DEMO-DEEP-00 LEVELS=3 OK RC 0 with 'STERP-I-BOM1004 000000004+ lines written to' (footing 'Completeness: INCOMPLETE ... depth limit 1') (amendment evidence p4/runs/rg016-bom030-legacy-route.txt, listings rg016-BOMRP010-STC-*.lst). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-016: BOMRP010 registers no spool on any core.JobRun row; read the listing through the spool file list] [A07-AMEND agent-07-20261021T211031Z-a544e35d consolidation lead (cross-pass item 6): each listing is read with jobs_getSpoolFile at the path of the newest spool file just listed (DSL saved-value reference ${<save>:<json path>}); its footing lines equal the legacy listings of the same inputs (amendment evidence p4/runs/rg016-BOMRP010-STC-20261021231615.lst sha256 a27b3cb93907fc8987c7dcea862eb7fa46f8ea8708d3bf6fcefd5b876106175f lines 133-137 and rg016-BOMRP010-STC-20261021231619.lst sha256 795c2ea80bac1d727cad858d1562bd7a911529d99cceb47a6d2b7290222188e0 lines 16-20)]",
+          "confidence": "observed"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-031",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-031-AC1",
+          "ac": 1,
+          "title": "BOMRP030: DEMO-PIN where-used sections and footing, COMPARE without TOREV RC 12 BOM1501, refusal raises one exception",
+          "layer": "integration",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "covers": [
+            "report"
+          ],
+          "steps": [
+            {
+              "save": "wu",
+              "job": "bom_submitBomrp030Run",
+              "body": {
+                "CO": "STC",
+                "ITEM": "DEMO-PIN",
+                "ASAT": "20261019",
+                "LEVELS": "25",
+                "MODE": "WHEREUSED",
+                "DRAFT": "Y",
+                "USER": "ENGINEER",
+                "reportCode": "BOMRP030"
+              }
+            },
+            {
+              "save": "notorev",
+              "job": "bom_submitBomrp030Run",
+              "body": {
+                "CO": "STC",
+                "BOMREF": "BOM-DEMO-BDY",
+                "FROMREV": "A",
+                "MODE": "COMPARE",
+                "USER": "ENGINEER",
+                "reportCode": "BOMRP040"
+              }
+            },
+            {
+              "save": "refused",
+              "job": "bom_submitBomrp030Run",
+              "body": {
+                "CO": "STC",
+                "BOMREF": "BOM-DEMO-BDY",
+                "FROMREV": "A",
+                "TOREV": "Z",
+                "COSTSET": "BOMDEMO",
+                "MODE": "COMPARE",
+                "USER": "ENGINEER",
+                "reportCode": "BOMRP040"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "wu",
+              "run": {
+                "status": "OK",
+                "returnCode": 0
+              }
+            },
+            {
+              "on": "wu",
+              "spoolContains": "DIRECT AND INDIRECT PARENTS (level 1 is a direct use)"
+            },
+            {
+              "on": "wu",
+              "spoolContains": "TOP LEVEL ASSEMBLIES AT THE END OF EACH PATH"
+            },
+            {
+              "on": "wu",
+              "spoolContains": "OPEN EXECUTION DEMAND THAT NEEDS AN EXPLICIT DECISION"
+            },
+            {
+              "on": "wu",
+              "spoolContains": "Completeness:"
+            },
+            {
+              "on": "notorev",
+              "run": {
+                "status": "FAILED",
+                "returnCode": 12,
+                "messageContains": "STERP-E-BOM1501"
+              }
+            },
+            {
+              "on": "refused",
+              "run": {
+                "status": "FAILED",
+                "returnCode": 8,
+                "messageContains": "STERP-E-BOM1507"
+              }
+            },
+            {
+              "on": "refused",
+              "spoolContains": "NO COMPARISON WAS PRODUCED"
+            },
+            {
+              "sql": "SELECT COUNT(*) FROM core.ExceptionItem WHERE Module = 'BOM' AND Category = 'BOM.CHANGE.REPORT' AND Severity = 'WARNING' AND DocumentType = 'REPORT' AND DocumentRef = 'BOMRP030' AND OwnerRole = 'ENGINEER' AND Priority = 5",
+              "equals": 1
+            }
+          ],
+          "derivation": "AC text with cobol/batch/bom/BOMRP030.cob (three WHEREUSD sections :555-640, 'Completeness: ' footing :253, argument check before JOBLOG START :262-264,366-390 'STERP-E-BOM1501 ... are required for MODE=COMPARE', BOMCOMP BYREF RC 16 'Revision Z of BOM-DEMO-BDY does not exist' -> RC 8 STERP-E-BOM1507 with EXCPRAIS module BOM, severity WARNING, category BOM.CHANGE.REPORT, document REPORT/BOMRP030, owner role ENGINEER, priority 5 and the refusal page :517-541,740-765) with core.ExceptionItem (db/tables/00-core/08-ExceptionItem.sql) and run status FAILED for RC >= 8 (contracts 8.3).",
+          "confidence": "inferred"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-040",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-040-AC1",
+          "ac": 1,
+          "title": "Explosion contract: TBOMEXPL B1, B3 and B4 values, shared descendant, cycle BOM0513, 20-level chain, depth limit",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "b1leaf",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "view": "LEAF",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "b1ind",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "b3",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-B3-PARENT"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 30,
+                "effectiveDate": "2026-10-07",
+                "view": "LEAF",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "b4",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-B4-TOP"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "view": "LEAF",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "b6r",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-B6-ROOT"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "b6c",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-B6-CYC"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "deep",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-DEEP-00"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "view": "LEAF",
+                "maxDepth": 0
+              }
+            },
+            {
+              "save": "limit",
+              "call": "bom_explodeBill",
+              "path": {
+                "parentItemCode": "DEMO-DEEP-00"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 1,
+                "effectiveDate": "2026-10-07",
+                "view": "INDENTED",
+                "maxDepth": 3
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "b1leaf",
+              "json": "$.data.completeness",
+              "equals": "COMPLETE"
+            },
+            {
+              "on": "b1leaf",
+              "json": "$.data.lines[*].required",
+              "equals": 11
+            },
+            {
+              "on": "b1leaf",
+              "json": "$.data.lines[*].required",
+              "equals": 70
+            },
+            {
+              "on": "b1leaf",
+              "json": "$.data.lines[*].required",
+              "equals": 0.6
+            },
+            {
+              "on": "b1leaf",
+              "json": "$.data.lines[*].required",
+              "equals": 0.5
+            },
+            {
+              "on": "b1leaf",
+              "json": "$.data.lines[*].required",
+              "equals": 10
+            },
+            {
+              "on": "b1ind",
+              "json": "$.data.lines[*].required",
+              "equals": 20
+            },
+            {
+              "on": "b3",
+              "json": "$.data.lines[*].required",
+              "equals": 0.78
+            },
+            {
+              "on": "b4",
+              "json": "$.data.lines[*].required",
+              "equals": 0.6
+            },
+            {
+              "on": "b4",
+              "json": "$.data.lines[*].required",
+              "equals": 0.4
+            },
+            {
+              "on": "b6r",
+              "json": "$.data.completeness",
+              "equals": "COMPLETE"
+            },
+            {
+              "on": "b6r",
+              "json": "$.data.lines",
+              "count": 5
+            },
+            {
+              "on": "b6c",
+              "problem": {
+                "status": 422,
+                "reasonCode": "BOM0513",
+                "detailContains": "Cycle rejected"
+              }
+            },
+            {
+              "on": "b6c",
+              "bodyContains": "returns to DEMO-B6-CYC"
+            },
+            {
+              "on": "deep",
+              "json": "$.data.completeness",
+              "equals": "COMPLETE"
+            },
+            {
+              "on": "deep",
+              "json": "$.data.depthReached",
+              "equals": 20
+            },
+            {
+              "on": "deep",
+              "json": "$.data.lines[0].required",
+              "equals": 1048576
+            },
+            {
+              "on": "limit",
+              "json": "$.data.completeness",
+              "equals": "INCOMPLETE"
+            },
+            {
+              "on": "limit",
+              "outcome": {
+                "reasonCode": "BOM0520"
+              }
+            }
+          ],
+          "derivation": "AC text with cobol/tests/bom/TBOMEXPL.cob:110-444 (B1 ten frames: 20 good braces, 25 brace starts in 3 batches giving plate 11, pins 70, resin 0.6, cleaner 0.5 from one run, labels 10; B3 0.78 kg; B4 independent runs 0.6 and 0.4 litres; B6 shared screw on two paths; B6 cycle BOM0513 'Cycle rejected: <path> returns to <item>', BOMEXPL.cob:1147-1172; AC-110 leaf 1,048,576 at depth 20) driven through bom_explodeBill on the seeded B1-B6 and DEMO-DEEP bills; the KITCREAT, KITTRIAL and MULTITRL request shapes are in-process calls with no HTTP surface (contract tests with KIT test doubles), so their summary fields and GETLINE windows cannot be pinned here.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-041",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-041-AC1",
+          "ac": 1,
+          "title": "Costing contract: TBOMCOST B1 material 70.10, conversion with setup 40.00, total 100.10 (brace branch once), unit 10.01",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "b1",
+              "call": "bom_costBill",
+              "path": {
+                "parentItemCode": "DEMO-FRAME"
+              },
+              "body": {
+                "revision": "",
+                "quantity": 10,
+                "effectiveDate": "2026-10-07",
+                "costSet": "BOMDEMO"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "b1",
+              "status": 200
+            },
+            {
+              "on": "b1",
+              "json": "$.data.completeness",
+              "equals": "COMPLETE"
+            },
+            {
+              "on": "b1",
+              "json": "$.data.missingRates",
+              "equals": 0
+            },
+            {
+              "on": "b1",
+              "json": "$.data.materialCost",
+              "equals": 70.1
+            },
+            {
+              "on": "b1",
+              "json": "$.data.conversionCost",
+              "equals": 40.0
+            },
+            {
+              "on": "b1",
+              "json": "$.data.totalCost",
+              "equals": 100.1
+            },
+            {
+              "on": "b1",
+              "json": "$.data.unitCost",
+              "equals": 10.01
+            }
+          ],
+          "derivation": "AC text with cobol/tests/bom/TBOMCOST.cob:90-163 (B1: material 70.10, conversion 30.00 of which setup 10.00, total 100.10 containing the 75.10 brace branch once, unit 10.01, COMPLETE) through bom_costBill, whose conversionCost is BC-CONVERSION-COST + BC-SETUP-COST (BomService.vb:275, SME-640) and whose branch column is always 0; the CST COSTROLL request shape is an in-process call with no HTTP surface, so its totals and GETLINE windows cannot be pinned here.",
+          "confidence": "unknown"
+        }
+      ]
+    },
+    {
+      "requirement_id": "FR-STERP-BOM-042",
+      "scenarios": [
+        {
+          "id": "FR-STERP-BOM-042-AC1",
+          "ac": 1,
+          "title": "Cycle kernel: DEMO-FRAME replacing a pin of DEMO-BRACE fails BOM1434; the CHECK finding BOM0334 is unreachable",
+          "layer": "unit",
+          "runner": "api",
+          "dataset": "fresh",
+          "context": {
+            "login": "SYSADM",
+            "company": "STC",
+            "site": "RDG",
+            "businessDate": "2026-10-07",
+            "actor": "ENGINEER"
+          },
+          "steps": [
+            {
+              "save": "edge",
+              "call": "bom_previewBulkChange",
+              "path": {
+                "changeRef": "ECO-A07-CYCLE"
+              },
+              "body": {
+                "oldItem": "DEMO-PIN",
+                "newItem": "DEMO-FRAME",
+                "effectiveDate": "2026-11-01",
+                "scope": "BOMREF",
+                "scopeItem": "BOM-DEMO-BRACE",
+                "includeDraft": true
+              }
+            },
+            {
+              "save": "check",
+              "call": "bom_validateBill",
+              "path": {
+                "bomRef": "BOM-DEMO-B6C"
+              },
+              "body": {
+                "bomRevision": "A",
+                "effectiveDate": "2026-10-19"
+              }
+            }
+          ],
+          "assertions": [
+            {
+              "on": "edge",
+              "problem": {
+                "status": 422,
+                "reasonCode": "BOM1411"
+              }
+            },
+            {
+              "on": "edge",
+              "json": "$.data.targetCount",
+              "equals": 1
+            },
+            {
+              "on": "edge",
+              "json": "$.data.lines[0].outcome",
+              "equals": "FAILED"
+            },
+            {
+              "on": "edge",
+              "json": "$.data.lines[0].reason",
+              "equals": "BOM1434"
+            },
+            {
+              "sql": "SELECT Status FROM bom.BomHeader WHERE CompanyCode = 'STC' AND BomRef = 'BOM-DEMO-BRACE' AND BomRevision = 'A'",
+              "equals": "RELEASED"
+            },
+            {
+              "on": "check",
+              "problem": {
+                "status": 404,
+                "reasonCode": "BOM0303"
+              }
+            }
+          ],
+          "derivation": "AC text with CYCLECHK EDGE (child = parent only, SME-630) and the BOMBREV where-used ancestry test (BOMBREV.cob:287-312, FAILED BOM1434) on DEMO-BRACE, whose parent DEMO-FRAME (31-bom-structures.sql:82) is proposed as the replacement; BOMVALID CHECK with finding BOM0334 is reachable only in process (bom_validateBill answers BOM0303 for every bill, FR-STERP-BOM-016, and previews stop cyclic proposals at BOM1434), so the second clause's RC 8 and BOM0334 cannot be pinned here.",
+          "confidence": "unknown"
+        }
+      ]
+    }
+  ]
+}

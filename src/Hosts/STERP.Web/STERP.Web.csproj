@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Sterp.Web</RootNamespace>
+    <AssemblyName>STERP.Web</AssemblyName>
+    <Description>STERP-WEB host: serves the WebAssembly shell for every route (deep links) behind Windows authentication, plus the anonymous configuration, client-error log and health endpoints. It never connects to the database (FR-STERP-WEB-001).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\STERP.Web.Client\STERP.Web.Client.csproj" />
+  </ItemGroup>
+</Project>

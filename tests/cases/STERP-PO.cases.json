@@ -1,0 +1,6445 @@
+{
+ "schema": "sterp-parity-cases/1",
+ "target_application_id": "STERP-PO",
+ "requirements": [
+  {
+   "requirement_id": "FR-STERP-PO-001",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-001-AC1",
+     "ac": 1,
+     "title": "Drift check of STERP-API and STERP-JOBS reports the po objects present with no difference",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07"
+     },
+     "covers": [
+      "health"
+     ],
+     "steps": [
+      {
+       "save": "api",
+       "call": "api_getReadiness",
+       "path": {},
+       "body": null
+      },
+      {
+       "save": "jobs",
+       "call": "jobs_getReadiness",
+       "path": {},
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "api",
+       "status": 200
+      },
+      {
+       "on": "api",
+       "json": "$.status",
+       "equals": "Healthy"
+      },
+      {
+       "on": "api",
+       "json": "$.driftDifferences",
+       "count": 0
+      },
+      {
+       "on": "jobs",
+       "status": 200
+      },
+      {
+       "on": "jobs",
+       "json": "$.status",
+       "equals": "Healthy"
+      },
+      {
+       "on": "jobs",
+       "json": "$.driftDifferences",
+       "count": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-001 AC1 and contracts 6.11 (drift check at start, readiness example status Healthy with empty driftDifferences) over the untouched repository deploy of db/tables/80-po, db/procs/po and db/triggers/po.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-001-AC2",
+     "ac": 2,
+     "title": "Purchasing operations create, alter or drop no po object (no DDL after the isolated restore)",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "req",
+       "call": "po_createRequisition",
+       "path": {},
+       "body": {
+        "purpose": "Bar stock top-up",
+        "neededBy": "2026-10-21",
+        "demandType": "MANUAL",
+        "demandRef": "",
+        "costCentre": "",
+        "project": "",
+        "budgetCode": ""
+       }
+      },
+      {
+       "save": "open",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {},
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "open",
+       "status": 200
+      },
+      {
+       "sql": "DECLARE @since datetime = COALESCE((SELECT MAX(restore_date) FROM msdb.dbo.restorehistory WHERE destination_database_name = DB_NAME()), (SELECT create_date FROM sys.databases WHERE name = DB_NAME())); SELECT COUNT(*) FROM sys.objects o WHERE o.schema_id = SCHEMA_ID('po') AND o.is_ms_shipped = 0 AND (o.create_date > @since OR o.modify_date > @since)",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-001 AC2 and contracts 6.1 (schema_change_policy frozen, the target executes no DDL): any DDL against a po object after the isolated restore would move its sys.objects create_date or modify_date past the restore.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-001-AC3",
+     "ac": 3,
+     "title": "po object list equals PO-sql-objects.csv owned rows: 23 tables, 1 view, 4 procedures, 1 trigger, 2 indexes",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07"
+     },
+     "steps": [
+      {
+       "save": "api",
+       "call": "api_getReadiness",
+       "path": {},
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "api",
+       "status": 200
+      },
+      {
+       "sql": "SELECT CONCAT((SELECT COUNT(*) FROM sys.tables WHERE schema_id = SCHEMA_ID('po')), '|', (SELECT COUNT(*) FROM sys.views WHERE schema_id = SCHEMA_ID('po')), '|', (SELECT COUNT(*) FROM sys.procedures WHERE schema_id = SCHEMA_ID('po')), '|', (SELECT COUNT(*) FROM sys.objects WHERE schema_id = SCHEMA_ID('po') AND type = 'TR'), '|', (SELECT COUNT(*) FROM sys.indexes i JOIN sys.tables t ON t.object_id = i.object_id WHERE t.schema_id = SCHEMA_ID('po') AND i.name IN ('IX_PurchasePrice_Lookup', 'IX_PoCommitment_Order')))",
+       "equals": "23|1|4|1|2"
+      },
+      {
+       "sql": "SELECT STRING_AGG(name, ',') WITHIN GROUP (ORDER BY name) FROM sys.objects WHERE schema_id = SCHEMA_ID('po') AND type IN ('P', 'V', 'TR')",
+       "equals": "tr_ReceiptLineAccepted,usp_CommitmentEnquiry,usp_OpenOrders,usp_OverdueSchedules,usp_ReceiptDeliveryState,vw_CommitmentBalance"
+      }
+     ],
+     "derivation": "FR-STERP-PO-001 AC3: the 31 'owned (schema)' rows of PO-sql-objects.csv (db/tables/80-po/01..06, db/procs/po/usp_PoEnquiry.sql:10-140, usp_ReceiptDeliveryState.sql:3, db/triggers/po/tr_ReceiptLineAccepted.sql:3).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-002",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-002-AC1",
+     "ac": 1,
+     "title": "BUYER sees Requisitions, Purchase Orders, Supplier Sources, Purchase Prices and reports, no Goods Receipt",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "navigation",
+      "permission"
+     ],
+     "steps": [
+      {
+       "save": "bar",
+       "gui": "/",
+       "actions": [
+        {
+         "menu": [
+          "Purchasing"
+         ]
+        }
+       ]
+      },
+      {
+       "save": "rpt",
+       "gui": "/",
+       "actions": [
+        {
+         "menu": [
+          "Purchasing",
+          "Purchasing Reports"
+         ]
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "bar",
+       "text": "Requisitions..."
+      },
+      {
+       "on": "bar",
+       "text": "Purchase Orders..."
+      },
+      {
+       "on": "bar",
+       "text": "Supplier Sources..."
+      },
+      {
+       "on": "bar",
+       "text": "Purchase Prices..."
+      },
+      {
+       "on": "bar",
+       "text": "Purchasing Reports"
+      },
+      {
+       "on": "bar",
+       "notText": "Goods Receipt and Inspection..."
+      },
+      {
+       "on": "rpt",
+       "text": "Pipeline and GRNI..."
+      },
+      {
+       "on": "rpt",
+       "text": "Overdue Orders..."
+      },
+      {
+       "on": "rpt",
+       "text": "Supplier Performance..."
+      },
+      {
+       "on": "rpt",
+       "text": "Print Purchase Order Document..."
+      },
+      {
+       "on": "rpt",
+       "text": "Requisition Generation..."
+      }
+     ],
+     "derivation": "FR-STERP-PO-002 AC1: core.MenuItem rows of db/seed/81-po-menu.sql:48-60 filtered by core.usp_UiMenuLoad for BUYER's grants (db/seed/03-core-roles-users.sql BUYER row; PO.SOURCE/PRICE.MAINT granted via 81-po-menu.sql:37-43).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-002-AC2",
+     "ac": 2,
+     "title": "WHSE sees Goods Receipt and Inspection and it opens the goods receipt page",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "navigation",
+      "permission"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/",
+       "actions": [
+        {
+         "menu": [
+          "Purchasing",
+          "Goods Receipt and Inspection..."
+         ]
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Goods Receipt and Inspection"
+      },
+      {
+       "on": "page",
+       "text": "Validate the delivery note against the order, count each line, then F10 to confirm it."
+      }
+     ],
+     "derivation": "FR-STERP-PO-002 AC2: menu row PO.RECEIPT.ENTRY (PO.RECEIPT.CONFIRM, db/seed/81-po-menu.sql:50) routed to /po/goods-receipt (STERP-WEB 7.2); page title and status text from frmGoodsReceipt.vb:39,98.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-002-AC3",
+     "ac": 3,
+     "title": "PURMGR has no Purchase Orders entry (no PO.ORDER.ENTER) but sees Tolerance Rules",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "PURMGR"
+     },
+     "covers": [
+      "navigation",
+      "permission"
+     ],
+     "steps": [
+      {
+       "save": "bar",
+       "gui": "/",
+       "actions": [
+        {
+         "menu": [
+          "Purchasing"
+         ]
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "bar",
+       "text": "Tolerance Rules..."
+      },
+      {
+       "on": "bar",
+       "notText": "Purchase Orders..."
+      }
+     ],
+     "derivation": "FR-STERP-PO-002 AC3: PURMGR grants (03-core-roles-users.sql) lack PO.ORDER.ENTER required by row PO.ORDER.ENTRY (81-po-menu.sql:49) while PO.TOLERANCE.MAINT follows PO.ORDER.APPROVE.HIGH (81-po-menu.sql:37-43).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-002-AC4",
+     "ac": 4,
+     "title": "Before wave W6 a Purchasing class opens the contracts 9.2 placeholder naming STERP-PO and W6",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "navigation"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/",
+       "actions": [
+        {
+         "menu": [
+          "Purchasing",
+          "Requisitions..."
+         ]
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Not yet available in the modernized application - use the legacy client (slice STERP-PO, wave W6)"
+      }
+     ],
+     "derivation": "FR-STERP-PO-002 AC4 and contracts 9.2 placeholder text for an undelivered class (frmRequisition, slice STERP-PO, wave W6); this expectation holds only until wave W6 is delivered.",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-010",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-010-AC1",
+     "ac": 1,
+     "title": "Requisition page opens with Needed by = business date + 14 and the legacy start-up status",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "keys"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/requisition",
+       "actions": []
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Enter the demand, add the lines, then F10 to submit it for approval."
+      },
+      {
+       "on": "page",
+       "text": "21/10/2026"
+      }
+     ],
+     "derivation": "FR-STERP-PO-010 AC1: frmRequisition.OnLoad (frmRequisition.vb:64-72) sets Needed by to BusinessDate+14 (2026-10-07 + 14, Fmt.Date dd/MM/yyyy) and the start-up status text.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-010-AC2",
+     "ac": 2,
+     "title": "Add line without a current requisition creates the header then the line and shows value and budget text",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "navigation"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/requisition",
+       "actions": [
+        {
+         "fill": {
+          "label": "Item",
+          "value": "BAR-AL6082-25MM"
+         }
+        },
+        {
+         "fill": {
+          "label": "Description",
+          "value": "Aluminium bar 6082-T6, 25 mm round"
+         }
+        },
+        {
+         "fill": {
+          "label": "Quantity",
+          "value": "40"
+         }
+        },
+        {
+         "fill": {
+          "label": "Unit",
+          "value": "M"
+         }
+        },
+        {
+         "fill": {
+          "label": "Est. price",
+          "value": "10.25"
+         }
+        },
+        {
+         "click": "Add line"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "DRAFT"
+      },
+      {
+       "on": "page",
+       "text": "total £410.00"
+      },
+      {
+       "on": "page",
+       "text": "budget not checked"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.RequisitionLine l JOIN po.Requisition r ON r.RequisitionId = l.RequisitionId WHERE r.CompanyCode = 'STC' AND r.SiteCode = 'BHM' AND r.Status = 'DRAFT' AND r.CreatedBy = 'BUYER' AND r.SourceDemandType = 'MANUAL' AND l.LineNum = 1 AND l.ItemCode = 'BAR-AL6082-25MM' AND l.EstimatedValueGBP = 410.00",
+       "equals": 1
+      }
+     ],
+     "derivation": "FR-STERP-PO-010 AC2: frmRequisition.AddClicked (frmRequisition.vb:84-99) calls Create then AddLine and shows '<req>  DRAFT   total £410.00   budget not checked' (40 x 10.25, POREQ.cob:212-381, BudgetText blank outcome).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-010-AC3",
+     "ac": 3,
+     "title": "F10 without a current requisition warns 'Add at least one line first.' and calls nothing",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "keys"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/requisition",
+       "actions": [
+        {
+         "press": "F10"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Add at least one line first."
+      },
+      {
+       "on": "page",
+       "notText": "Submit requisition"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Requisition WHERE CompanyCode = 'STC'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-010 AC3: frmRequisition.OnConfirm (frmRequisition.vb:126-130) warns before any confirmation or service call.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-010-AC4",
+     "ac": 4,
+     "title": "Demand SALES from the picker is refused REQ0009 'Demand type SALES is not recognised'",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/requisition",
+       "actions": [
+        {
+         "select": {
+          "label": "Demand",
+          "value": "SALES"
+         }
+        },
+        {
+         "fill": {
+          "label": "Item",
+          "value": "BAR-AL6082-25MM"
+         }
+        },
+        {
+         "fill": {
+          "label": "Description",
+          "value": "Aluminium bar 6082-T6, 25 mm round"
+         }
+        },
+        {
+         "fill": {
+          "label": "Quantity",
+          "value": "40"
+         }
+        },
+        {
+         "fill": {
+          "label": "Unit",
+          "value": "M"
+         }
+        },
+        {
+         "fill": {
+          "label": "Est. price",
+          "value": "10.25"
+         }
+        },
+        {
+         "click": "Add line"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Demand type SALES is not recognised"
+      },
+      {
+       "on": "page",
+       "text": "Reason code: REQ0009"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Requisition WHERE CompanyCode = 'STC'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-010 AC4 (BC-PO-05 reproduced): picker values of frmRequisition.vb:38 versus the POREQ demand domain (POREQ.cob:128-137 REQ0009 message) shown by ShowResult with 'Reason code:' (BaseForm.vb:180,241).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-011",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-011-AC1",
+     "ac": 1,
+     "title": "Create returns a POREQ-series number, status DRAFT and writes one po.Requisition row created by BUYER",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_createRequisition",
+       "path": {},
+       "body": {
+        "purpose": "Bar stock top-up",
+        "neededBy": "2026-10-21",
+        "demandType": "MANUAL",
+        "demandRef": "",
+        "costCentre": "",
+        "project": "",
+        "budgetCode": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.reqNumber",
+       "equals": "PR00000001",
+       "normalize": "document-number"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.status",
+       "equals": "DRAFT"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Requisition WHERE CompanyCode = 'STC' AND SiteCode = 'BHM' AND Status = 'DRAFT' AND CreatedBy = 'BUYER' AND RequesterUser = 'BUYER' AND RequisitionDate = '2026-10-07'",
+       "equals": 1
+      }
+     ],
+     "derivation": "FR-STERP-PO-011 AC1 and the po_createRequisition 200 example: POREQ CREATE (POREQ.cob:141-206) draws series POREQ (prefix PR, length 8, db/seed/81-po-menu.sql number series) and inserts DRAFT with CreatedBy = CA-USER.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-011-AC2",
+     "ac": 2,
+     "title": "Demand type PROJECT is refused 422 REQ0009 and no requisition is written",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_createRequisition",
+       "path": {},
+       "body": {
+        "purpose": "Bar stock top-up",
+        "neededBy": "2026-10-21",
+        "demandType": "PROJECT",
+        "demandRef": "",
+        "costCentre": "",
+        "project": "",
+        "budgetCode": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "REQ0009",
+        "detailContains": "Demand type PROJECT is not recognised"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Requisition WHERE CompanyCode = 'STC'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-011 AC2: POREQ 1000-INIT demand domain check (POREQ.cob:128-137) RC 8 REQ0009 mapped to 422 (contracts 4.6).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-011-EDGE-TEXT-NORMALIZATION",
+     "ac": null,
+     "title": "Code fields trimmed and upper-cased, purpose encoded to Windows-1252 ('?') and right-truncated to 200",
+     "layer": "unit",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "text-normalization"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_createRequisition",
+       "path": {},
+       "body": {
+        "purpose": "ΩAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "neededBy": "2026-10-21",
+        "demandType": " manual ",
+        "demandRef": "",
+        "costCentre": " purch ",
+        "project": "",
+        "budgetCode": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.data.demandType",
+       "equals": "MANUAL"
+      },
+      {
+       "sql": "SELECT CONCAT(LEN(Purpose), '|', LEFT(Purpose, 3), '|', SourceDemandType, '|', DimCostCentre) FROM po.Requisition WHERE CompanyCode = 'STC'",
+       "equals": "200|?AA|MANUAL|PURCH"
+      }
+     ],
+     "derivation": "Contracts 4.4 and spec 4.1 step 3: PoMap.S trims/upper-cases code fields (PoMap.vb:13-15, RequisitionService.vb:34-46) and CobolCodec encodes RQ-PURPOSE X(200) to Windows-1252 with '?' and right truncation (CobolCodec.cs:15,37-43).",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-012",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-012-AC1",
+     "ac": 1,
+     "title": "40 M of BAR-AL6082-25MM at 10.25 on a DRAFT requisition returns line 1, value 410.00, total 410.00",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "sql": "INSERT po.Requisition (CompanyCode, SiteCode, RequisitionNumber, RequesterUser, Purpose, RequisitionDate, NeededByDate, DimCostCentre, SourceDemandType, TotalValueGBP, BudgetCode, Status, CreatedBy) VALUES ('STC', 'BHM', 'PR-A07-012', 'BUYER', 'Bar stock top-up', '2026-10-07', '2026-10-21', NULL, 'MANUAL', 0, NULL, 'DRAFT', 'BUYER');"
+      },
+      {
+       "save": "r1",
+       "call": "po_addRequisitionLine",
+       "path": {
+        "reqNumber": "PR-A07-012"
+       },
+       "body": {
+        "itemCode": "BAR-AL6082-25MM",
+        "description": "Aluminium bar 6082-T6, 25 mm round",
+        "quantity": 40,
+        "uomCode": "M",
+        "estUnitPrice": 10.25,
+        "suggestSupp": "S0001",
+        "accountCode": "",
+        "lineNeededBy": "2026-10-21"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineNum",
+       "equals": 1
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineValueGbp",
+       "equals": 410.0
+      },
+      {
+       "on": "r1",
+       "json": "$.data.totalGbp",
+       "equals": 410.0
+      }
+     ],
+     "derivation": "FR-STERP-PO-012 AC1 and the po_addRequisitionLine example: POREQ ADDLINE (POREQ.cob:212-381) MAX+1 line number, ROUNDED(40 x 10.25) = 410.00 and header re-total.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-012-AC2",
+     "ac": 2,
+     "title": "Quantity 0 is refused 422 REQ0004 and no requisition line is written",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "sql": "INSERT po.Requisition (CompanyCode, SiteCode, RequisitionNumber, RequesterUser, Purpose, RequisitionDate, NeededByDate, DimCostCentre, SourceDemandType, TotalValueGBP, BudgetCode, Status, CreatedBy) VALUES ('STC', 'BHM', 'PR-A07-012', 'BUYER', 'Bar stock top-up', '2026-10-07', '2026-10-21', NULL, 'MANUAL', 0, NULL, 'DRAFT', 'BUYER');"
+      },
+      {
+       "save": "r1",
+       "call": "po_addRequisitionLine",
+       "path": {
+        "reqNumber": "PR-A07-012"
+       },
+       "body": {
+        "itemCode": "BAR-AL6082-25MM",
+        "description": "Aluminium bar 6082-T6, 25 mm round",
+        "quantity": 0,
+        "uomCode": "M",
+        "estUnitPrice": 10.25,
+        "suggestSupp": "S0001",
+        "accountCode": "",
+        "lineNeededBy": "2026-10-21"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "REQ0004",
+        "detailContains": "a quantity greater than zero"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.RequisitionLine l JOIN po.Requisition r ON r.RequisitionId = l.RequisitionId WHERE r.CompanyCode = 'STC' AND r.RequisitionNumber = 'PR-A07-012'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-012 AC2: POREQ 3000-ADDLINE description/quantity check (POREQ.cob:228-236) RC 8 REQ0004 before the MERGE.",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-013",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-013-AC1",
+     "ac": 1,
+     "title": "Enquiry of demo requisition PR00000001 returns status, total, live line count and open value",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_getRequisition",
+       "path": {
+        "reqNumber": "PR00000001"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.data.status",
+       "equals": "APPROVED"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.totalGbp",
+       "equals": 1936.76
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineCnt",
+       "equals": 2
+      },
+      {
+       "on": "r1",
+       "json": "$.data.openGbp",
+       "equals": 1936.76
+      }
+     ],
+     "derivation": "FR-STERP-PO-013 AC1: the POREQ ENQUIRE 8000-READ-HDR statement (POREQ.cob:770-834) executed verbatim on the restored demo dataset returns PR00000001 APPROVED, TotalValueGBP 1936.76, 2 live lines and open value 1936.760000 (lines 612.90 + 1,323.86, nothing converted), moved by NUMVAL into RQ-TOTAL-GBP/RQ-OPEN-GBP S9(13)V99 (dataset query DQ-01). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-036: totals of the Agent 07 demo dataset replace the QA PODEMO listing figure 1,428.32]",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-013-AC2",
+     "ac": 2,
+     "title": "Unknown requisition number returns 404 REQ0002",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_getRequisition",
+       "path": {
+        "reqNumber": "PR99999999"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 404,
+        "type": "not-found",
+        "reasonCode": "REQ0002",
+        "detailContains": "Requisition PR99999999 is not on file for company STC"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-013 AC2: POREQ 8000-READ-HDR not found RC 16 REQ0002 (POREQ.cob:807-817) mapped to 404 (contracts 4.6).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-014",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-014-AC1",
+     "ac": 1,
+     "title": "Submitting an uncoded DRAFT requisition returns OK, SUBMITTED and budget outcome WITHIN",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "sql": "INSERT po.Requisition (CompanyCode, SiteCode, RequisitionNumber, RequesterUser, Purpose, RequisitionDate, NeededByDate, DimCostCentre, SourceDemandType, TotalValueGBP, BudgetCode, Status, CreatedBy) VALUES ('STC', 'BHM', 'PR-A07-014A', 'BUYER', 'Bar stock top-up', '2026-10-07', '2026-10-21', NULL, 'MANUAL', 410.00, NULL, 'DRAFT', 'BUYER'); INSERT po.RequisitionLine (RequisitionId, LineNum, ItemCode, Description, Quantity, UomCode, EstimatedUnitPrice, EstimatedValueGBP, SuggestedSupplierCode, NeededByDate, Status) SELECT RequisitionId, 1, 'BAR-AL6082-25MM', 'Aluminium bar 6082-T6, 25 mm round', 40, 'M', 10.25, 410.00, 'S0001', '2026-10-21', 'OPEN' FROM po.Requisition WHERE CompanyCode = 'STC' AND RequisitionNumber = 'PR-A07-014A';"
+      },
+      {
+       "save": "r1",
+       "call": "po_submitRequisition",
+       "path": {
+        "reqNumber": "PR-A07-014A"
+       },
+       "body": {}
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK",
+        "messageContains": "submitted for approval"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.status",
+       "equals": "SUBMITTED"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.budgetOutcome",
+       "equals": "WITHIN"
+      },
+      {
+       "sql": "SELECT Status FROM po.Requisition WHERE CompanyCode = 'STC' AND RequisitionNumber = 'PR-A07-014A'",
+       "equals": "SUBMITTED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-014 AC1: POREQ SUBMIT (POREQ.cob:388-424) skips BUDGCHK when budget code and cost centre are blank (4100-BUDGET :428-433) and 4200-SET-STATUS writes SUBMITTED.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-014-AC2",
+     "ac": 2,
+     "title": "A coded requisition taking the budget to 102.50% is held 202 REQ0007 BLOCK and stays DRAFT",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "sql": "INSERT fin.Budget (CompanyCode, BudgetCode, FiscalYear, Name, BudgetType, Version, CurrencyCode, Status, IsBaseline, OwnerUser, ApprovedBy, ApprovedAt, CreatedBy) VALUES ('STC', 'A07-BUD-014', 2026, 'A07 parity budget A07-BUD-014', 'BUDGET', 1, 'GBP', 'APPROVED', 0, 'FINCTRL', 'FINCTRL', '2026-04-01T09:00:00', 'A07'); INSERT fin.BudgetLine (CompanyCode, BudgetCode, FiscalYear, Version, PeriodNo, AccountCode, DimCostCentre, DimProject, Amount, Narrative) VALUES ('STC', 'A07-BUD-014', 2026, 1, 1, '6000', 'A07CC014', NULL, 400.00, 'A07 parity budget'); INSERT po.Requisition (CompanyCode, SiteCode, RequisitionNumber, RequesterUser, Purpose, RequisitionDate, NeededByDate, DimCostCentre, SourceDemandType, TotalValueGBP, BudgetCode, Status, CreatedBy) VALUES ('STC', 'BHM', 'PR-A07-014B', 'BUYER', 'Bar stock top-up', '2026-10-07', '2026-10-21', 'A07CC014', 'MANUAL', 410.00, 'A07-BUD-014', 'DRAFT', 'BUYER'); INSERT po.RequisitionLine (RequisitionId, LineNum, ItemCode, Description, Quantity, UomCode, EstimatedUnitPrice, EstimatedValueGBP, SuggestedSupplierCode, NeededByDate, Status) SELECT RequisitionId, 1, 'BAR-AL6082-25MM', 'Aluminium bar 6082-T6, 25 mm round', 40, 'M', 10.25, 410.00, 'S0001', '2026-10-21', 'OPEN' FROM po.Requisition WHERE CompanyCode = 'STC' AND RequisitionNumber = 'PR-A07-014B';"
+      },
+      {
+       "save": "r1",
+       "call": "po_submitRequisition",
+       "path": {
+        "reqNumber": "PR-A07-014B"
+       },
+       "body": {}
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 202
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 6,
+        "severity": "HOLD",
+        "reasonCode": "REQ0007"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.budgetOutcome",
+       "equals": "BLOCK"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.budgetUsedPct",
+       "equals": 102.5
+      },
+      {
+       "sql": "SELECT Status FROM po.Requisition WHERE CompanyCode = 'STC' AND RequisitionNumber = 'PR-A07-014B'",
+       "equals": "DRAFT"
+      }
+     ],
+     "derivation": "FR-STERP-PO-014 AC2: BUDGCHK CHECK after-value 410.00/400.00 = 102.5000% >= block 100 (BUDGCHK.cob:395-413) and POREQ SUBMIT RC 6 REQ0007 without override and no status update (POREQ.cob:414-423); budget arranged for FY2026.",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-015",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-015-AC1",
+     "ac": 1,
+     "title": "Approved source S0001 for BAR-AL6082-25MM returns lead time, minimum order, last paid price, currency",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "sql": "INSERT po.SupplierSource (CompanyCode, ItemCode, SupplierCode, SupplierPartNumber, Priority, ApprovalStatus, ApprovalEvidence, LeadTimeDays, MinOrderQty, PackQty, OrderUomCode, CurrencyCode, EffectiveFrom, IsActive, CreatedBy) VALUES ('STC', 'BAR-AL6082-25MM', 'S0001', 'S0001-BARAL608225MM', 1, 'APPROVED', 'Supplier audit S0001 passed', 10, 0, 1, 'M', 'GBP', '2026-01-01', 1, 'A07');"
+      },
+      {
+       "save": "r1",
+       "call": "po_checkSupplierSource",
+       "path": {},
+       "body": {
+        "reqNumber": "",
+        "itemCode": "BAR-AL6082-25MM",
+        "supplier": "S0001",
+        "quantity": 40,
+        "uomCode": "M",
+        "neededBy": "2026-10-21"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.approvalStatus",
+       "equals": "APPROVED"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.leadTimeDays",
+       "equals": 10
+      },
+      {
+       "on": "r1",
+       "json": "$.data.minOrderQty",
+       "equals": 0
+      },
+      {
+       "on": "r1",
+       "json": "$.data.srcCurrency",
+       "equals": "GBP"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lastPaidPrice",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-015 AC1: SOURCSEL CHECK takes the newest active row (SOURCSEL.cob:159-176) and POPRICE HISTORY finds no confirmed receipt on the fresh deploy (POPRICE.cob:416-430); the approved source row is arranged because the seed picks sources by checksum (92-po-demo.sql:24-56).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-015-AC2",
+     "ac": 2,
+     "title": "Supplier without a source: the page shows the SRC0002 refusal text with cue WARNING",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.SupplierSource SET IsActive = 0 WHERE CompanyCode = 'STC' AND ItemCode = 'BAR-AL6082-25MM' AND SupplierCode = 'S0001';"
+      },
+      {
+       "save": "page",
+       "gui": "/po/requisition",
+       "actions": [
+        {
+         "fill": {
+          "label": "Item",
+          "value": "BAR-AL6082-25MM"
+         }
+        },
+        {
+         "fill": {
+          "label": "Suggested supplier",
+          "value": "S0001"
+         }
+        },
+        {
+         "fill": {
+          "label": "Quantity",
+          "value": "40"
+         }
+        },
+        {
+         "click": "Check this source"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Supplier S0001 is not an approved source for item BAR-AL6082-25MM"
+      },
+      {
+       "on": "page",
+       "text": "WARNING"
+      }
+     ],
+     "derivation": "FR-STERP-PO-015 AC2: SOURCSEL CHECK no row RC 16 SRC0002 (SOURCSEL.cob:197-209, 404) shown by frmRequisition.SourceClicked as the detail with cue '!  WARNING' (frmRequisition.vb:108-115).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-015-AC3",
+     "ac": 3,
+     "title": "UNAPPROVED source is held 202 SRC0005 and needs an authoriser",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "sql": "INSERT po.SupplierSource (CompanyCode, ItemCode, SupplierCode, SupplierPartNumber, Priority, ApprovalStatus, ApprovalEvidence, LeadTimeDays, MinOrderQty, PackQty, OrderUomCode, CurrencyCode, EffectiveFrom, IsActive, CreatedBy) VALUES ('STC', 'BAR-AL6082-25MM', 'S0001', 'S0001-BARAL608225MM', 1, 'UNAPPROVED', 'No audit held - use needs an authoriser', 10, 0, 1, 'M', 'GBP', '2026-02-01', 1, 'A07');"
+      },
+      {
+       "save": "r1",
+       "call": "po_checkSupplierSource",
+       "path": {},
+       "body": {
+        "reqNumber": "",
+        "itemCode": "BAR-AL6082-25MM",
+        "supplier": "S0001",
+        "quantity": 40,
+        "uomCode": "M",
+        "neededBy": "2026-10-21"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 202
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 6,
+        "severity": "HOLD",
+        "reasonCode": "SRC0005",
+        "messageContains": "is an unapproved source and needs explicit authorisation"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.approvalStatus",
+       "equals": "UNAPPROVED"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.needsAuth",
+       "equals": "Y"
+      }
+     ],
+     "derivation": "FR-STERP-PO-015 AC3 and the 202 example: SOURCSEL CHECK UNAPPROVED branch RC 6 SRC0005 (SOURCSEL.cob:250-262) with no authoriser sent by the facade (RequisitionService.vb:105-117).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-020",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-020-AC1",
+     "ac": 1,
+     "title": "F5 with Order PO00000001..PO00000005 shows DRAFT, AWAITAPPROVAL, APPROVED, ISSUED, ACKNOWLEDGED",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "keys",
+      "journey"
+     ],
+     "steps": [
+      {
+       "save": "p1",
+       "gui": "/po/purchase-order",
+       "actions": [
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000001"
+         }
+        },
+        {
+         "press": "F5"
+        }
+       ]
+      },
+      {
+       "save": "p2",
+       "gui": "/po/purchase-order",
+       "actions": [
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000002"
+         }
+        },
+        {
+         "press": "F5"
+        }
+       ]
+      },
+      {
+       "save": "p3",
+       "gui": "/po/purchase-order",
+       "actions": [
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000003"
+         }
+        },
+        {
+         "press": "F5"
+        }
+       ]
+      },
+      {
+       "save": "p4",
+       "gui": "/po/purchase-order",
+       "actions": [
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000004"
+         }
+        },
+        {
+         "press": "F5"
+        }
+       ]
+      },
+      {
+       "save": "p5",
+       "gui": "/po/purchase-order",
+       "actions": [
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000005"
+         }
+        },
+        {
+         "press": "F5"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "p1",
+       "text": "DRAFT"
+      },
+      {
+       "on": "p1",
+       "notText": "AWAITAPPROVAL"
+      },
+      {
+       "on": "p2",
+       "text": "AWAITAPPROVAL"
+      },
+      {
+       "on": "p2",
+       "notText": "ACKNOWLEDGED"
+      },
+      {
+       "on": "p3",
+       "text": "APPROVED"
+      },
+      {
+       "on": "p3",
+       "notText": "AWAITAPPROVAL"
+      },
+      {
+       "on": "p4",
+       "text": "ISSUED"
+      },
+      {
+       "on": "p4",
+       "notText": "AWAITAPPROVAL"
+      },
+      {
+       "on": "p5",
+       "text": "ACKNOWLEDGED"
+      },
+      {
+       "on": "p5",
+       "notText": "AWAITAPPROVAL"
+      }
+     ],
+     "derivation": "FR-STERP-PO-020 AC1 (DEMO-WORKFLOWS workflow 3 step 2): frmPurchaseOrder.OnRefreshKey binds po_listOpenOrders for the typed order (frmPurchaseOrder.vb:113-120); statuses from the legacy PODEMO run (PODEMO.cob:2200-2600 scenarios).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-020-AC2",
+     "ac": 2,
+     "title": "PO00000009 is BLANKET in GBP, PO00000010 SERVICE and PO00000011 SUBCONTRACT on the order list",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "journey"
+     ],
+     "steps": [
+      {
+       "save": "o9",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000009"
+       },
+       "body": null
+      },
+      {
+       "save": "o10",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000010"
+       },
+       "body": null
+      },
+      {
+       "save": "o11",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000011"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "o9",
+       "json": "$.items[0].orderType",
+       "equals": "BLANKET"
+      },
+      {
+       "on": "o9",
+       "json": "$.items[0].currencyCode",
+       "equals": "GBP"
+      },
+      {
+       "on": "o10",
+       "json": "$.items[0].orderType",
+       "equals": "SERVICE"
+      },
+      {
+       "on": "o11",
+       "json": "$.items[0].orderType",
+       "equals": "SUBCONTRACT"
+      }
+     ],
+     "derivation": "FR-STERP-PO-020 AC2 (DEMO-WORKFLOWS workflow 3 step 6): the page shows the po_listOpenOrders rows unchanged (contracts 4.10); types from PODEMO 3500/3700/3800 sections, GBP per FUNCTIONAL-QA-LEDGER ('PO00000009 is GBP').",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-020-AC3",
+     "ac": 3,
+     "title": "Check budget answering RC 8 BUD0001 shows the hold dialog BLOCK 0.00% with Reason code BUD0001",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/purchase-order",
+       "actions": [
+        {
+         "click": "Check budget"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "BLOCK - 0.00% of the budget is used after this order"
+      },
+      {
+       "on": "page",
+       "text": "Reason code: BUD0001"
+      }
+     ],
+     "derivation": "FR-STERP-PO-020 AC3 and rule R4: frmPurchaseOrder.BudgetClicked builds the text from the BUDGCHK answer and calls ShowHold for BLOCK on every return code (frmPurchaseOrder.vb:167-189; BUDGCHK.cob:136-152 BUD0001; BaseForm.vb:189-193).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-020-AC4",
+     "ac": 4,
+     "title": "F10 without a current order warns 'There is no order to issue.' and asks nothing",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "keys"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/purchase-order",
+       "actions": [
+        {
+         "press": "F10"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "There is no order to issue."
+      },
+      {
+       "on": "page",
+       "notText": "to the supplier?"
+      }
+     ],
+     "derivation": "FR-STERP-PO-020 AC4: frmPurchaseOrder.OnConfirm returns before the 'Issue order <n> to the supplier?' confirmation when no order is current (frmPurchaseOrder.vb:253-258).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-020-EDGE-DEMO-JOURNEY",
+     "ac": null,
+     "title": "Workflow 3 steps 1-6: REQGEN preview, status ladder, approval, PO00000004 receipt, quarantine stock, order types",
+     "layer": "e2e",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "journey"
+     ],
+     "steps": [
+      {
+       "save": "s1",
+       "job": "po_runReqgen",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "SITE": "BHM",
+        "MODE": "PREVIEW"
+       }
+      },
+      {
+       "save": "o1",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000001"
+       },
+       "body": null
+      },
+      {
+       "save": "o2",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000002"
+       },
+       "body": null
+      },
+      {
+       "save": "o3",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000003"
+       },
+       "body": null
+      },
+      {
+       "save": "o4",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000004"
+       },
+       "body": null
+      },
+      {
+       "save": "o5",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000005"
+       },
+       "body": null
+      },
+      {
+       "save": "refuse",
+       "call": "po_decidePurchaseOrderApproval",
+       "path": {
+        "orderNumber": "PO00000002"
+       },
+       "body": {
+        "decision": "APPROVE",
+        "comment": ""
+       }
+      },
+      {
+       "save": "inbox",
+       "call": "platform_decideApproval",
+       "path": {
+        "approvalId": 1
+       },
+       "body": {
+        "decision": "APPROVED",
+        "comment": "Within the purchasing manager's authority"
+       },
+       "as": "PURMGR"
+      },
+      {
+       "sql": "UPDATE po.PurchaseOrder SET SupplierCode = 'S0001' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004'; UPDATE po.PurchaseOrderLine SET UnitPrice = 10.2708 WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004' AND LineNum = 1;"
+      },
+      {
+       "save": "val",
+       "call": "po_validateGoodsReceipt",
+       "path": {},
+       "body": {
+        "orderNumber": "PO00000004",
+        "deliveryNote": "A07-DEMO-DN-4",
+        "physicalDate": "2026-10-07",
+        "warehouse": "MAIN",
+        "ownership": "RECEIPT",
+        "shipEvidence": "",
+        "importEntry": "",
+        "location": "GOODSIN",
+        "lotCode": "A07-DEMO-LOT-4"
+       },
+       "as": "WHSE"
+      },
+      {
+       "save": "conf",
+       "call": "po_confirmGoodsReceipt",
+       "path": {},
+       "body": {
+        "receipt": {
+         "orderNumber": "PO00000004",
+         "supplier": "S0001",
+         "deliveryNote": "A07-DEMO-DN-4",
+         "physicalDate": "2026-10-07",
+         "postingDate": "2026-10-07",
+         "warehouse": "MAIN",
+         "ownership": "RECEIPT",
+         "incoterm": "DAP",
+         "shipEvidence": "",
+         "importEntry": "",
+         "subcontractJob": "",
+         "dupPolicy": "WARN",
+         "receivedBy": "WHSE",
+         "currency": "GBP",
+         "fxRate": 1,
+         "lineCnt": 1,
+         "lineTable": {
+          "line": [
+           {
+            "lNum": 1,
+            "lPoLine": 1,
+            "lSchedule": 1,
+            "lItem": "BAR-AL6082-25MM",
+            "lRevision": "",
+            "lDesc": "Aluminium bar 6082-T6, 25 mm round",
+            "lOrdered": 40,
+            "lCancelled": 0,
+            "lCounted": 0,
+            "lReceived": 40,
+            "lUom": "M",
+            "lFactor": 1,
+            "lLocation": "GOODSIN",
+            "lLot": "A07-DEMO-LOT-4",
+            "lTrace": "LOT",
+            "lInspect": "N",
+            "lStocked": "Y",
+            "lPrice": 10.2708,
+            "lStdCost": 0,
+            "lOverPct": 0
+           }
+          ]
+         }
+        }
+       },
+       "as": "WHSE"
+      },
+      {
+       "save": "insp",
+       "call": "itm_listStockBalances",
+       "path": {},
+       "query": {
+        "itemCode": "BAR-AL6082-25MM",
+        "siteCode": "BHM",
+        "condition": "INSPECTION",
+        "includeZero": false
+       },
+       "body": null,
+       "as": "QUALITY"
+      },
+      {
+       "save": "quar",
+       "call": "itm_listStockBalances",
+       "path": {},
+       "query": {
+        "itemCode": "TUBE-AL7005-34.9X1.4",
+        "siteCode": "BHM",
+        "condition": "QUARANTINE",
+        "includeZero": false
+       },
+       "body": null,
+       "as": "QUALITY"
+      },
+      {
+       "save": "o9",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000009"
+       },
+       "body": null
+      },
+      {
+       "save": "o10",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000010"
+       },
+       "body": null
+      },
+      {
+       "save": "o11",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000011"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "s1",
+       "run": {
+        "status": "OK",
+        "returnCode": 0
+       }
+      },
+      {
+       "on": "s1",
+       "spoolContains": "MODE=PREVIEW - proposal only"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Requisition WHERE CompanyCode = 'STC' AND SourceDemandType IN ('SHORTAGE', 'REPLEN')",
+       "equals": 0
+      },
+      {
+       "on": "o1",
+       "json": "$.items[0].status",
+       "equals": "DRAFT"
+      },
+      {
+       "on": "o2",
+       "json": "$.items[0].status",
+       "equals": "AWAITAPPROVAL"
+      },
+      {
+       "on": "o3",
+       "json": "$.items[0].status",
+       "equals": "APPROVED"
+      },
+      {
+       "on": "o4",
+       "json": "$.items[0].status",
+       "equals": "ISSUED"
+      },
+      {
+       "on": "o5",
+       "json": "$.items[0].status",
+       "equals": "ACKNOWLEDGED"
+      },
+      {
+       "on": "refuse",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "APV0007",
+        "detailContains": "STERP-E-0008"
+       }
+      },
+      {
+       "on": "inbox",
+       "status": 200
+      },
+      {
+       "on": "inbox",
+       "json": "$.status",
+       "equals": "APPROVED"
+      },
+      {
+       "sql": "SELECT CONCAT(Status, '|', ApprovedBy) FROM po.PurchaseOrder WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000002'",
+       "equals": "APPROVED|PURMGR"
+      },
+      {
+       "on": "val",
+       "status": 200
+      },
+      {
+       "on": "val",
+       "json": "$.data.totalGbp",
+       "equals": 410.83
+      },
+      {
+       "on": "conf",
+       "status": 200
+      },
+      {
+       "on": "conf",
+       "json": "$.data.status",
+       "equals": "CONFIRMED"
+      },
+      {
+       "on": "conf",
+       "json": "$.data.grniGbp",
+       "equals": 410.83
+      },
+      {
+       "sql": "SELECT CONCAT(Status, '|', GrniValueGBP, '|', CASE WHEN JournalId IS NULL THEN 'NOJOURNAL' ELSE 'JOURNAL' END) FROM po.Receipt WHERE CompanyCode = 'STC' AND PurchaseOrderNumber = 'PO00000004'",
+       "equals": "CONFIRMED|410.83|JOURNAL"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.ReceiptLine rl JOIN po.Receipt r ON r.ReceiptId = rl.ReceiptId JOIN po.PurchaseOrderLine pl ON pl.PurchaseOrderLineId = rl.PurchaseOrderLineId WHERE r.CompanyCode = 'STC' AND r.PurchaseOrderNumber = 'PO00000004' AND pl.OrderNumber = 'PO00000004' AND pl.LineNum = 1 AND rl.ReceivedQty = 40 AND rl.AcceptedQty = 40",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT m.ValueGBP FROM po.Receipt r JOIN po.ReceiptLine rl ON rl.ReceiptId = r.ReceiptId JOIN inv.StockMovement m ON m.MovementId = rl.MovementId WHERE r.CompanyCode = 'STC' AND r.PurchaseOrderNumber = 'PO00000004'",
+       "equals": 410.83
+      },
+      {
+       "sql": "SELECT CONCAT(COUNT(*), '|', SUM(CASE WHEN (jl.AccountCode = '1100' AND jl.DebitAmountGBP = 410.83 AND jl.CreditAmountGBP = 0) OR (jl.AccountCode = '2010' AND jl.CreditAmountGBP = 410.83 AND jl.DebitAmountGBP = 0) THEN 1 ELSE 0 END)) FROM po.Receipt r JOIN fin.JournalLine jl ON jl.JournalId = r.JournalId WHERE r.CompanyCode = 'STC' AND r.PurchaseOrderNumber = 'PO00000004'",
+       "equals": "2|2"
+      },
+      {
+       "sql": "SELECT CONCAT(pl.ReceivedQty, '|', pl.AcceptedQty, '|', p.DeliveryStatus) FROM po.PurchaseOrderLine pl JOIN po.PurchaseOrder p ON p.PurchaseOrderId = pl.PurchaseOrderId WHERE p.CompanyCode = 'STC' AND p.OrderNumber = 'PO00000004' AND pl.LineNum = 1",
+       "equals": "40.000000|40.000000|FULLRECEIVED"
+      },
+      {
+       "on": "insp",
+       "json": "$.items[*].locationCode",
+       "contains": "INSP01"
+      },
+      {
+       "on": "insp",
+       "json": "$.items[*].qtyOnHand",
+       "equals": 55
+      },
+      {
+       "on": "quar",
+       "json": "$.items[*].locationCode",
+       "contains": "QUAR01"
+      },
+      {
+       "on": "quar",
+       "json": "$.items[*].qtyOnHand",
+       "equals": 85
+      },
+      {
+       "on": "o9",
+       "json": "$.items[0].orderType",
+       "equals": "BLANKET"
+      },
+      {
+       "on": "o9",
+       "json": "$.items[0].currencyCode",
+       "equals": "GBP"
+      },
+      {
+       "on": "o10",
+       "json": "$.items[0].orderType",
+       "equals": "SERVICE"
+      },
+      {
+       "on": "o11",
+       "json": "$.items[0].orderType",
+       "equals": "SUBCONTRACT"
+      }
+     ],
+     "derivation": "STERP-PO.md section 10 demo journey (DEMO-WORKFLOWS workflow 3 steps 1-6) through the API: PODEMO statuses, BUYER refusal E-0008 and inbox ApprovalId 1 (QA final006-007), legacy QA evidence final008-final010 (CONFIRMED GRN00000003, exact line FK, 40, 410.83, GRNI journal, FULLRECEIVED), seeded BHM INSP01 55 and QUAR01 85 (db/seed/65-itm-partners-stock.sql:138-139); the validate value is ROUNDED(received x UnitPrice / FX rate) (RECEIPT.cob:451-462) over the order line read by GoodsReceiptService.vb:22-44 and the restored demo dataset prices PO00000004 line 1 at 15.9948 (dataset query DQ-04, legacy value 639.79), so the arranged order reproduces the QA ledger order (supplier S0001, UnitPrice 10.2708 = 410.83 / 40) for which section 10 states 410.83 and the validated document equals the confirmed one. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-036: PO00000004 line 1 UnitPrice arranged to 10.2708; binding 410.83 kept] [A07-AMEND agent-07-20261021T211031Z-a544e35d consolidation lead: the receipt segment (supplier S0001, price 10.2708, validate and confirm) is observed on the legacy .NET route GoodsReceiptService as WHSE on the arranged democ: CONFIRMED|410.83|JOURNAL, movement 410.83, journal 1100 Dr / 2010 Cr 410.83, line 40|40|FULLRECEIVED (amendment evidence lead/LL-03)]",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-021",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-021-AC1",
+     "ac": 1,
+     "title": "Open orders filtered on PO00000004 return one row with Status ISSUED",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000004"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.count",
+       "equals": 1
+      },
+      {
+       "on": "r1",
+       "json": "$.items[0].orderNumber",
+       "equals": "PO00000004"
+      },
+      {
+       "on": "r1",
+       "json": "$.items[0].status",
+       "equals": "ISSUED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-021 AC1 and the po_listOpenOrders 200 example: po.usp_OpenOrders @OrderNumber filter (db/procs/po/usp_PoEnquiry.sql:32-89) on the PODEMO-issued order.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-021-AC2",
+     "ac": 2,
+     "title": "Unfiltered open orders return the procedure result for STC/BHM in procedure order",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {},
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.items[*].orderNumber",
+       "contains": "PO00000001"
+      },
+      {
+       "on": "r1",
+       "json": "$.items[*].orderNumber",
+       "contains": "PO00000005"
+      },
+      {
+       "on": "r1",
+       "json": "$.items[0].siteCode",
+       "equals": "BHM"
+      }
+     ],
+     "derivation": "FR-STERP-PO-021 AC2: rows must equal EXEC po.usp_OpenOrders @CompanyCode='STC', @SiteCode='BHM' in order (usp_PoEnquiry.sql:32-89); the full row set and order depend on every demo driver and are not expressible as literals here, so only membership and site are pinned.",
+     "confidence": "unknown"
+    },
+    {
+     "id": "FR-STERP-PO-021-AC3",
+     "ac": 3,
+     "title": "includeClosed false omits the CANCELLED PO00000007 and the CLOSED PO00000006, includeClosed true returns both",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrder SET Status = CASE OrderNumber WHEN 'PO00000006' THEN 'CLOSED' ELSE 'CANCELLED' END WHERE CompanyCode = 'STC' AND OrderNumber IN ('PO00000006', 'PO00000007');"
+      },
+      {
+       "save": "open",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000007",
+        "includeClosed": false
+       },
+       "body": null
+      },
+      {
+       "save": "all",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000007",
+        "includeClosed": true
+       },
+       "body": null
+      },
+      {
+       "save": "openc",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000006",
+        "includeClosed": false
+       },
+       "body": null
+      },
+      {
+       "save": "allc",
+       "call": "po_listOpenOrders",
+       "path": {},
+       "query": {
+        "orderNumber": "PO00000006",
+        "includeClosed": true
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "open",
+       "json": "$.count",
+       "equals": 0
+      },
+      {
+       "on": "all",
+       "json": "$.count",
+       "equals": 1
+      },
+      {
+       "on": "all",
+       "json": "$.items[0].status",
+       "equals": "CANCELLED"
+      },
+      {
+       "on": "openc",
+       "json": "$.count",
+       "equals": 0
+      },
+      {
+       "on": "allc",
+       "json": "$.count",
+       "equals": 1
+      },
+      {
+       "on": "allc",
+       "json": "$.items[0].status",
+       "equals": "CLOSED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-021 AC3: po.usp_OpenOrders @IncludeClosed 0 excludes CLOSED/CANCELLED headers (usp_PoEnquiry.sql:32-89); the restored demo dataset holds no CLOSED or CANCELLED order because PODEMO 2800-CANCELLED cancels only line 1 of PO00000007 through POCLOSE, which stamps order lines and never the header (PODEMO.cob:926-956, POCLOSE.cob:345-378; dataset query DQ-03), so PO00000007 is arranged CANCELLED and PO00000006 CLOSED (statuses of CK_POrd_St) and the legacy procedure then returns no row for each with @IncludeClosed 0 and the row with that status with @IncludeClosed 1 (legacy-sql-execution LS-02). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-036: arranged CANCELLED and CLOSED headers replace the assumed PODEMO cancellation; CLOSED exclusion added]",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-022",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-022-AC1",
+     "ac": 1,
+     "title": "Create for S0006 with D2N30 returns a POORD-series draft CAPTURED with BuyerUser BUYER and business date",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_createPurchaseOrder",
+       "path": {},
+       "body": {
+        "orderType": "STANDARD",
+        "supplier": "S0006",
+        "currency": "GBP",
+        "termsCode": "D2N30",
+        "incoterms": "",
+        "namedPlace": "",
+        "supplierRef": "CF-2026-118",
+        "budgetCode": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK",
+        "messageContains": "opened for supplier S0006"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.orderNumber",
+       "equals": "PO00000001",
+       "normalize": "document-number"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.status",
+       "equals": "DRAFT"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.outcome",
+       "equals": "CAPTURED"
+      },
+      {
+       "sql": "SELECT CONCAT(BuyerUser, '|', CONVERT(char(10), OrderDate, 23), '|', Status, '|', SupplierCode) FROM po.PurchaseOrder WHERE CompanyCode = 'STC'",
+       "equals": "BUYER|2026-10-07|DRAFT|S0006"
+      }
+     ],
+     "derivation": "FR-STERP-PO-022 AC1 and the po_createPurchaseOrder 200 example: POORDER CREATE (POORDER.cob:182-285) with PAYTERMC APPLY of D2N30 (30 days, core.PaymentTerms seed) and NUMGEN POORD (prefix PO, length 8).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-022-AC2",
+     "ac": 2,
+     "title": "Type CALLOFF without blanketNumber is refused 422 ORD0017",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_createPurchaseOrder",
+       "path": {},
+       "body": {
+        "orderType": "CALLOFF",
+        "supplier": "S0006",
+        "currency": "GBP",
+        "termsCode": "D2N30",
+        "incoterms": "",
+        "namedPlace": "",
+        "supplierRef": "CF-2026-118",
+        "budgetCode": "",
+        "blanketNumber": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "ORD0017",
+        "detailContains": "must name the blanket order"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.PurchaseOrder WHERE CompanyCode = 'STC'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-022 AC2: POORDER 2000-CREATE call-off check RC 8 ORD0017 (POORDER.cob:199-207).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-022-AC3",
+     "ac": 3,
+     "title": "Type FRAMEWORK is refused 422 ORD0008 'Order type FRAMEWORK is not recognised'",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_createPurchaseOrder",
+       "path": {},
+       "body": {
+        "orderType": "FRAMEWORK",
+        "supplier": "S0006",
+        "currency": "GBP",
+        "termsCode": "D2N30",
+        "incoterms": "",
+        "namedPlace": "",
+        "supplierRef": "CF-2026-118",
+        "budgetCode": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "ORD0008",
+        "detailContains": "Order type FRAMEWORK is not recognised"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.PurchaseOrder WHERE CompanyCode = 'STC'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-022 AC3: POORDER 2000-CREATE type domain RC 8 ORD0008 (POORDER.cob:190-198).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-023",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-023-AC1",
+     "ac": 1,
+     "title": "Auto-priced STOCK line of 40 M for S0001 on 2026-10-07 takes CONTRACT CTR-S0001-DEMO, net 500.00",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "o",
+       "call": "po_createPurchaseOrder",
+       "path": {},
+       "body": {
+        "orderType": "STANDARD",
+        "supplier": "S0001",
+        "currency": "GBP"
+       }
+      },
+      {
+       "save": "r1",
+       "call": "po_addPurchaseOrderLine",
+       "path": {
+        "orderNumber": "PO00000001"
+       },
+       "body": {
+        "lineType": "STOCK",
+        "itemCode": "BAR-AL6082-25MM",
+        "description": "Aluminium bar 6082-T6, 25 mm round",
+        "orderedQty": 40,
+        "uomCode": "M",
+        "unitPrice": 0,
+        "discountPct": 0,
+        "accountCode": "",
+        "costCentre": "",
+        "destSite": "BHM",
+        "schReqDate": "2026-10-21"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.data.priceSource",
+       "equals": "CONTRACT"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.unitPrice",
+       "equals": 12.5
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineNetGbp",
+       "equals": 500.0
+      },
+      {
+       "on": "r1",
+       "json": "$.data.netAmount",
+       "equals": 500.0
+      }
+     ],
+     "derivation": "FR-STERP-PO-023 AC1 and the po_addPurchaseOrderLine example: unit price 0 sets autoPrice Y, POPRICE PRICE at the business date picks CTR-S0001-DEMO 12.500000 (db/seed/92-po-demo.sql:83; POPRICE.cob:152-178), ROUNDED2(12.5 x 40).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-023-AC2",
+     "ac": 2,
+     "title": "Adding a line to ISSUED order PO00000004 is refused 422 ORD0003",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_addPurchaseOrderLine",
+       "path": {
+        "orderNumber": "PO00000004"
+       },
+       "body": {
+        "lineType": "STOCK",
+        "itemCode": "BAR-AL6082-25MM",
+        "description": "Aluminium bar 6082-T6, 25 mm round",
+        "orderedQty": 40,
+        "uomCode": "M",
+        "unitPrice": 0,
+        "discountPct": 0,
+        "accountCode": "",
+        "costCentre": "",
+        "destSite": "BHM",
+        "schReqDate": "2026-10-21"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "ORD0003",
+        "detailContains": "use AMEND rather than ADDLINE"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-023 AC2: POORDER 3000-ADDLINE status gate RC 8 ORD0003 (POORDER.cob:327-337) on the PODEMO-issued order.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-023-AC3",
+     "ac": 3,
+     "title": "An unknown item on DRAFT order PO00000001 is refused 422 ORD0018",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_addPurchaseOrderLine",
+       "path": {
+        "orderNumber": "PO00000001"
+       },
+       "body": {
+        "lineType": "STOCK",
+        "itemCode": "ZZ-NO-SUCH-ITEM",
+        "description": "Aluminium bar 6082-T6, 25 mm round",
+        "orderedQty": 40,
+        "uomCode": "M",
+        "unitPrice": 12.5,
+        "discountPct": 0,
+        "accountCode": "",
+        "costCentre": "",
+        "destSite": "BHM",
+        "schReqDate": "2026-10-21"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "ORD0018",
+        "detailContains": "Item ZZ-NO-SUCH-ITEM is not on the item master"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-023 AC3: POORDER 3050 item check against inv.Item RC 8 ORD0018 (POORDER.cob:407-440) on the PODEMO draft.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-023-AC4",
+     "ac": 4,
+     "title": "A line captured with the screen's fields (no VAT rate sent) carries lineVatGbp 0.00",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_addPurchaseOrderLine",
+       "path": {
+        "orderNumber": "PO00000001"
+       },
+       "body": {
+        "lineType": "STOCK",
+        "itemCode": "BAR-AL6082-25MM",
+        "description": "Aluminium bar 6082-T6, 25 mm round",
+        "orderedQty": 40,
+        "uomCode": "M",
+        "unitPrice": 12.5,
+        "discountPct": 0,
+        "accountCode": "",
+        "costCentre": "",
+        "destSite": "BHM",
+        "schReqDate": "2026-10-21"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineVatGbp",
+       "equals": 0
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineNetGbp",
+       "equals": 500.0
+      }
+     ],
+     "derivation": "FR-STERP-PO-023 AC4: PurchaseOrderService.AddLine sends no OR-VAT-RATE-PCT (PurchaseOrderService.vb:87-118) and POORDER 3200-VALUE reads the rate only from the COMMAREA (POORDER.cob:495-496,589).",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-024",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-024-AC1",
+     "ac": 1,
+     "title": "Price of 40 M for S0001 on 2026-10-07 is CONTRACT CTR-S0001-DEMO effective 2026-01-01",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_explainPurchasePrice",
+       "path": {},
+       "query": {
+        "supplier": "S0001",
+        "itemCode": "BAR-AL6082-25MM",
+        "quantity": 40,
+        "uomCode": "M",
+        "currency": "GBP"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.data.priceBasis",
+       "equals": "CONTRACT"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.agreementRef",
+       "equals": "CTR-S0001-DEMO"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.effectiveFrom",
+       "equals": "2026-01-01"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.netValue",
+       "equals": 500.0
+      }
+     ],
+     "derivation": "FR-STERP-PO-024 AC1 and the po_explainPurchasePrice example: POPRICE 2000-PRICE ordering item, CONTRACT, priority, latest effective-from (POPRICE.cob:152-178) over db/seed/92-po-demo.sql:81-103.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-024-AC2",
+     "ac": 2,
+     "title": "With business date 2025-06-01 the 2025 agreement CTR-S0001-2025 at 13.750000 applies",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2025-06-01",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "date-boundary"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_explainPurchasePrice",
+       "path": {},
+       "query": {
+        "supplier": "S0001",
+        "itemCode": "BAR-AL6082-25MM",
+        "quantity": 40,
+        "uomCode": "M",
+        "currency": "GBP"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.data.agreementRef",
+       "equals": "CTR-S0001-2025"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.unitPrice",
+       "equals": 13.75
+      },
+      {
+       "on": "r1",
+       "json": "$.data.effectiveFrom",
+       "equals": "2025-01-01"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.netValue",
+       "equals": 550.0
+      }
+     ],
+     "derivation": "FR-STERP-PO-024 AC2: pricing date = business date (PurchaseOrderService.vb:182-195) and the 2025 row (EffectiveFrom 2025-01-01, EffectiveTo 2025-12-31, 13.750000) of db/seed/92-po-demo.sql:84.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-024-AC3",
+     "ac": 3,
+     "title": "Price breaks without a quantity are refused 422 POP1003 (empty break grid on the page)",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_listPriceBreaks",
+       "path": {},
+       "query": {
+        "supplier": "S0001",
+        "itemCode": "BAR-AL6082-25MM"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "POP1003",
+        "detailContains": "A purchase quantity must be greater than zero"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-024 AC3 (BC-PO-09 reproduced): the facade sends no quantity to BREAKS (PurchaseOrderService.vb:218-227) and POPRICE 1000-INIT refuses it RC 8 POP1003 (POPRICE.cob:130-136).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-024-EDGE-DATE-BOUNDARY",
+     "ac": null,
+     "title": "Business date 2025-12-31 is still inside CTR-S0001-2025 (inclusive EffectiveTo)",
+     "layer": "unit",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2025-12-31",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "date-boundary"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_explainPurchasePrice",
+       "path": {},
+       "query": {
+        "supplier": "S0001",
+        "itemCode": "BAR-AL6082-25MM",
+        "quantity": 40,
+        "uomCode": "M",
+        "currency": "GBP"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.data.agreementRef",
+       "equals": "CTR-S0001-2025"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.effectiveTo",
+       "equals": "2025-12-31"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.unitPrice",
+       "equals": 13.75
+      }
+     ],
+     "derivation": "Contracts 4.4 dates yyyyMMdd and POPRICE 2000-PRICE 'EffectiveTo >= pricing date' (POPRICE.cob:166-168) on the seeded rows CTR-S0001-2025 (to 2025-12-31) and CTR-S0001-DEMO (from 2026-01-01), db/seed/92-po-demo.sql:83-84.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-024-EDGE-BREAK-AT-FROM-QTY",
+     "ac": null,
+     "title": "Quantity exactly 100 reaches the 100 break: 11.750000, break used 100, net 1175.00",
+     "layer": "unit",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "edge-record"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_explainPurchasePrice",
+       "path": {},
+       "query": {
+        "supplier": "S0001",
+        "itemCode": "BAR-AL6082-25MM",
+        "quantity": 100,
+        "uomCode": "M",
+        "currency": "GBP"
+       },
+       "body": null
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "json": "$.data.unitPrice",
+       "equals": 11.75
+      },
+      {
+       "on": "r1",
+       "json": "$.data.breakQtyUsed",
+       "equals": 100
+      },
+      {
+       "on": "r1",
+       "json": "$.data.netValue",
+       "equals": 1175.0
+      }
+     ],
+     "derivation": "POPRICE 2200-APPLY-BREAK 'FromQty <= quantity' highest break (POPRICE.cob:283-312) on the seeded ladder 100/11.75 and 500/10.90 of CTR-S0001-DEMO (db/seed/92-po-demo.sql:104-112).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-025",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-025-AC1",
+     "ac": 1,
+     "title": "No budget code and no cost centre is refused 422 BUD0001 with data.outcome BLOCK",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_checkBudget",
+       "path": {},
+       "body": {
+        "budgetCode": "",
+        "accountCode": "",
+        "costCentre": "",
+        "project": "",
+        "docType": "ORDER",
+        "docRef": "",
+        "netGbp": 300.0,
+        "nonrecVatGbp": 0,
+        "chargeGbp": 0
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "BUD0001",
+        "detailContains": "either a budget code or a cost centre"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.outcome",
+       "equals": "BLOCK"
+      }
+     ],
+     "derivation": "FR-STERP-PO-025 AC1 and rule R4 (spec 7.1.2): BUDGCHK 1000-INIT RC 8 BUD0001 outcome BLOCK (BUDGCHK.cob:136-152).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-025-AC2",
+     "ac": 2,
+     "title": "A budget code without an approved budget returns 404 BUD0002 carrying the budget data",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_checkBudget",
+       "path": {},
+       "body": {
+        "budgetCode": "A07-NOBUDGET",
+        "accountCode": "",
+        "costCentre": "",
+        "project": "",
+        "docType": "ORDER",
+        "docRef": "",
+        "netGbp": 300.0,
+        "nonrecVatGbp": 0,
+        "chargeGbp": 0
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 404,
+        "type": "not-found",
+        "reasonCode": "BUD0002",
+        "detailContains": "No approved budget for A07-NOBUDGET in 2026"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.outcome",
+       "equals": "BLOCK"
+      }
+     ],
+     "derivation": "FR-STERP-PO-025 AC2 and rule R4: BUDGCHK 2000-CHECK zero approved budget RC 16 BUD0002 (BUDGCHK.cob:159-172).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-025-AC3",
+     "ac": 3,
+     "title": "Budget 10000.00 with 8800.00 committed and 300.00 proposed warns BUD0003 at 91.0000%",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "sql": "INSERT fin.Budget (CompanyCode, BudgetCode, FiscalYear, Name, BudgetType, Version, CurrencyCode, Status, IsBaseline, OwnerUser, ApprovedBy, ApprovedAt, CreatedBy) VALUES ('STC', 'A07-BUD-025', 2026, 'A07 parity budget A07-BUD-025', 'BUDGET', 1, 'GBP', 'APPROVED', 0, 'FINCTRL', 'FINCTRL', '2026-04-01T09:00:00', 'A07'); INSERT fin.BudgetLine (CompanyCode, BudgetCode, FiscalYear, Version, PeriodNo, AccountCode, DimCostCentre, DimProject, Amount, Narrative) VALUES ('STC', 'A07-BUD-025', 2026, 1, 1, '6000', 'A07CC025', NULL, 10000.00, 'A07 parity budget'); INSERT po.Commitment (CompanyCode, OrderNumber, LineNum, BudgetCode, AccountCode, DimCostCentre, FiscalYear, Stage, MovementDate, Quantity, AmountGBP, NonRecoverableVatGBP, ChargeGBP, SourceDocType, SourceDocRef, Narrative, CreatedBy) VALUES ('STC', 'PO-A07-025', 1, 'A07-BUD-025', '6000', 'A07CC025', 2026, 'COMMITTED', '2026-09-30', 1, 8800.00, 0, 0, 'PURCHASEORDER', 'PO-A07-025', 'COMMITTED movement for PURCHASEORDER PO-A07-025', 'A07');"
+      },
+      {
+       "save": "r1",
+       "call": "po_checkBudget",
+       "path": {},
+       "body": {
+        "budgetCode": "A07-BUD-025",
+        "accountCode": "",
+        "costCentre": "A07CC025",
+        "project": "",
+        "docType": "ORDER",
+        "docRef": "",
+        "netGbp": 300.0,
+        "nonrecVatGbp": 0,
+        "chargeGbp": 0
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 4,
+        "severity": "WARNING",
+        "reasonCode": "BUD0003"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.usedAfterPct",
+       "equals": 91.0
+      },
+      {
+       "on": "r1",
+       "json": "$.data.warnPct",
+       "equals": 90.0
+      },
+      {
+       "on": "r1",
+       "json": "$.data.blockPct",
+       "equals": 100.0
+      },
+      {
+       "on": "r1",
+       "json": "$.data.availableGbp",
+       "equals": 1200.0
+      }
+     ],
+     "derivation": "FR-STERP-PO-025 AC3 and the 200 WARNING example: BUDGCHK 3000-ASSESS (8800 + 300) / 10000 = 91.0000% >= warn 90 (BUDGCHK.cob:370-430) over an arranged FY2026 budget and commitment on a dedicated cost centre.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-025-EDGE-NUMERIC-SCALE",
+     "ac": null,
+     "title": "netGbp 300.005 is rounded half away from zero to 300.01 before BUDGCHK",
+     "layer": "unit",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "numeric-scale"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_checkBudget",
+       "path": {},
+       "body": {
+        "budgetCode": "",
+        "accountCode": "",
+        "costCentre": "",
+        "project": "",
+        "docType": "ORDER",
+        "docRef": "",
+        "netGbp": 300.005,
+        "nonrecVatGbp": 0,
+        "chargeGbp": 0
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "BUD0001"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.netGbp",
+       "equals": 300.01
+      },
+      {
+       "on": "r1",
+       "json": "$.data.proposedGbp",
+       "equals": 300.01
+      }
+     ],
+     "derivation": "Contracts 4.4 numeric with scale (CobolCodec.cs:24-29) on BC-NET-GBP PIC S9(13)V99; BUDGCHK 1000-INIT computes proposed = net + non-recoverable VAT + charge before the BUD0001 refusal (BUDGCHK.cob:134-135), returned per rule R4.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-025-EDGE-NUMERIC-MAGNITUDE",
+     "ac": null,
+     "title": "netGbp with 14 integer digits keeps the low-order 13 digits (high-order truncation)",
+     "layer": "unit",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "numeric-magnitude"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_checkBudget",
+       "path": {},
+       "body": {
+        "budgetCode": "",
+        "accountCode": "",
+        "costCentre": "",
+        "project": "",
+        "docType": "ORDER",
+        "docRef": "",
+        "netGbp": 12345678901234.56,
+        "nonrecVatGbp": 0,
+        "chargeGbp": 0
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "BUD0001"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.proposedGbp",
+       "equals": 2345678901234.56
+      }
+     ],
+     "derivation": "Contracts 4.4 numeric too large keeps the low-order digits (CobolCodec.cs:76-79, BC-002 rejected) on BC-NET-GBP PIC S9(13)V99; proposed value computed in BUDGCHK 1000-INIT and returned per rule R4.",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-026",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-026-AC1",
+     "ac": 1,
+     "title": "Supplier checks for S0006 show 'Diligence PASS (0 failed, 0 missing, 0 expired)' and terms 30 days vs 60",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/purchase-order",
+       "actions": [
+        {
+         "fill": {
+          "label": "Supplier",
+          "value": "S0006"
+         }
+        },
+        {
+         "fill": {
+          "label": "Payment terms",
+          "value": "D2N30"
+         }
+        },
+        {
+         "click": "Supplier checks"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Diligence PASS (0 failed, 0 missing, 0 expired)"
+      },
+      {
+       "on": "page",
+       "text": "Terms 30 days against a limit of 60"
+      }
+     ],
+     "derivation": "FR-STERP-PO-026 AC1: frmPurchaseOrder.ChecksClicked text (frmPurchaseOrder.vb:193-209) over POSUPCHK CHECK of the seeded S0006 evidence (92-po-demo.sql:113-138, all PASS to 2027-03-31) and PAYTERMC CHECK of D2N30 (30 days, statutory default 60, PAYTERMC.cob:53-55,206-240).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-026-AC2",
+     "ac": 2,
+     "title": "Terms of 90 days for S0006 return 202 HOLD PTC0004 with needsException Y",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "sql": "INSERT core.PaymentTerms (TermsCode, Name, BasisType, Days, IsStatutoryDefault, EffectiveDays, CreatedBy) SELECT 'N90', '90 days net', 'INVOICE', 90, 0, 90, 'A07' WHERE NOT EXISTS (SELECT 1 FROM core.PaymentTerms WHERE TermsCode = 'N90');"
+      },
+      {
+       "save": "r1",
+       "call": "po_checkPaymentTerms",
+       "path": {
+        "supplierCode": "S0006"
+       },
+       "body": {
+        "termsCode": "N90",
+        "valueGbp": 500.0,
+        "orderNumber": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 202
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 6,
+        "severity": "HOLD",
+        "reasonCode": "PTC0004",
+        "messageContains": "Payment terms of 90 days exceed the maximum of 60 days"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.needsException",
+       "equals": "Y"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.termsDays",
+       "equals": 90
+      },
+      {
+       "on": "r1",
+       "json": "$.data.outcome",
+       "equals": "BREACH"
+      }
+     ],
+     "derivation": "FR-STERP-PO-026 AC2 and the N90 example of po_createPurchaseOrder 202: PAYTERMC 4000-ASSESS days > effective limit 60 is RC 6 PTC0004 BREACH (PAYTERMC.cob:270-290); terms code N90 arranged because the seed holds none above 60 days.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-026-AC3",
+     "ac": 3,
+     "title": "Supplier S0030 without evidence returns 404 DIL0002 listing the four baseline types missing",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_checkSupplierDiligence",
+       "path": {
+        "supplierCode": "S0030"
+       },
+       "body": {
+        "orderValueGbp": 500.0
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 404,
+        "type": "not-found",
+        "reasonCode": "DIL0002",
+        "detailContains": "No due diligence evidence is held for supplier S0030"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.missingList",
+       "matches": "SANCTIONS.*COMPANIESHSE.*VATNUMBER.*BUSINESSSIZE"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.canOrder",
+       "equals": "N"
+      }
+     ],
+     "derivation": "FR-STERP-PO-026 AC3 and rule R4: POSUPCHK 2000-CHECK no evidence RC 16 DIL0002 with the D-29 baseline list (POSUPCHK.cob:47-54,145-160); S0030 is PENDING (60-ap-suppliers.sql:42) so 92-po-demo.sql seeds it no evidence.",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-027",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-027-AC1",
+     "ac": 1,
+     "title": "BUYER's Approval on pending PO00000002: CHECK 202 APV0005, DECIDE 422 APV0007 refusal, nothing changes",
+     "layer": "api-journey",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "permission",
+      "journey"
+     ],
+     "steps": [
+      {
+       "save": "chk",
+       "call": "po_checkPurchaseOrderApproval",
+       "path": {
+        "orderNumber": "PO00000002"
+       },
+       "body": {}
+      },
+      {
+       "save": "dec",
+       "call": "po_decidePurchaseOrderApproval",
+       "path": {
+        "orderNumber": "PO00000002"
+       },
+       "body": {
+        "decision": "APPROVE",
+        "comment": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "chk",
+       "status": 202
+      },
+      {
+       "on": "chk",
+       "outcome": {
+        "returnCode": 6,
+        "severity": "HOLD",
+        "reasonCode": "APV0005"
+       }
+      },
+      {
+       "on": "chk",
+       "json": "$.data.approvalStatus",
+       "equals": "PENDING"
+      },
+      {
+       "on": "dec",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "APV0007",
+        "detailContains": "STERP-E-0008"
+       }
+      },
+      {
+       "sql": "SELECT CONCAT(p.Status, '|', a.Status) FROM po.PurchaseOrder p JOIN core.Approval a ON a.CompanyCode = p.CompanyCode AND a.DocumentType = 'PURCHASEORDER' AND a.DocumentRef = p.OrderNumber WHERE p.CompanyCode = 'STC' AND p.OrderNumber = 'PO00000002'",
+       "equals": "AWAITAPPROVAL|PENDING"
+      }
+     ],
+     "derivation": "FR-STERP-PO-027 AC1 (DEMO-WORKFLOWS workflow 3 step 3): POAPPRV 5000-CHECK pending RC 6 APV0005 and 4000-DECIDE maps the core.usp_DecideApproval THROW 50008 (BUYER lacks PO.ORDER.APPROVE, request by BUYER1) to RC 8 APV0007 (POAPPRV.cob:459-520; usp_RequestApproval.sql:35-60; QA ledger 'refused with E-0008').",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-027-AC2",
+     "ac": 2,
+     "title": "PURMGR's inbox approval makes PO00000002 APPROVED by PURMGR and CHECK then returns 200 OK",
+     "layer": "api-journey",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "journey"
+     ],
+     "steps": [
+      {
+       "save": "inbox",
+       "call": "platform_decideApproval",
+       "path": {
+        "approvalId": 1
+       },
+       "body": {
+        "decision": "APPROVED",
+        "comment": "Within the purchasing manager's authority"
+       },
+       "as": "PURMGR"
+      },
+      {
+       "save": "chk",
+       "call": "po_checkPurchaseOrderApproval",
+       "path": {
+        "orderNumber": "PO00000002"
+       },
+       "body": {}
+      }
+     ],
+     "assertions": [
+      {
+       "on": "inbox",
+       "status": 200
+      },
+      {
+       "on": "inbox",
+       "json": "$.status",
+       "equals": "APPROVED"
+      },
+      {
+       "sql": "SELECT CONCAT(Status, '|', ApprovedBy) FROM po.PurchaseOrder WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000002'",
+       "equals": "APPROVED|PURMGR"
+      },
+      {
+       "on": "chk",
+       "status": 200
+      },
+      {
+       "on": "chk",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-027 AC2: core.usp_DecideApproval via the PLATFORM inbox fires core.trg_ApprovalPurchaseOrder (db/triggers/po-approval-state.sql:3-33); ApprovalId 1 is PO00000002's PODEMO request (QA evidence final006).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-027-AC3",
+     "ac": 3,
+     "title": "A decision on an order whose content changed after the request fails STERP-E-0021 and nothing changes",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "concurrency"
+     ],
+     "steps": [
+      {
+       "sql": "INSERT core.Delegation (CompanyCode, FromUser, ToUser, ApprovalType, MaxAmount, ValidFrom, ValidTo, Reason, Status, CreatedBy) VALUES ('STC', 'PURMGR', 'BUYER', 'PURCHASEORDER', NULL, CAST(SYSDATETIME() AS date), DATEADD(day, 14, CAST(SYSDATETIME() AS date)), 'Purchasing manager on leave (A07 parity arrangement)', 'ACTIVE', 'A07'); UPDATE po.PurchaseOrder SET ContentHash = 'a07-content-changed-after-request' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000002';"
+      },
+      {
+       "save": "dec",
+       "call": "po_decidePurchaseOrderApproval",
+       "path": {
+        "orderNumber": "PO00000002"
+       },
+       "body": {
+        "decision": "APPROVE",
+        "comment": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "dec",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "APV0007",
+        "detailContains": "STERP-E-0021"
+       }
+      },
+      {
+       "sql": "SELECT CONCAT(p.Status, '|', a.Status) FROM po.PurchaseOrder p JOIN core.Approval a ON a.CompanyCode = p.CompanyCode AND a.DocumentType = 'PURCHASEORDER' AND a.DocumentRef = p.OrderNumber WHERE p.CompanyCode = 'STC' AND p.OrderNumber = 'PO00000002'",
+       "equals": "AWAITAPPROVAL|PENDING"
+      }
+     ],
+     "derivation": "FR-STERP-PO-027 AC3: core.trg_ApprovalPurchaseOrder throws 50021 when po.PurchaseOrder.ContentHash differs from the approval hash (po-approval-state.sql:7-17, as db/tests/po-approval-sync.sql test 3); a named delegation lets BUYER reach the UPDATE; POAPPRV reports it RC 8 APV0007 (POAPPRV.cob:508-517).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-027-AC4",
+     "ac": 4,
+     "title": "Target hash equals the legacy ContentHash: legacy approvals are matched and a REQUEST reuses the row",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "coexistence"
+     ],
+     "steps": [
+      {
+       "save": "chk",
+       "call": "po_checkPurchaseOrderApproval",
+       "path": {
+        "orderNumber": "PO00000003"
+       },
+       "body": {}
+      },
+      {
+       "save": "req",
+       "call": "po_requestPurchaseOrderApproval",
+       "path": {
+        "orderNumber": "PO00000002"
+       },
+       "body": {
+        "comment": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "chk",
+       "status": 200
+      },
+      {
+       "on": "chk",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "on": "chk",
+       "json": "$.data.approvalStatus",
+       "equals": "APPROVED"
+      },
+      {
+       "on": "req",
+       "outcome": {
+        "returnCode": 4,
+        "reasonCode": "APV0005"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM core.Approval a JOIN po.PurchaseOrder p ON p.CompanyCode = a.CompanyCode AND p.OrderNumber = a.DocumentRef WHERE a.CompanyCode = 'STC' AND a.DocumentType = 'PURCHASEORDER' AND a.DocumentRef = 'PO00000002' AND a.ApprovalId = 1 AND a.Status = 'PENDING' AND a.ContentHash COLLATE Latin1_General_BIN2 = p.ContentHash COLLATE Latin1_General_BIN2",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM core.Approval WHERE CompanyCode = 'STC' AND DocumentType = 'PURCHASEORDER' AND DocumentRef = 'PO00000002' AND Status = 'INVALIDATED'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-027 AC4: POAPPRV 8000-HASH reproduced bit for bit (POAPPRV.cob:765-799, probes/poapprv_hash.py); CHECK returns APV0006 and REQUEST invalidates when hashes differ (POAPPRV.cob:372-457,590-600; usp_RequestApproval.sql:20-27), so the legacy PODEMO hashes must be matched and reused byte for byte.",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-028",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-028-AC1",
+     "ac": 1,
+     "title": "Screen field QUANTITY on PO00000004 records a non-material amendment and keeps the order ISSUED",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_amendPurchaseOrder",
+       "path": {
+        "orderNumber": "PO00000004"
+       },
+       "body": {
+        "lineNum": 1,
+        "amendField": "QUANTITY",
+        "amendNew": "45",
+        "amendReason": "Supplier short of stock"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK",
+        "messageContains": "Order PO00000004 amendment recorded: Supplier short of stock"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.OrderAmendment WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004' AND FieldName = 'QUANTITY' AND IsMaterial = 0 AND RevisedValue = '45' AND Status = 'OPEN'",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT Status FROM po.PurchaseOrder WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004'",
+       "equals": "ISSUED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-028 AC1 (BC-PO-04 reproduced): POAMEND materiality is a case-sensitive match on SupplierCode/OrderedQty/UnitPrice/TermsCode/CurrencyCode (POAMEND.cob:311-324) so screen field QUANTITY is RC 0 with the recorded message.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-028-AC2",
+     "ac": 2,
+     "title": "API field OrderedQty is material: 202 HOLD ORD0012, order AMENDED, approval rows unchanged",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_amendPurchaseOrder",
+       "path": {
+        "orderNumber": "PO00000004"
+       },
+       "body": {
+        "lineNum": 1,
+        "amendField": "OrderedQty",
+        "amendNew": "45",
+        "amendReason": "Supplier short of stock"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 202
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 6,
+        "severity": "HOLD",
+        "reasonCode": "ORD0012",
+        "messageContains": "amended materially (OrderedQty)"
+       }
+      },
+      {
+       "sql": "SELECT Status FROM po.PurchaseOrder WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004'",
+       "equals": "AMENDED"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM core.Approval WHERE CompanyCode = 'STC' AND DocumentType = 'PURCHASEORDER' AND DocumentRef = 'PO00000004' AND Status <> 'APPROVED'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-028 AC2: POAMEND material branch RC 6 ORD0012 and 3600-MARK-AMENDED (POAMEND.cob:328-340,377-400); INVALID finds nothing because the hash covers no amended value (F-POAMEND-01).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-028-AC3",
+     "ac": 3,
+     "title": "A blank amendment reason is refused 422 ORD0016 and nothing is written",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_amendPurchaseOrder",
+       "path": {
+        "orderNumber": "PO00000004"
+       },
+       "body": {
+        "lineNum": 1,
+        "amendField": "QUANTITY",
+        "amendNew": "45",
+        "amendReason": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "ORD0016",
+        "detailContains": "needs a reason"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.OrderAmendment WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004'",
+       "equals": 0
+      },
+      {
+       "sql": "SELECT Status FROM po.PurchaseOrder WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004'",
+       "equals": "ISSUED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-028 AC3: POAMEND 3000-AMEND reason check RC 8 ORD0016 before any statement (POAMEND.cob:282-292).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-028-AC4",
+     "ac": 4,
+     "title": "Material amendment passes the reason as @UserCode: audit UserCode is its first 20 characters",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "audit"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrderLine SET Description = 'Aluminium bar 6082-T6, 25 mm round, cut to 1 m' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004' AND LineNum = 1;"
+      },
+      {
+       "save": "r1",
+       "call": "po_amendPurchaseOrder",
+       "path": {
+        "orderNumber": "PO00000004"
+       },
+       "body": {
+        "lineNum": 1,
+        "amendField": "OrderedQty",
+        "amendNew": "45",
+        "amendReason": "Supplier short of stock - quantity raised to 45"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 202
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 6,
+        "reasonCode": "ORD0012"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM core.AuditLog WHERE CompanyCode = 'STC' AND EntityType = 'core.Approval' AND Action = 'INVALIDATED' AND UserCode = 'Supplier short of st'",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT InvalidatedReason FROM core.Approval WHERE CompanyCode = 'STC' AND DocumentType = 'PURCHASEORDER' AND DocumentRef = 'PO00000004' AND Status = 'INVALIDATED'",
+       "equals": "Material change to the approved content"
+      }
+     ],
+     "derivation": "FR-STERP-PO-028 AC4 (G09-ADV-12, SME-1219, BC-PO-06 not approved): POAPPRV INVALID binds 'EXEC core.usp_InvalidateApprovals ?, 'PURCHASEORDER', ?, ?, ?' so the reason lands in @UserCode varchar(20) and @Reason defaults (POAPPRV.cob:616-640; usp_RequestApproval.sql:62-77); line content changed so an approval is stale.",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-029",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-029-AC1",
+     "ac": 1,
+     "title": "Issuing APPROVED PO00000003 returns OK, status ISSUED and one COMMITTED commitment per OPEN line",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_issuePurchaseOrder",
+       "path": {
+        "orderNumber": "PO00000003"
+       },
+       "body": {}
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.status",
+       "equals": "ISSUED"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Commitment WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000003' AND Stage = 'COMMITTED'",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT Status FROM po.PurchaseOrder WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000003'",
+       "equals": "ISSUED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-029 AC1: POORDER ISSUE gates then BUDGCHK COMMIT per OPEN line and 5400-MARK-ISSUED (POORDER.cob:852-899,943-1116); PO00000003 is the one-line approved PODEMO order (PODEMO 2400-APPROVED).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-029-AC2",
+     "ac": 2,
+     "title": "Re-issuing ISSUED PO00000004 answers 200 WARNING ORD0003 and writes no new commitment",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_issuePurchaseOrder",
+       "path": {
+        "orderNumber": "PO00000004"
+       },
+       "body": {}
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 4,
+        "severity": "WARNING",
+        "reasonCode": "ORD0003",
+        "messageContains": "has already been issued to the supplier"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Commitment WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004' AND Stage = 'COMMITTED'",
+       "equals": 1
+      }
+     ],
+     "derivation": "FR-STERP-PO-029 AC2: POORDER 5000-ISSUE RC 4 ORD0003 for ISSUED/ACKNOWLEDGED before any gate (POORDER.cob:867-876); the single commitment is the one PODEMO's issue of the one-line order wrote.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-029-AC3",
+     "ac": 3,
+     "title": "Issuing PO00000002 with a pending approval is held 202 ORD0012 and writes no commitment",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_issuePurchaseOrder",
+       "path": {
+        "orderNumber": "PO00000002"
+       },
+       "body": {}
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 202
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 6,
+        "severity": "HOLD",
+        "reasonCode": "ORD0012"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Commitment WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000002' AND Stage = 'COMMITTED'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-029 AC3: gate 3 POAPPRV CHECK pending RC 6 APV0005 is passed through as ORD0012 and holds the order before 5300-COMMIT-LINES (POORDER.cob:891-893,974-1000).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-029-AC4",
+     "ac": 4,
+     "title": "First issue of a BLANKET order opens one po.BlanketBalance row with AgreedQty, AgreedValue, currency",
+     "layer": "api-journey",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "steps": [
+      {
+       "save": "o",
+       "call": "po_createPurchaseOrder",
+       "path": {},
+       "body": {
+        "orderType": "BLANKET",
+        "supplier": "S0001",
+        "currency": "GBP"
+       }
+      },
+      {
+       "save": "l",
+       "call": "po_addPurchaseOrderLine",
+       "path": {
+        "orderNumber": "PO00000001"
+       },
+       "body": {
+        "lineType": "STOCK",
+        "itemCode": "BAR-AL6082-25MM",
+        "description": "Aluminium bar 6082-T6, 25 mm round",
+        "orderedQty": 40,
+        "uomCode": "M",
+        "unitPrice": 12.5,
+        "discountPct": 0,
+        "destSite": "BHM"
+       }
+      },
+      {
+       "save": "rq",
+       "call": "po_requestPurchaseOrderApproval",
+       "path": {
+        "orderNumber": "PO00000001"
+       },
+       "body": {
+        "comment": ""
+       }
+      },
+      {
+       "sql": "DECLARE @id bigint = (SELECT TOP (1) ApprovalId FROM core.Approval WHERE CompanyCode = 'STC' AND DocumentType = 'PURCHASEORDER' AND DocumentRef = 'PO00000001' AND Status = 'PENDING' ORDER BY ApprovalId DESC); EXEC core.usp_DecideApproval @ApprovalId = @id, @UserCode = 'PURMGR', @Decision = 'APPROVED', @Comment = 'A07 parity arrangement: inbox approval';"
+      },
+      {
+       "save": "r1",
+       "call": "po_issuePurchaseOrder",
+       "path": {
+        "orderNumber": "PO00000001"
+       },
+       "body": {}
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.BlanketBalance WHERE CompanyCode = 'STC' AND BlanketOrderNumber = 'PO00000001'",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT CONCAT(AgreedQty, '|', AgreedValue, '|', CurrencyCode) FROM po.BlanketBalance WHERE CompanyCode = 'STC' AND BlanketOrderNumber = 'PO00000001' AND LineNum = 1",
+       "equals": "40.000000|500.00|GBP"
+      }
+     ],
+     "derivation": "FR-STERP-PO-029 AC4: POORDER 5500-BLANKET-BAL MERGE of OPEN lines (AgreedQty = OrderedQty, AgreedValue = NetAmount, order currency) on first issue (POORDER.cob:907-942); first POORD number of the fresh deploy, decision through the procedure the PLATFORM inbox calls.",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-030",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-030-AC1",
+     "ac": 1,
+     "title": "Validate PO00000004 without a lot shows Reason code RCP0004 and keeps the loaded line in the grid",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/goods-receipt",
+       "actions": [
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000004"
+         }
+        },
+        {
+         "click": "Validate"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Reason code: RCP0004"
+      },
+      {
+       "on": "page",
+       "text": "Aluminium bar 6082-T6, 25 mm round"
+      }
+     ],
+     "derivation": "FR-STERP-PO-030 AC1 (DEMO-WORKFLOWS workflow 3 step 4): frmGoodsReceipt.ValidateClicked binds the loaded lines before ShowResult (frmGoodsReceipt.vb:115-128); RECEIPT 2100-ONE-LINE lot rule RCP0004 (RECEIPT.cob:389-401).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-030-AC2",
+     "ac": 2,
+     "title": "Count 40 at GOODSIN with a new lot and F10 with ownership RECEIPT confirms 1 accepted line, GRNI 410.83",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "journey",
+      "keys"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrderLine SET UnitPrice = 10.2708 WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004' AND LineNum = 1;"
+      },
+      {
+       "save": "page",
+       "gui": "/po/goods-receipt",
+       "actions": [
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000004"
+         }
+        },
+        {
+         "select": {
+          "label": "Ownership passes",
+          "value": "RECEIPT"
+         }
+        },
+        {
+         "fill": {
+          "label": "Lot",
+          "value": "A07-LOT-030"
+         }
+        },
+        {
+         "fill": {
+          "label": "Location",
+          "value": "GOODSIN"
+         }
+        },
+        {
+         "fill": {
+          "label": "Counted",
+          "value": "40"
+         }
+        },
+        {
+         "click": "Validate"
+        },
+        {
+         "click": "Count line"
+        },
+        {
+         "press": "F10"
+        },
+        {
+         "click": "Yes"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "CONFIRMED: 1 accepted, 0 quarantined, 0 held."
+      },
+      {
+       "on": "page",
+       "text": "GRNI £410.83"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Receipt WHERE CompanyCode = 'STC' AND PurchaseOrderNumber = 'PO00000004' AND Status = 'CONFIRMED' AND GrniValueGBP = 410.83",
+       "equals": 1
+      }
+     ],
+     "derivation": "FR-STERP-PO-030 AC2: frmGoodsReceipt.OnConfirm status text (frmGoodsReceipt.vb:150-163); legacy QA evidence final010 'Receipt GRN00000003 CONFIRMED: 1 accepted, 0 quarantined, 0 held.  GRNI £410.83' (40 x 10.2708). [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-036 (consolidation lead, cross-pass item 1, consistent with FR-STERP-PO-031-AC2 and the PO-020 demo journey): PO00000004 line 1 is arranged at the QA ledger price 10.2708 that the binding GRNI 410.83 presupposes (410.83 / 40; the demo dataset prices it 15.9948, legacy GRNI 639.79); legacy .NET route GoodsReceiptService Validate/Count/Confirm as WHSE on the arranged democ (lot A07-LOT-030, GOODSIN, 40): 'Receipt GRN00000003 CONFIRMED: 1 accepted, 0 quarantined, 0 held.  GRNI £410.83, price variance £0.00, journal JNS00000085.' and po.Receipt GrniValueGBP 410.83 (amendment evidence lead/LL-02)]",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-030-AC3",
+     "ac": 3,
+     "title": "Changing Order to PO00000005 after validation blocks F10 with the header-changed warning, no call",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "keys"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/goods-receipt",
+       "actions": [
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000004"
+         }
+        },
+        {
+         "fill": {
+          "label": "Lot",
+          "value": "A07-LOT-030"
+         }
+        },
+        {
+         "click": "Validate"
+        },
+        {
+         "fill": {
+          "label": "Order",
+          "value": "PO00000005"
+         }
+        },
+        {
+         "press": "F10"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "The receipt header has changed. Validate it again before counting or confirming."
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Receipt WHERE CompanyCode = 'STC' AND PurchaseOrderNumber IN ('PO00000004', 'PO00000005')",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-030 AC3 (GUI-021 fix): frmGoodsReceipt.HeaderReady compares the header captured at validation (frmGoodsReceipt.vb:198-227) before any confirmation or service call.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-030-AC4",
+     "ac": 4,
+     "title": "F2 on Order opens the lookup showing the SQL Server parameter error of po.usp_OpenOrders",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "keys"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/po/goods-receipt",
+       "actions": [
+        {
+         "click": "Order"
+        },
+        {
+         "press": "F2"
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "is not a parameter for procedure usp_OpenOrders"
+      }
+     ],
+     "derivation": "FR-STERP-PO-030 AC4 (BC-PO-03 reproduced): frmLookup passes @CompanyCode, @SiteCode, @Search, @Argument (MaintService.vb:80-83, frmLookup.vb:30-40) to po.usp_OpenOrders which declares neither (usp_PoEnquiry.sql:32-35).",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-031",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-031-AC1",
+     "ac": 1,
+     "title": "Validate PO00000004 without a lot: 422 RCP0004 carrying the line with trace LOT and outcome REJECT",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_validateGoodsReceipt",
+       "path": {},
+       "body": {
+        "orderNumber": "PO00000004",
+        "deliveryNote": "A07-DN-031",
+        "physicalDate": "2026-10-07",
+        "warehouse": "MAIN",
+        "ownership": "RECEIPT",
+        "shipEvidence": "",
+        "importEntry": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "RCP0004",
+        "detailContains": "is lot traceable"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineCnt",
+       "equals": 1
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineTable.line[0].lItem",
+       "equals": "BAR-AL6082-25MM"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineTable.line[0].lReceived",
+       "equals": 40
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineTable.line[0].lTrace",
+       "equals": "LOT"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineTable.line[0].lOutcome",
+       "equals": "REJECT"
+      }
+     ],
+     "derivation": "FR-STERP-PO-031 AC1 and rule R4: facade LoadLines (GoodsReceiptService.vb:104-146) and RECEIPT 2100-ONE-LINE lot rule (RECEIPT.cob:389-401); line values from legacy QA evidence (host005: 40 M, trace LOT).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-031-AC2",
+     "ac": 2,
+     "title": "Validate with lot LOT-QA-1 and GOODSIN: 200 OK, 40 accepted and total 410.83",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrderLine SET UnitPrice = 10.2708 WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004' AND LineNum = 1;"
+      },
+      {
+       "save": "r1",
+       "call": "po_validateGoodsReceipt",
+       "path": {},
+       "body": {
+        "orderNumber": "PO00000004",
+        "deliveryNote": "A07-DN-031",
+        "physicalDate": "2026-10-07",
+        "warehouse": "MAIN",
+        "ownership": "RECEIPT",
+        "shipEvidence": "",
+        "importEntry": "",
+        "location": "GOODSIN",
+        "lotCode": "LOT-QA-1"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineTable.line[0].lAccepted",
+       "equals": 40
+      },
+      {
+       "on": "r1",
+       "json": "$.data.totalGbp",
+       "equals": 410.83
+      }
+     ],
+     "derivation": "FR-STERP-PO-031 AC2 and the validate 200 example: RECEIPT accepts the whole outstanding 40 of a line without inspection and values it ROUNDED(received x UnitPrice / FX rate) at scale 2 (RECEIPT.cob:451-462, RECEIPTCA.cpy:93,108,124) over the order line read by GoodsReceiptService.vb:22-44; the restored demo dataset prices PO00000004 line 1 at 15.9948 with FX 1, trace LOT and no inspection (dataset query DQ-04, legacy value 639.79), so the line is arranged at the QA ledger price 10.2708 (410.83 / 40, FUNCTIONAL-QA-LEDGER.md:476,518) and ROUNDED(40 x 10.2708 / 1) = 410.83. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-036: PO00000004 line 1 UnitPrice arranged to 10.2708 so the binding totalGbp 410.83 holds on the legacy formula] [A07-AMEND agent-07-20261021T211031Z-a544e35d consolidation lead: the arranged price is confirmed on the legacy .NET route GoodsReceiptService.Validate (LOT-QA-1, GOODSIN) as WHSE on the arranged democ: RC 00, RC-L-ACCEPTED 40, RC-L-VALUE-GBP 410.83, TotalGBP 410.83, no po.Receipt row (amendment evidence lead/LL-01)]",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-031-AC3",
+     "ac": 3,
+     "title": "Ownership INCOTERMS without shipment evidence is refused 422 RCP0009",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_validateGoodsReceipt",
+       "path": {},
+       "body": {
+        "orderNumber": "PO00000004",
+        "deliveryNote": "A07-DN-031",
+        "physicalDate": "2026-10-07",
+        "warehouse": "MAIN",
+        "ownership": "INCOTERMS",
+        "shipEvidence": "",
+        "importEntry": "",
+        "location": "GOODSIN",
+        "lotCode": "LOT-QA-1"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "RCP0009",
+        "detailContains": "shipment evidence"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-031 AC3: RECEIPT 1000-INIT INCOTERMS without RC-SHIP-EVIDENCE is RC 8 RCP0009 (RECEIPT.cob:183-193).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-031-AC4",
+     "ac": 4,
+     "title": "Ownership ON-RECEIPT fails like the legacy ArgumentException: 500 SYS0001",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_validateGoodsReceipt",
+       "path": {},
+       "body": {
+        "orderNumber": "PO00000004",
+        "deliveryNote": "A07-DN-031",
+        "physicalDate": "2026-10-07",
+        "warehouse": "MAIN",
+        "ownership": "ON-RECEIPT",
+        "shipEvidence": "",
+        "importEntry": "",
+        "lotCode": "LOT-QA-1"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 500,
+        "type": "severe",
+        "reasonCode": "SYS0001",
+        "detailContains": "Ownership must be RECEIPT, INCOTERMS or DROPSHIP."
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-031 AC4: GoodsReceiptService.Validate throws ArgumentException for other ownership values (GoodsReceiptService.vb:76-79) mapped by Guard to SYS0001 (contracts 4.6, BaseForm.vb:221-238).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-031-AC5",
+     "ac": 5,
+     "title": "A validate call writes no receipt, stock movement or order quantity",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_validateGoodsReceipt",
+       "path": {},
+       "body": {
+        "orderNumber": "PO00000004",
+        "deliveryNote": "A07-DN-031",
+        "physicalDate": "2026-10-07",
+        "warehouse": "MAIN",
+        "ownership": "RECEIPT",
+        "shipEvidence": "",
+        "importEntry": "",
+        "location": "GOODSIN",
+        "lotCode": "A07-LOT-031E"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Receipt WHERE CompanyCode = 'STC' AND PurchaseOrderNumber = 'PO00000004'",
+       "equals": 0
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CompanyCode = 'STC' AND LotCode = 'A07-LOT-031E'",
+       "equals": 0
+      },
+      {
+       "sql": "SELECT CONCAT(pl.ReceivedQty, '|', pl.AcceptedQty, '|', p.DeliveryStatus) FROM po.PurchaseOrderLine pl JOIN po.PurchaseOrder p ON p.PurchaseOrderId = pl.PurchaseOrderId WHERE p.CompanyCode = 'STC' AND p.OrderNumber = 'PO00000004' AND pl.LineNum = 1",
+       "equals": "0.000000|0.000000|NOTRECEIVED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-031 AC5 and the operation's UOW note: the outstanding-lines query is a read and RECEIPT VALIDATE does no database work (WS-DB-READY only for CONFIRM/TRANSIT/REVERSE, RECEIPT.cob:197-200).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-032",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-032-AC1",
+     "ac": 1,
+     "title": "Confirming the counted PO00000004 document returns CONFIRMED, a PORCP number, 1 line, GRNI 410.83",
+     "layer": "component",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrder SET SupplierCode = 'S0001' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004';"
+      },
+      {
+       "save": "r1",
+       "call": "po_confirmGoodsReceipt",
+       "path": {},
+       "body": {
+        "receipt": {
+         "orderNumber": "PO00000004",
+         "supplier": "S0001",
+         "deliveryNote": "A07-DN-0321",
+         "physicalDate": "2026-10-07",
+         "postingDate": "2026-10-07",
+         "warehouse": "MAIN",
+         "ownership": "RECEIPT",
+         "incoterm": "DAP",
+         "shipEvidence": "",
+         "importEntry": "",
+         "subcontractJob": "",
+         "dupPolicy": "WARN",
+         "receivedBy": "WHSE",
+         "currency": "GBP",
+         "fxRate": 1,
+         "lineCnt": 1,
+         "lineTable": {
+          "line": [
+           {
+            "lNum": 1,
+            "lPoLine": 1,
+            "lSchedule": 1,
+            "lItem": "BAR-AL6082-25MM",
+            "lRevision": "",
+            "lDesc": "Aluminium bar 6082-T6, 25 mm round",
+            "lOrdered": 40,
+            "lCancelled": 0,
+            "lCounted": 0,
+            "lReceived": 40,
+            "lUom": "M",
+            "lFactor": 1,
+            "lLocation": "GOODSIN",
+            "lLot": "A07-LOT-0321",
+            "lTrace": "LOT",
+            "lInspect": "N",
+            "lStocked": "Y",
+            "lPrice": 10.2708,
+            "lStdCost": 0,
+            "lOverPct": 0
+           }
+          ]
+         }
+        }
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.status",
+       "equals": "CONFIRMED"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.receiptRef",
+       "equals": "GRN00000003",
+       "normalize": "document-number"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.linesAccepted",
+       "equals": 1
+      },
+      {
+       "on": "r1",
+       "json": "$.data.grniGbp",
+       "equals": 410.83
+      },
+      {
+       "on": "r1",
+       "json": "$.data.journalNumber",
+       "equals": "JNS00000086",
+       "normalize": "document-number"
+      }
+     ],
+     "derivation": "FR-STERP-PO-032 AC1 and the confirm 200 example: RECEIPT CONFIRM (RECEIPT.cob:523-857) over the validated document; legacy QA evidence final008-final010 (CONFIRMED GRN00000003, exact line FK, 40, 410.83, GRNI journal, FULLRECEIVED); supplier pinned to the OpenAPI example S0001 so the literal document equals validate's answer.",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-032-AC2",
+     "ac": 2,
+     "title": "One unit commits the CONFIRMED receipt, linked line 40/40, movement and journal 410.83, FULLRECEIVED",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "journey"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrder SET SupplierCode = 'S0001' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004';"
+      },
+      {
+       "save": "r1",
+       "call": "po_confirmGoodsReceipt",
+       "path": {},
+       "body": {
+        "receipt": {
+         "orderNumber": "PO00000004",
+         "supplier": "S0001",
+         "deliveryNote": "A07-DN-0322",
+         "physicalDate": "2026-10-07",
+         "postingDate": "2026-10-07",
+         "warehouse": "MAIN",
+         "ownership": "RECEIPT",
+         "incoterm": "DAP",
+         "shipEvidence": "",
+         "importEntry": "",
+         "subcontractJob": "",
+         "dupPolicy": "WARN",
+         "receivedBy": "WHSE",
+         "currency": "GBP",
+         "fxRate": 1,
+         "lineCnt": 1,
+         "lineTable": {
+          "line": [
+           {
+            "lNum": 1,
+            "lPoLine": 1,
+            "lSchedule": 1,
+            "lItem": "BAR-AL6082-25MM",
+            "lRevision": "",
+            "lDesc": "Aluminium bar 6082-T6, 25 mm round",
+            "lOrdered": 40,
+            "lCancelled": 0,
+            "lCounted": 0,
+            "lReceived": 40,
+            "lUom": "M",
+            "lFactor": 1,
+            "lLocation": "GOODSIN",
+            "lLot": "A07-LOT-0322",
+            "lTrace": "LOT",
+            "lInspect": "N",
+            "lStocked": "Y",
+            "lPrice": 10.2708,
+            "lStdCost": 0,
+            "lOverPct": 0
+           }
+          ]
+         }
+        }
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "sql": "SELECT CONCAT(Status, '|', GrniValueGBP, '|', CASE WHEN JournalId IS NULL THEN 'NOJOURNAL' ELSE 'JOURNAL' END) FROM po.Receipt WHERE CompanyCode = 'STC' AND PurchaseOrderNumber = 'PO00000004'",
+       "equals": "CONFIRMED|410.83|JOURNAL"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.ReceiptLine rl JOIN po.Receipt r ON r.ReceiptId = rl.ReceiptId JOIN po.PurchaseOrderLine pl ON pl.PurchaseOrderLineId = rl.PurchaseOrderLineId WHERE r.CompanyCode = 'STC' AND r.PurchaseOrderNumber = 'PO00000004' AND pl.OrderNumber = 'PO00000004' AND pl.LineNum = 1 AND rl.ReceivedQty = 40 AND rl.AcceptedQty = 40",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT m.ValueGBP FROM po.Receipt r JOIN po.ReceiptLine rl ON rl.ReceiptId = r.ReceiptId JOIN inv.StockMovement m ON m.MovementId = rl.MovementId WHERE r.CompanyCode = 'STC' AND r.PurchaseOrderNumber = 'PO00000004'",
+       "equals": 410.83
+      },
+      {
+       "sql": "SELECT CONCAT(COUNT(*), '|', SUM(CASE WHEN (jl.AccountCode = '1100' AND jl.DebitAmountGBP = 410.83 AND jl.CreditAmountGBP = 0) OR (jl.AccountCode = '2010' AND jl.CreditAmountGBP = 410.83 AND jl.DebitAmountGBP = 0) THEN 1 ELSE 0 END)) FROM po.Receipt r JOIN fin.JournalLine jl ON jl.JournalId = r.JournalId WHERE r.CompanyCode = 'STC' AND r.PurchaseOrderNumber = 'PO00000004'",
+       "equals": "2|2"
+      },
+      {
+       "sql": "SELECT CONCAT(pl.ReceivedQty, '|', pl.AcceptedQty, '|', p.DeliveryStatus) FROM po.PurchaseOrderLine pl JOIN po.PurchaseOrder p ON p.PurchaseOrderId = pl.PurchaseOrderId WHERE p.CompanyCode = 'STC' AND p.OrderNumber = 'PO00000004' AND pl.LineNum = 1",
+       "equals": "40.000000|40.000000|FULLRECEIVED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-032 AC2: RECEIPT 8300/8400 unit with STKMOVE RECEIPT, POPOST DR 1100 / CR 2010 (POACCNTS.cpy:21-22) and po.usp_ReceiptDeliveryState CONFIRMED (usp_ReceiptDeliveryState.sql:30-110); legacy QA evidence final008-final010 (CONFIRMED GRN00000003, exact line FK, 40, 410.83, GRNI journal, FULLRECEIVED).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-032-AC3",
+     "ac": 3,
+     "title": "A failing STKMOVE (retired item) rolls the whole receipt back and the problem carries the document",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrder SET SupplierCode = 'S0001' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004'; UPDATE inv.Item SET LifecycleStatus = 'RETIRED' WHERE CompanyCode = 'STC' AND ItemCode = 'BAR-AL6082-25MM';"
+      },
+      {
+       "save": "r1",
+       "call": "po_confirmGoodsReceipt",
+       "path": {},
+       "body": {
+        "receipt": {
+         "orderNumber": "PO00000004",
+         "supplier": "S0001",
+         "deliveryNote": "A07-DN-0323",
+         "physicalDate": "2026-10-07",
+         "postingDate": "2026-10-07",
+         "warehouse": "MAIN",
+         "ownership": "RECEIPT",
+         "incoterm": "DAP",
+         "shipEvidence": "",
+         "importEntry": "",
+         "subcontractJob": "",
+         "dupPolicy": "WARN",
+         "receivedBy": "WHSE",
+         "currency": "GBP",
+         "fxRate": 1,
+         "lineCnt": 1,
+         "lineTable": {
+          "line": [
+           {
+            "lNum": 1,
+            "lPoLine": 1,
+            "lSchedule": 1,
+            "lItem": "BAR-AL6082-25MM",
+            "lRevision": "",
+            "lDesc": "Aluminium bar 6082-T6, 25 mm round",
+            "lOrdered": 40,
+            "lCancelled": 0,
+            "lCounted": 0,
+            "lReceived": 40,
+            "lUom": "M",
+            "lFactor": 1,
+            "lLocation": "GOODSIN",
+            "lLot": "A07-LOT-0323",
+            "lTrace": "LOT",
+            "lInspect": "N",
+            "lStocked": "Y",
+            "lPrice": 10.2708,
+            "lStdCost": 0,
+            "lOverPct": 0
+           }
+          ]
+         }
+        }
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "RCP0010",
+        "detailContains": "is retired; historical enquiry only"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.orderNumber",
+       "equals": "PO00000004"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineTable.line[0].lOutcome",
+       "equals": "REJECT"
+      },
+      {
+       "on": "r1",
+       "json": "$.data.lineTable.line[0].lReason",
+       "equals": "RCP0010"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Receipt WHERE CompanyCode = 'STC' AND PurchaseOrderNumber = 'PO00000004'",
+       "equals": 0
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM inv.StockMovement WHERE CompanyCode = 'STC' AND LotCode = 'A07-LOT-0323'",
+       "equals": 0
+      },
+      {
+       "sql": "SELECT CONCAT(pl.ReceivedQty, '|', pl.AcceptedQty, '|', p.DeliveryStatus) FROM po.PurchaseOrderLine pl JOIN po.PurchaseOrder p ON p.PurchaseOrderId = pl.PurchaseOrderId WHERE p.CompanyCode = 'STC' AND p.OrderNumber = 'PO00000004' AND pl.LineNum = 1",
+       "equals": "0.000000|0.000000|NOTRECEIVED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-032 AC3 and rule R4: STKMOVE refuses a RETIRED item RC 8 STK0001 (STKMOVE.cob:306-314), RECEIPT 3200-MOVE-STOCK marks the line REJECT/RCP0010 and passes the RC and message (RECEIPT.cob:609-681), 8400-END-UOW rolls back on RC 8-16 (RECEIPT.cob:1157-1187); the item is arranged RETIRED to make STKMOVE fail.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-032-AC4",
+     "ac": 4,
+     "title": "Confirming the same delivery note again for the supplier answers 200 WARNING RCP0007",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "idempotency"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrder SET SupplierCode = 'S0001' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004';"
+      },
+      {
+       "save": "c1",
+       "call": "po_confirmGoodsReceipt",
+       "path": {},
+       "body": {
+        "receipt": {
+         "orderNumber": "PO00000004",
+         "supplier": "S0001",
+         "deliveryNote": "A07-DN-0324",
+         "physicalDate": "2026-10-07",
+         "postingDate": "2026-10-07",
+         "warehouse": "MAIN",
+         "ownership": "RECEIPT",
+         "incoterm": "DAP",
+         "shipEvidence": "",
+         "importEntry": "",
+         "subcontractJob": "",
+         "dupPolicy": "WARN",
+         "receivedBy": "WHSE",
+         "currency": "GBP",
+         "fxRate": 1,
+         "lineCnt": 1,
+         "lineTable": {
+          "line": [
+           {
+            "lNum": 1,
+            "lPoLine": 1,
+            "lSchedule": 1,
+            "lItem": "BAR-AL6082-25MM",
+            "lRevision": "",
+            "lDesc": "Aluminium bar 6082-T6, 25 mm round",
+            "lOrdered": 40,
+            "lCancelled": 0,
+            "lCounted": 0,
+            "lReceived": 20,
+            "lUom": "M",
+            "lFactor": 1,
+            "lLocation": "GOODSIN",
+            "lLot": "A07-LOT-0324",
+            "lTrace": "LOT",
+            "lInspect": "N",
+            "lStocked": "Y",
+            "lPrice": 10.2708,
+            "lStdCost": 0,
+            "lOverPct": 0
+           }
+          ]
+         }
+        }
+       }
+      },
+      {
+       "save": "c2",
+       "call": "po_confirmGoodsReceipt",
+       "path": {},
+       "body": {
+        "receipt": {
+         "orderNumber": "PO00000004",
+         "supplier": "S0001",
+         "deliveryNote": "A07-DN-0324",
+         "physicalDate": "2026-10-07",
+         "postingDate": "2026-10-07",
+         "warehouse": "MAIN",
+         "ownership": "RECEIPT",
+         "incoterm": "DAP",
+         "shipEvidence": "",
+         "importEntry": "",
+         "subcontractJob": "",
+         "dupPolicy": "WARN",
+         "receivedBy": "WHSE",
+         "currency": "GBP",
+         "fxRate": 1,
+         "lineCnt": 1,
+         "lineTable": {
+          "line": [
+           {
+            "lNum": 1,
+            "lPoLine": 1,
+            "lSchedule": 1,
+            "lItem": "BAR-AL6082-25MM",
+            "lRevision": "",
+            "lDesc": "Aluminium bar 6082-T6, 25 mm round",
+            "lOrdered": 40,
+            "lCancelled": 0,
+            "lCounted": 20,
+            "lReceived": 20,
+            "lUom": "M",
+            "lFactor": 1,
+            "lLocation": "GOODSIN",
+            "lLot": "A07-LOT-0324",
+            "lTrace": "LOT",
+            "lInspect": "N",
+            "lStocked": "Y",
+            "lPrice": 10.2708,
+            "lStdCost": 0,
+            "lOverPct": 0
+           }
+          ]
+         }
+        }
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "c1",
+       "status": 200
+      },
+      {
+       "on": "c2",
+       "status": 200
+      },
+      {
+       "on": "c2",
+       "outcome": {
+        "returnCode": 4,
+        "severity": "WARNING",
+        "reasonCode": "RCP0007",
+        "messageContains": "Delivery note A07-DN-0324 was already received"
+       }
+      },
+      {
+       "on": "c2",
+       "json": "$.data.wasDuplicate",
+       "equals": "Y"
+      }
+     ],
+     "derivation": "FR-STERP-PO-032 AC4: RECEIPT 1200-DUPLICATE finds a non-reversed receipt of the supplier with the note and the facade default policy WARN gives RC 4 RCP0007 (RECEIPT.cob:209-246; GoodsReceiptService.vb:88).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-033",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-033-AC1",
+     "ac": 1,
+     "title": "Reversing the PO00000004 receipt posts DR 2010 / CR 1100 410.83 and takes 40 off the order line",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrder SET SupplierCode = 'S0001' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004';"
+      },
+      {
+       "save": "c1",
+       "call": "po_confirmGoodsReceipt",
+       "path": {},
+       "body": {
+        "receipt": {
+         "orderNumber": "PO00000004",
+         "supplier": "S0001",
+         "deliveryNote": "A07-DN-0331",
+         "physicalDate": "2026-10-07",
+         "postingDate": "2026-10-07",
+         "warehouse": "MAIN",
+         "ownership": "RECEIPT",
+         "incoterm": "DAP",
+         "shipEvidence": "",
+         "importEntry": "",
+         "subcontractJob": "",
+         "dupPolicy": "WARN",
+         "receivedBy": "WHSE",
+         "currency": "GBP",
+         "fxRate": 1,
+         "lineCnt": 1,
+         "lineTable": {
+          "line": [
+           {
+            "lNum": 1,
+            "lPoLine": 1,
+            "lSchedule": 1,
+            "lItem": "BAR-AL6082-25MM",
+            "lRevision": "",
+            "lDesc": "Aluminium bar 6082-T6, 25 mm round",
+            "lOrdered": 40,
+            "lCancelled": 0,
+            "lCounted": 0,
+            "lReceived": 40,
+            "lUom": "M",
+            "lFactor": 1,
+            "lLocation": "GOODSIN",
+            "lLot": "A07-LOT-0331",
+            "lTrace": "LOT",
+            "lInspect": "N",
+            "lStocked": "Y",
+            "lPrice": 10.2708,
+            "lStdCost": 0,
+            "lOverPct": 0
+           }
+          ]
+         }
+        }
+       }
+      },
+      {
+       "save": "r1",
+       "call": "po_reverseGoodsReceipt",
+       "path": {
+        "receiptRef": "GRN00000003"
+       },
+       "body": {
+        "reverseReason": "Wrong order keyed"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "c1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 0,
+        "severity": "OK"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.status",
+       "equals": "REVERSED"
+      },
+      {
+       "sql": "SELECT CONCAT(COUNT(*), '|', SUM(CASE WHEN (jl.AccountCode = '2010' AND jl.DebitAmountGBP = 410.83) OR (jl.AccountCode = '1100' AND jl.CreditAmountGBP = 410.83) THEN 1 ELSE 0 END)) FROM fin.Journal j JOIN fin.JournalLine jl ON jl.JournalId = j.JournalId WHERE j.CompanyCode = 'STC' AND j.CorrelationId LIKE 'RCPREV-STC-%'",
+       "equals": "2|2"
+      },
+      {
+       "sql": "SELECT CONCAT(pl.ReceivedQty, '|', pl.AcceptedQty, '|', p.DeliveryStatus) FROM po.PurchaseOrderLine pl JOIN po.PurchaseOrder p ON p.PurchaseOrderId = pl.PurchaseOrderId WHERE p.CompanyCode = 'STC' AND p.OrderNumber = 'PO00000004' AND pl.LineNum = 1",
+       "equals": "0.000000|0.000000|NOTRECEIVED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-033 AC1 and the reverse example: RECEIPT REVERSE STKMOVE ISSUE, POPOST 'RCPREV-<co>-<ref>' DR 2010 / CR 1100 for the stored GRNI and usp_ReceiptDeliveryState REVERSED (RECEIPT.cob:928-1088); GRN00000003 is the next PORCP number after PODEMO's two receipts (QA evidence final010).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-033-AC2",
+     "ac": 2,
+     "title": "Reversal with an empty reason is refused 422 RCP0012 and the receipt stays CONFIRMED",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_reverseGoodsReceipt",
+       "path": {
+        "receiptRef": "GRN00000001"
+       },
+       "body": {
+        "reverseReason": ""
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "RCP0012",
+        "detailContains": "A reversal must say why"
+       }
+      },
+      {
+       "sql": "SELECT Status FROM po.Receipt WHERE CompanyCode = 'STC' AND ReceiptRef = 'GRN00000001'",
+       "equals": "CONFIRMED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-033 AC2: RECEIPT 5000 reason check RC 8 RCP0012 (RECEIPT.cob:928-937) on PODEMO's confirmed GRN00000001 (PODEMO 3000-RECEIVED-CLOSED).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-033-AC3",
+     "ac": 3,
+     "title": "Reversing a receipt that is not CONFIRMED answers 404 RCP0012 'not a confirmed receipt of this company'",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.Receipt SET Status = 'REVERSED' WHERE CompanyCode = 'STC' AND ReceiptRef = 'GRN00000002';"
+      },
+      {
+       "save": "r1",
+       "call": "po_reverseGoodsReceipt",
+       "path": {
+        "receiptRef": "GRN00000002"
+       },
+       "body": {
+        "reverseReason": "Wrong order keyed"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 404,
+        "type": "not-found",
+        "reasonCode": "RCP0012",
+        "detailContains": "Receipt GRN00000002 is not a confirmed receipt of this company"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-033 AC3: the facade stored-lines query returns no rows for a non-CONFIRMED receipt and RECEIPT 5000 answers RC 16 RCP0012 (RECEIPT.cob:955-963); GRN00000002 arranged as already reversed.",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-034",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-034-AC1",
+     "ac": 1,
+     "title": "Inspecting 40 quarantined with 38 accepted and 2 scrapped answers 200 WARNING 38 to good, 2 to scrap",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrder SET SupplierCode = 'S0001' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004'; UPDATE inv.Item SET RequiresInspection = 1 WHERE CompanyCode = 'STC' AND ItemCode = 'BAR-AL6082-25MM';"
+      },
+      {
+       "save": "c1",
+       "call": "po_confirmGoodsReceipt",
+       "path": {},
+       "body": {
+        "receipt": {
+         "orderNumber": "PO00000004",
+         "supplier": "S0001",
+         "deliveryNote": "A07-DN-0341",
+         "physicalDate": "2026-10-07",
+         "postingDate": "2026-10-07",
+         "warehouse": "MAIN",
+         "ownership": "RECEIPT",
+         "incoterm": "DAP",
+         "shipEvidence": "",
+         "importEntry": "",
+         "subcontractJob": "",
+         "dupPolicy": "WARN",
+         "receivedBy": "WHSE",
+         "currency": "GBP",
+         "fxRate": 1,
+         "lineCnt": 1,
+         "lineTable": {
+          "line": [
+           {
+            "lNum": 1,
+            "lPoLine": 1,
+            "lSchedule": 1,
+            "lItem": "BAR-AL6082-25MM",
+            "lRevision": "",
+            "lDesc": "Aluminium bar 6082-T6, 25 mm round",
+            "lOrdered": 40,
+            "lCancelled": 0,
+            "lCounted": 0,
+            "lReceived": 40,
+            "lUom": "M",
+            "lFactor": 1,
+            "lLocation": "GOODSIN",
+            "lLot": "A07-LOT-0341",
+            "lTrace": "LOT",
+            "lInspect": "Y",
+            "lStocked": "Y",
+            "lPrice": 10.2708,
+            "lStdCost": 0,
+            "lOverPct": 0
+           }
+          ]
+         }
+        }
+       }
+      },
+      {
+       "save": "r1",
+       "call": "po_recordInspection",
+       "path": {
+        "receiptRef": "GRN00000003",
+        "lineNum": 1
+       },
+       "body": {
+        "itemCode": "BAR-AL6082-25MM",
+        "lotCode": "A07-LOT-0341",
+        "warehouse": "MAIN",
+        "location": "GOODSIN",
+        "goodLocation": "GOODSIN",
+        "uomCode": "M",
+        "inspectedQty": 40,
+        "acceptedQty": 38,
+        "rejectedQty": 2,
+        "reworkQty": 0,
+        "disposition": "SCRAP",
+        "rejectReason": "DAMAGED",
+        "rejectNarr": "Bent bar ends"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "c1",
+       "json": "$.data.linesQuarant",
+       "equals": 1
+      },
+      {
+       "on": "r1",
+       "status": 200
+      },
+      {
+       "on": "r1",
+       "outcome": {
+        "returnCode": 4,
+        "severity": "WARNING",
+        "messageContains": "rejected with disposition SCRAP"
+       }
+      },
+      {
+       "on": "r1",
+       "json": "$.data.toGoodQty",
+       "equals": 38
+      },
+      {
+       "on": "r1",
+       "json": "$.data.toScrapQty",
+       "equals": 2
+      },
+      {
+       "on": "r1",
+       "json": "$.data.scrapValueGbp",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-034 AC1 and the inspection example (INSPECT.cob:225-267); the AC's AcceptedQty +38 through po.tr_ReceiptLineAccepted is not asserted: INSPECT 3200-RELEASE sends no SM-HOLD-ID and STKMOVE 5000-RELEASE-HOLD refuses that (STK0014, STKMOVE.cob:1157-1163), which would skip 3600-UPDATE-LINE while F-INSPECT-01 still returns RC 4.",
+     "confidence": "unknown"
+    },
+    {
+     "id": "FR-STERP-PO-034-AC2",
+     "ac": 2,
+     "title": "Accepted + rejected + rework different from inspected is refused 422 INS0002",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_recordInspection",
+       "path": {
+        "receiptRef": "GRN00000001",
+        "lineNum": 1
+       },
+       "body": {
+        "warehouse": "MAIN",
+        "inspectedQty": 10,
+        "acceptedQty": 5,
+        "rejectedQty": 0,
+        "reworkQty": 0,
+        "disposition": "ACCEPT"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "INS0002",
+        "detailContains": "must add back to the inspected quantity"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-034 AC2: INSPECT 2000-VALIDATE add-back rule RC 8 INS0002 (INSPECT.cob:122-137) after reading the quarantine quantity of PODEMO's receipt line GRN00000001/1 (INSPECT.cob:186-216).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-034-AC3",
+     "ac": 3,
+     "title": "Disposition CONCESSION from the page (no authoriser field) is refused 422 INS0005",
+     "layer": "contract",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "WHSE"
+     },
+     "covers": [
+      "error-mapping"
+     ],
+     "steps": [
+      {
+       "save": "r1",
+       "call": "po_recordInspection",
+       "path": {
+        "receiptRef": "GRN00000001",
+        "lineNum": 1
+       },
+       "body": {
+        "warehouse": "MAIN",
+        "inspectedQty": 0,
+        "acceptedQty": 0,
+        "rejectedQty": 0,
+        "reworkQty": 0,
+        "disposition": "CONCESSION",
+        "concessionRef": "CONC-A07-1"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "r1",
+       "problem": {
+        "status": 422,
+        "type": "business-rule",
+        "reasonCode": "INS0005",
+        "detailContains": "record who authorised the concession"
+       }
+      }
+     ],
+     "derivation": "FR-STERP-PO-034 AC3: frmGoodsReceipt has a Concession ref but no authoriser field (frmGoodsReceipt.vb:26-29) and INSPECT 2000-VALIDATE refuses CONCESSION without IN-CONCESSION-BY RC 8 INS0005 (INSPECT.cob:160-170).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-040",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-040-AC1",
+     "ac": 1,
+     "title": "REQGEN PREVIEW for STC/BHM registers in core.JobRun, ends RC 0, prints the proposal, writes no requisition",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runReqgen",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "SITE": "BHM",
+        "MODE": "PREVIEW"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "run": {
+        "status": "OK",
+        "returnCode": 0
+       }
+      },
+      {
+       "on": "run",
+       "spoolContains": "Requisition generation - replenishment and shortage"
+      },
+      {
+       "on": "run",
+       "spoolContains": "MODE=PREVIEW - proposal only"
+      },
+      {
+       "sql": "SELECT CASE WHEN COUNT(*) >= 1 THEN 1 ELSE 0 END FROM core.JobRun WHERE JobName = 'REQGEN' AND CompanyCode = 'STC'",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Requisition WHERE CompanyCode = 'STC'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-040 AC1 (DEMO-WORKFLOWS workflow 3 step 1): REQGEN title and PREVIEW subtitle (REQGEN.cob:341-358), PREVIEW writes nothing (REQGEN.cob:23-24,285-288); full spool equality with the legacy listing is the oracle's job.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-040-AC2",
+     "ac": 2,
+     "title": "MODE=preview in lower case is treated as PREVIEW",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runReqgen",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "SITE": "BHM",
+        "MODE": "preview"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "run": {
+        "status": "OK",
+        "returnCode": 0
+       }
+      },
+      {
+       "on": "run",
+       "spoolContains": "MODE=PREVIEW - proposal only"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.Requisition WHERE CompanyCode = 'STC'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-040 AC2: REQGEN CR1101 'anything that is not plainly COMMIT is PREVIEW' (REQGEN.cob:285-288).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-040-AC3",
+     "ac": 3,
+     "title": "MODE=COMMIT raises replenishment requisitions through POREQ and no order or commitment",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runReqgen",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "SITE": "BHM",
+        "MODE": "COMMIT"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "spoolContains": "MODE=COMMIT - requisitions are created"
+      },
+      {
+       "sql": "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM po.Requisition WHERE CompanyCode = 'STC' AND SiteCode = 'BHM' AND SourceDemandType IN ('SHORTAGE', 'REPLEN')",
+       "equals": 1
+      },
+      {
+       "sql": "SELECT (SELECT COUNT(*) FROM po.PurchaseOrder) + (SELECT COUNT(*) FROM po.Commitment)",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-040 AC3: REQGEN COMMIT raises proposals through POREQ CREATE/ADDLINE (REQGEN.cob:574-728) and never writes orders or commitments; the exact requisitions must equal the legacy run on the same state, which cannot be expressed as literals here.",
+     "confidence": "unknown"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-041",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-041-AC1",
+     "ac": 1,
+     "title": "POPIPE for STC prints the pipeline and GRNI listing with every OPEN order line",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runPopipe",
+       "path": {},
+       "body": {
+        "CO": "STC"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "spoolContains": "Purchasing pipeline and GRNI (RPT-009)"
+      },
+      {
+       "on": "run",
+       "spoolContains": "All sites"
+      },
+      {
+       "on": "run",
+       "spoolContains": "PO00000004"
+      }
+     ],
+     "derivation": "FR-STERP-PO-041 AC1: POPIPE title/subtitle and detail lines (POPIPE.cob:108-160,285-305,345-380); the spool body must equal the legacy listing for the same state, which needs the legacy oracle, so only fixed lines are pinned.",
+     "confidence": "unknown"
+    },
+    {
+     "id": "FR-STERP-PO-041-AC2",
+     "ac": 2,
+     "title": "A line overdue on its original promise ends POPIPE RC 4 and core.JobRun shows WARNING",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseSchedule SET OriginalConfirmedDate = '2026-10-01', CurrentConfirmedDate = '2026-10-01' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004' AND LineNum = 1;"
+      },
+      {
+       "save": "run",
+       "job": "po_runPopipe",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "ASAT": "20261019"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "run": {
+        "status": "WARNING",
+        "returnCode": 4
+       }
+      },
+      {
+       "on": "run",
+       "json": "$.sysout",
+       "contains": "STERP-W-1705"
+      },
+      {
+       "sql": "SELECT TOP (1) Status FROM core.JobRun WHERE JobName = 'POPIPE' ORDER BY JobRunId DESC",
+       "equals": "WARNING"
+      }
+     ],
+     "derivation": "FR-STERP-PO-041 AC2: POPIPE counts lines whose original (else current) promise is before ASAT and ends RC 4 with STERP-W-1705 (POPIPE.cob:360-363,479-486); JOBLOG END WARNING for RC 4.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-041-AC3",
+     "ac": 3,
+     "title": "SITE BHM only changes the subtitle: an order of another site is still listed",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseOrder SET SiteCode = 'RDG' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000003';"
+      },
+      {
+       "save": "run",
+       "job": "po_runPopipe",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "SITE": "BHM"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "spoolContains": "Site BHM"
+      },
+      {
+       "on": "run",
+       "spoolContains": "PO00000003"
+      }
+     ],
+     "derivation": "FR-STERP-PO-041 AC3 (SME-865): SITE only feeds the subtitle (POPIPE.cob:297-304) and the line query has no site predicate (POPIPE.cob:345-372); PO00000003 arranged at RDG.",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-042",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-042-AC1",
+     "ac": 1,
+     "title": "OVERDUE for STC as at 2026-10-19 with DAYS 1 lists nothing on the demo data and exits 0, equal to legacy",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runOverdue",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "DAYS": "1",
+        "ASAT": "20261019"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "json": "$.run.execution.exitCode",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-042 AC1: legacy OVERDUE CO=STC DAYS=1 ASAT=20261019 USER=BUYER on the restored demo dataset lists no schedule ('STERP-I-1724 0000000+ overdue schedule(s) from 000000007+ open schedule(s)'), writes a 0-byte listing (Report Writer INITIATE/TERMINATE without GENERATE, OVERDUE.cob:523-540) and exits 0 (legacy run LR-05); RC 4 is set only when a schedule is listed (OVERDUE.cob:535-537, spec FR-STERP-PO-042 'else 0'), so exit code 0 pins the empty legacy listing. [A07-AMEND agent-07-20261021T211031Z-a544e35d RG-036: the heading-text assertion contradicted the empty legacy listing and is replaced by the legacy exit code]",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-042-AC2",
+     "ac": 2,
+     "title": "A schedule late by at least DAYS is listed: OVERDUE exits RC 4 and its own run row stays RUNNING (SME-009)",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "sql": "UPDATE po.PurchaseSchedule SET RequestedDate = '2026-10-01', OriginalConfirmedDate = '2026-10-01', CurrentConfirmedDate = '2026-10-01' WHERE CompanyCode = 'STC' AND OrderNumber = 'PO00000004' AND LineNum = 1;"
+      },
+      {
+       "save": "run",
+       "job": "po_runOverdue",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "DAYS": "1",
+        "ASAT": "20261019"
+       }
+      },
+      {
+       "save": "files",
+       "call": "jobs_listSpoolFiles",
+       "query": {
+        "filter": "lst",
+        "folder": "spool"
+       }
+      },
+      {
+       "save": "listing",
+       "call": "jobs_getSpoolFile",
+       "query": {
+        "path": "${files:$.items[0].path}"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "json": "$.run.execution.exitCode",
+       "equals": 4
+      },
+      {
+       "on": "run",
+       "run": {
+        "status": "RUNNING"
+       }
+      },
+      {
+       "on": "run",
+       "json": "$.run.returnCode",
+       "isNull": true
+      },
+      {
+       "on": "run",
+       "json": "$.run.spoolFile",
+       "isNull": true
+      },
+      {
+       "on": "files",
+       "json": "$.items[0].fileName",
+       "matches": "^OVERDUE-STC-[0-9]{14}\\.lst$"
+      },
+      {
+       "on": "listing",
+       "status": 200
+      },
+      {
+       "on": "listing",
+       "bodyContains": "PO00000004        1 S0004        BAR-AL6082-25MM"
+      },
+      {
+       "on": "listing",
+       "bodyContains": "Overdue lines in total  :     1         Value at risk           :          639.79"
+      }
+     ],
+     "derivation": "FR-STERP-PO-042 AC2: OVERDUE lists a schedule 18 days late (>= DAYS 1) and ends RC 4 when anything is listed (OVERDUE.cob:377-430,535-537); PO00000004 schedule arranged to 2026-10-01. [A07-AMEND agent-07-20261021T211031Z-a544e35d consolidation lead (cross-pass item 2): the run the 202 returns is OVERDUE's own registration (FR-STERP-PLATFORM-057 AC1; contracts 8.3: a self-registering program registers once; po_runOverdue states no launcher registration, unlike itm_submitOpenstkRun/itm_submitStkstatRun), and OVERDUE never closes it: 0500-JOB-END INITIALIZEs WS-JOBLOG before JOBLOG END (OVERDUE.cob:543-561), so JOBLOG refuses the END without a run id (JOBLOG.cob:100-107, JOB0002, SME-009; jobs_getRun 'a run whose legacy-equivalent END was refused stays RUNNING'). 'The run ends RC 4' is the program exit code. Legacy runs on the arranged democ (amendment evidence lead/LL-04 through ReportService.Run and p6/LR-05 as a bare program): exit 4, the program's own row RUNNING with NULL ReturnCode and SpoolFile (the WARNING 4 row of LL-04 is the desktop launcher's own row, which this API does not write), listing OVERDUE-STC-<stamp>.lst with the PO00000004 line and the totals line (lead/LL-04-OVERDUE-STC-20261022010032.lst sha256 b14324a7a8147eeff693b9a6b36a2551b05c0b525883b5632a09ced704804473); the listing is therefore read through the spool file list. The previous run WARNING/4 expectation contradicted the legacy row]",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-043",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-043-AC1",
+     "ac": 1,
+     "title": "SUPPPERF PREVIEW prints the measures and changes no po.SupplierPerformance row",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runSuppperf",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "MODE": "PREVIEW"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "spoolContains": "Supplier performance - OTIF, quality, price (PO-023)"
+      },
+      {
+       "on": "run",
+       "spoolContains": "All suppliers, mode PREVIEW"
+      },
+      {
+       "on": "run",
+       "json": "$.sysout",
+       "contains": "STERP-I-1738 PREVIEW - nothing stored"
+      },
+      {
+       "sql": "SELECT COUNT(*) FROM po.SupplierPerformance WHERE CompanyCode = 'STC'",
+       "equals": 0
+      }
+     ],
+     "derivation": "FR-STERP-PO-043 AC1: SUPPPERF headings and PREVIEW branch (SUPPPERF.cob:348-367,816-823) over PODEMO's confirmed receipts; the demo dataset holds no po.SupplierPerformance rows before the run.",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-043-AC2",
+     "ac": 2,
+     "title": "SUPPPERF COMMIT stores ORIGINAL and CURRENT measure rows per supplier-month equal to legacy",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runSuppperf",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "MODE": "COMMIT"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "spoolContains": "All suppliers, mode COMMIT"
+      },
+      {
+       "sql": "SELECT CASE WHEN COUNT(*) > 0 AND SUM(CASE WHEN MeasureBasis = 'ORIGINAL' THEN 1 ELSE 0 END) = SUM(CASE WHEN MeasureBasis = 'CURRENT' THEN 1 ELSE 0 END) THEN 1 ELSE 0 END FROM po.SupplierPerformance WHERE CompanyCode = 'STC'",
+       "equals": 1
+      }
+     ],
+     "derivation": "FR-STERP-PO-043 AC2: SUPPPERF COMMIT DELETE+INSERT two measure rows per supplier-month (SUPPPERF.cob:717-809); the 19 column values must equal a legacy COMMIT run on the same state (row-level oracle comparison).",
+     "confidence": "unknown"
+    },
+    {
+     "id": "FR-STERP-PO-043-AC3",
+     "ac": 3,
+     "title": "MODE=preview in lower case is coerced to COMMIT and stores rows",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runSuppperf",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "MODE": "preview"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "spoolContains": "All suppliers, mode COMMIT"
+      },
+      {
+       "sql": "SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM po.SupplierPerformance WHERE CompanyCode = 'STC'",
+       "equals": 1
+      }
+     ],
+     "derivation": "FR-STERP-PO-043 AC3 (SME-871): any MODE other than PREVIEW/COMMIT becomes COMMIT (SUPPPERF.cob:290-291) and the subtitle prints the mode (SUPPPERF.cob:360-367).",
+     "confidence": "observed"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-044",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-044-AC1",
+     "ac": 1,
+     "title": "First PODOC run for approved PO00000003 prints ORIGINAL ISSUE and the approved-version text",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runPodoc",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "ORDER": "PO00000003"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "spoolContains": "ORIGINAL ISSUE - order PO00000003"
+      },
+      {
+       "on": "run",
+       "spoolContains": "Approved version as shown by the hash"
+      }
+     ],
+     "derivation": "FR-STERP-PO-044 AC1: PODOC 0650-COUNT-PRINTS finds no earlier OK/WARNING run (PODOC.cob:425-470) and 0600 sets the approved-version note when an approver exists (PODOC.cob:400-412).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-044-AC2",
+     "ac": 2,
+     "title": "A second PODOC run of PO00000003 prints REPRINT No 1 and warns STERP-W-1748",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run1",
+       "job": "po_runPodoc",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "ORDER": "PO00000003"
+       }
+      },
+      {
+       "save": "run2",
+       "job": "po_runPodoc",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "ORDER": "PO00000003"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run2",
+       "spoolContains": "*** REPRINT No 1"
+      },
+      {
+       "on": "run2",
+       "json": "$.sysout",
+       "contains": "STERP-W-1748"
+      }
+     ],
+     "derivation": "FR-STERP-PO-044 AC2: earlier OK/WARNING PODOC runs with ORDER=PO00000003 in core.JobRun.Arguments are counted (PODOC.cob:425-470) and STERP-W-1748 is displayed (PODOC.cob:775-779).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-044-AC3",
+     "ac": 3,
+     "title": "PODOC for draft PO00000001 without an approver prints NOT APPROVED and ends RC 4",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runPodoc",
+       "path": {},
+       "body": {
+        "CO": "STC",
+        "ORDER": "PO00000001"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "run": {
+        "status": "WARNING",
+        "returnCode": 4
+       }
+      },
+      {
+       "on": "run",
+       "spoolContains": "NOT APPROVED - this is a draft, not an order"
+      }
+     ],
+     "derivation": "FR-STERP-PO-044 AC3: PODOC 0600 no approver sets 'NOT APPROVED - this is a draft, not an order' and RC 4 (PODOC.cob:400-403).",
+     "confidence": "inferred"
+    },
+    {
+     "id": "FR-STERP-PO-044-AC4",
+     "ac": 4,
+     "title": "PODOC without ORDER ends RC 12 with STERP-E-1740 and prints no document",
+     "layer": "integration",
+     "runner": "api",
+     "dataset": "demo",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "report"
+     ],
+     "steps": [
+      {
+       "save": "run",
+       "job": "po_runPodoc",
+       "path": {},
+       "body": {
+        "CO": "STC"
+       }
+      }
+     ],
+     "assertions": [
+      {
+       "on": "run",
+       "run": {
+        "status": "FAILED",
+        "returnCode": 12
+       }
+      },
+      {
+       "on": "run",
+       "json": "$.sysout",
+       "contains": "STERP-E-1740 ORDER=<order number> is required"
+      }
+     ],
+     "derivation": "FR-STERP-PO-044 AC4: PODOC 0100-READ-ARGS RC 12 STERP-E-1740 and finish without opening the spool (PODOC.cob:247-251,292-296); observed in the isolated legacy runtime (agent-06 runtime-evidence batch/PODOC-generic.log: exit=12).",
+     "confidence": "inferred"
+    }
+   ]
+  },
+  {
+   "requirement_id": "FR-STERP-PO-050",
+   "scenarios": [
+    {
+     "id": "FR-STERP-PO-050-AC1",
+     "ac": 1,
+     "title": "Purchasing > Supplier Sources opens the generic maintenance of po.SupplierSource with seeded captions",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "navigation"
+     ],
+     "steps": [
+      {
+       "save": "page",
+       "gui": "/",
+       "actions": [
+        {
+         "menu": [
+          "Purchasing",
+          "Supplier Sources..."
+         ]
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "page",
+       "text": "Supplier part"
+      },
+      {
+       "on": "page",
+       "text": "Lead time (days)"
+      },
+      {
+       "on": "page",
+       "text": "Minimum order"
+      },
+      {
+       "on": "page",
+       "text": "Pack quantity"
+      },
+      {
+       "on": "page",
+       "text": "Effective from"
+      },
+      {
+       "on": "page",
+       "text": "APPROVED"
+      }
+     ],
+     "derivation": "FR-STERP-PO-050 AC1: menu row PO.SOURCE.MAINT -> frmGenericMaint PO.SOURCE (81-po-menu.sql:51), which lists rows on open (frmGenericMaint.vb:24-29,104-124) with the core.MaintColumn captions of 81-po-menu.sql:127-146 over the seeded sources whose ApprovalStatus is APPROVED/UNAPPROVED (92-po-demo.sql:41-51).",
+     "confidence": "observed"
+    },
+    {
+     "id": "FR-STERP-PO-050-AC2",
+     "ac": 2,
+     "title": "A user without PO.TOLERANCE.MAINT (BUYER) has no Tolerance Rules entry",
+     "layer": "ui-journey",
+     "runner": "gui",
+     "dataset": "fresh",
+     "context": {
+      "login": "SYSADM",
+      "company": "STC",
+      "site": "BHM",
+      "businessDate": "2026-10-07",
+      "actor": "BUYER"
+     },
+     "covers": [
+      "navigation",
+      "permission"
+     ],
+     "steps": [
+      {
+       "save": "bar",
+       "gui": "/",
+       "actions": [
+        {
+         "menu": [
+          "Purchasing"
+         ]
+        }
+       ]
+      }
+     ],
+     "assertions": [
+      {
+       "on": "bar",
+       "text": "Supplier Sources..."
+      },
+      {
+       "on": "bar",
+       "notText": "Tolerance Rules..."
+      }
+     ],
+     "derivation": "FR-STERP-PO-050 AC2: row PO.TOL.MAINT requires PO.TOLERANCE.MAINT (81-po-menu.sql:53), granted only to holders of PO.ORDER.APPROVE.HIGH (81-po-menu.sql:35-41), which BUYER lacks (03-core-roles-users.sql:45); PO.SOURCE.MAINT follows PO.ORDER.ENTER, which BUYER holds.",
+     "confidence": "observed"
+    }
+   ]
+  }
+ ]
+}

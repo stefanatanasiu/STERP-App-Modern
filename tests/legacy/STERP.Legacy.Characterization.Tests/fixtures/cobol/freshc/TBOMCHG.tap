@@ -1,0 +1,60 @@
+# suite TBOMCHG
+ok 1 - A bulk change without a reference is refused
+ok 2 - An unknown action is refused
+ok 3 - An unknown function is refused
+ok 4 - Every bill that uses the pin is in the preview
+ok 5 - A preview changes nothing
+ok 6 - A preview applies nothing
+ok 7 - An unconfigured alternate group fails the proposal
+ok 8 - One failed bill refuses the whole bulk change
+ok 9 - The refusal is reported as BOM1411
+ok 10 - The refusal names the reason
+ok 11 - All seven outcomes can be paged back
+ok 12 - One named bill is one target
+ok 13 - The released frame bill is treated as a new revision
+ok 14 - The released revision A is the source, not the target
+ok 15 - The proposal is the next free revision B
+ok 16 - The pin line of the B1 frame is line thirty
+ok 17 - One pin per frame before the change
+ok 18 - A replacement keeps the quantity it found
+ok 19 - A valid proposal is pending, not applied
+ok 20 - The frame proposal may be applied
+ok 21 - A replacement that closes a loop fails
+ok 22 - The cycle refusal carries reason BOM1434
+ok 23 - The cycle refusal names the offending path
+ok 24 - A cycle refuses the run
+ok 25 - The run reports return code eight
+ok 26 - An unknown replacement item fails
+ok 27 - An unknown replacement item changes nothing
+ok 28 - A bill without the component is skipped
+ok 29 - A skipped bill carries reason BOM1431
+ok 30 - A skipped bill is not a failure
+ok 31 - A skipped bill is counted as skipped
+ok 32 - B3 uses 250 grams per basis before the change
+ok 33 - B3 would use 500 grams per basis after the change
+ok 34 - The B3 quantity change is a new revision
+ok 35 - The B3 quantity change validates
+ok 36 - B5 removal takes the first occurrence, line ten
+ok 37 - B5 each occurrence is 1.2 pieces
+ok 38 - A removed line leaves nothing behind
+ok 39 - The second occurrence is reported, not removed
+ok 40 - The B5 removal validates
+ok 41 - An added component gets the next line number thirty
+ok 42 - An added component uses the requested quantity
+ok 43 - The B5 addition validates
+ok 44 - An applied bulk change reports APPLIED
+ok 45 - One bill was changed
+ok 46 - It was changed by raising a new revision
+ok 47 - The new revision has its own identity
+ok 48 - Repeating the same change is recognised
+ok 49 - A repeat returns the first outcome as a warning
+ok 50 - A repeat is reported as BOM1410
+ok 51 - A repeat still reports the one bill it changed
+ok 52 - The applied change left a second revision behind
+ok 53 - The released revision A still asks for 250 grams
+ok 54 - The new draft revision B carries the 500 grams
+ok 55 - A draft revision is amended in place, not copied
+ok 56 - The suite leaves the seeded bills as it found them
+1..56
+# TBOMCHG passed 00056 failed 00000
+# exit 0

@@ -1,0 +1,7 @@
+ok - ap workflow GUI: Bacs catalogue and actual launcher expose only company and stored run  # REQ: AP-013,AP-026,COM-017
+ok - ap workflow GUI: bank change, callback, proposal and file actions are wired  # REQ: AP-002,AP-011,AP-013,AP-027
+ok - ap workflow GUI: bank evidence preserves pending state and permission boundaries  # REQ: AP-002,AP-027,D-19
+ok - ap workflow GUI: bank identifiers and evidence refuse native-width overflow without writing  # REQ: AP-002,AP-027,COM-017
+ok - ap workflow GUI: payment menus reach the real form without granting proposal authority  # REQ: AP-011,AP-012,AP-013,COM-002
+ok - ap workflow GUI: reserve and release retain the existing proposal header  # REQ: AP-011,AP-020
+ok - ap workflow GUI: treasury approvals, instructions and local Bacs launcher  # REQ: AP-012,AP-013,AP-026,D-07
