@@ -1,0 +1,4 @@
+# front-end packages and the generated bundle (built from client\ by the project build)
+client/node_modules/
+client/coverage/
+wwwroot/

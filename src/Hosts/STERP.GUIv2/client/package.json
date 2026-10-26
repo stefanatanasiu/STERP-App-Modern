@@ -1,0 +1,44 @@
+{
+  "name": "sterp-guiv2",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "STERP GUIv2 front end: React and three.js over the existing STERP APIs, served by the STERP.GUIv2 host.",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "watch": "vite build --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource-variable/fraunces": "5.3.0",
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource/pacifico": "5.3.0",
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.2",
+    "@react-three/postprocessing": "3.2.0",
+    "@tanstack/react-query": "5.104.3",
+    "clsx": "2.1.1",
+    "lucide-react": "1.58.0",
+    "motion": "14.3.0",
+    "postprocessing": "6.39.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "react-router": "8.4.0",
+    "three": "0.186.1",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@types/three": "0.186.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}

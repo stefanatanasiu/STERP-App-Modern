@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Sterp.GuiV2</RootNamespace>
+    <AssemblyName>STERP.GUIv2</AssemblyName>
+    <Description>STERP-GUIv2: the modern single-page GUI (React, three.js) over the existing STERP.Api and STERP.Jobs operations. The host serves the application and forwards its calls to the existing APIs under the signed-in user's own Windows identity; it owns no business logic and never connects to the database.</Description>
+    <!-- the client is built by npm into wwwroot: the SDK must neither glob node_modules nor treat the bundle as static web assets -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);client\**;wwwroot\**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.Negotiate" />
+  </ItemGroup>
+
+  <!--
+    Front end (client\, Vite + React + TypeScript). Built into wwwroot\ before the .NET build, incrementally (only when a client
+    source changed since the last bundle). Without Node.js the build still succeeds with a warning and the host serves a page that
+    explains how to enable GUIv2, so the other STERP services are never held back by it.
+      -p:GuiV2SkipClient=true   skips the front-end steps (the existing wwwroot is served as it is)
+  -->
+  <PropertyGroup>
+    <GuiV2ClientDir>$(MSBuildProjectDirectory)\client\</GuiV2ClientDir>
+    <GuiV2WebRoot>$(MSBuildProjectDirectory)\wwwroot\</GuiV2WebRoot>
+    <GuiV2SkipClient Condition="'$(GuiV2SkipClient)' == ''">false</GuiV2SkipClient>
+  </PropertyGroup>
+  <ItemGroup>
+    <GuiV2ClientInput Include="client\src\**\*;client\public\**\*;client\index.html;client\package.json;client\package-lock.json;client\vite.config.ts;client\tsconfig.json" />
+  </ItemGroup>
+
+  <Target Name="GuiV2Client" BeforeTargets="BeforeBuild" Condition="'$(GuiV2SkipClient)' != 'true' and '$(DesignTimeBuild)' != 'true'" DependsOnTargets="GuiV2DetectNode;GuiV2NpmInstall;GuiV2NpmBuild" />
+
+  <Target Name="GuiV2DetectNode">
+    <Exec Command="node --version" IgnoreExitCode="true" EchoOff="true" StandardOutputImportance="low" StandardErrorImportance="low" IgnoreStandardErrorWarningFormat="true">
+      <Output TaskParameter="ExitCode" PropertyName="_GuiV2NodeExit" />
+    </Exec>
+    <PropertyGroup>
+      <_GuiV2HasNode Condition="'$(_GuiV2NodeExit)' == '0'">true</_GuiV2HasNode>
+    </PropertyGroup>
+    <Warning Condition="'$(_GuiV2HasNode)' != 'true' and !Exists('$(GuiV2WebRoot)index.html')" Code="GUIV2001" Text="STERP.GUIv2: Node.js was not found, so the GUIv2 front end was not built. Install Node.js LTS (winget install OpenJS.NodeJS.LTS) and build again; until then GUIv2 shows a page explaining this. The other services are not affected." />
+    <Warning Condition="'$(_GuiV2HasNode)' != 'true' and Exists('$(GuiV2WebRoot)index.html')" Code="GUIV2002" Text="STERP.GUIv2: Node.js was not found; the existing GUIv2 front-end bundle in wwwroot is served as it is and may be out of date." />
+  </Target>
+
+  <!-- npm ci when the lock file is newer than the installed tree; a failure (offline machine) degrades like a missing Node.js -->
+  <Target Name="GuiV2NpmInstall" Condition="'$(_GuiV2HasNode)' == 'true'" Inputs="$(GuiV2ClientDir)package.json;$(GuiV2ClientDir)package-lock.json" Outputs="$(GuiV2ClientDir)node_modules\.package-lock.json">
+    <Message Importance="high" Text="STERP.GUIv2: installing the front-end packages (npm ci) ..." />
+    <Exec Command="npm ci --no-audit --no-fund --loglevel=error" WorkingDirectory="$(GuiV2ClientDir)" IgnoreStandardErrorWarningFormat="true" ContinueOnError="true">
+      <Output TaskParameter="ExitCode" PropertyName="_GuiV2NpmCiExit" />
+    </Exec>
+    <!-- an up-to-date skip still evaluates this group (output inference) with no exit code: only a real failure counts -->
+    <PropertyGroup>
+      <_GuiV2HasNode Condition="'$(_GuiV2NpmCiExit)' != '' and '$(_GuiV2NpmCiExit)' != '0'">false</_GuiV2HasNode>
+    </PropertyGroup>
+    <Warning Condition="'$(_GuiV2NpmCiExit)' != '' and '$(_GuiV2NpmCiExit)' != '0'" Code="GUIV2003" Text="STERP.GUIv2: npm ci failed (exit code $(_GuiV2NpmCiExit)), so the GUIv2 front end was not rebuilt. Check the network access to the npm registry and build again." />
+  </Target>
+
+  <!-- type check and bundle; a source error fails the build with the TypeScript or Vite message -->
+  <Target Name="GuiV2NpmBuild" Condition="'$(_GuiV2HasNode)' == 'true'" Inputs="@(GuiV2ClientInput)" Outputs="$(GuiV2WebRoot)index.html">
+    <Message Importance="high" Text="STERP.GUIv2: building the front end (npm run build) ..." />
+    <Exec Command="npm run build --silent" WorkingDirectory="$(GuiV2ClientDir)" />
+  </Target>
+
+  <!-- dotnet publish: the bundle goes with the host (it is generated during the build, after item evaluation) -->
+  <Target Name="GuiV2PublishClient" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <_GuiV2Bundle Include="$(GuiV2WebRoot)**\*" />
+      <ResolvedFileToPublish Include="@(_GuiV2Bundle)" RelativePath="wwwroot\%(RecursiveDir)%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    </ItemGroup>
+  </Target>
+</Project>

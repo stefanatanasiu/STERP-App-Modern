@@ -55,8 +55,10 @@ This is a summary: detailed test results are kept with the evidence package, not
 | STERP-API | `src/Hosts/STERP.Api` | `https://localhost:7101` | all online module operations (11 slices in one process) |
 | STERP-JOBS | `src/Hosts/STERP.Jobs` | `https://localhost:7102` | job submission, monitoring, restart, SYSOUT and spool; runs batch programs and streams in-process |
 | STERP-PORTAL | `src/Hosts/STERP.ApiPortal` | `https://localhost:7103` | API Console: catalogue, operation pages with legacy traceability and "Try it out" with Windows authentication |
+| STERP-GUIV2 | `src/Hosts/STERP.GUIv2` | `https://localhost:7104` | additional modern front end (bills of material in 3D) that only calls the operations above; see its [README](src/Hosts/STERP.GUIv2/README.md) |
 
-Ports follow one rule: Web = `PortBase`, Api = `PortBase+1`, Jobs = `PortBase+2`, Portal = `PortBase+3`. The business
+Ports follow one rule: Web = `PortBase`, Api = `PortBase+1`, Jobs = `PortBase+2`, Portal = `PortBase+3`, GUIv2 =
+`PortBase+4`. The business
 logic is split into eleven vertical slices, delivered in waves W0-W10 (`src/Modules/STERP.Modules.<Slice>`, with pages
 in `src/Web/STERP.Web.Pages.<Slice>`). The COBOL semantics (decimal scale, rounding, truncation, padding and dates) live
 in `src/Platform/STERP.Platform.Kernel`, and the host pipeline (Windows Negotiate authentication, user context, error
@@ -76,6 +78,8 @@ the services, so legacy audit triggers record the real user. There are no secret
   described in [docs/DEMO-DATA.md](docs/DEMO-DATA.md#create-the-backups). They are binaries and are not published here.
 - A trusted localhost HTTPS certificate: `dotnet dev-certs https --trust` (once per user).
 - For the GUI tests only: Microsoft Edge (Playwright drives the installed Edge).
+- For GUIv2's front end only: Node.js LTS (`winget install OpenJS.NodeJS.LTS`). Without it the build only warns, and
+  GUIv2 shows a page explaining this.
 
 No ODBC driver, COBOL runtime or GnuCOBOL is needed to run the modernized application. They are needed only to build
 the legacy datasets and to run the legacy characterization tests.
@@ -101,7 +105,7 @@ Trust the localhost HTTPS certificate once (`dotnet dev-certs https --trust`). T
 repository root, or run it from a terminal:
 
 ```bat
-run-sterp.bat              :: build, start the four services, wait until they are ready, open the GUI
+run-sterp.bat              :: build, start the five services, wait until they are ready, open the GUI and GUIv2
 run-sterp.bat /status      :: show which services are up and ready
 run-sterp.bat /stop        :: stop the services (refuses while batch jobs run; /force stops anyway)
 run-sterp.bat /restart     :: stop, rebuild and start again
@@ -110,7 +114,7 @@ run-sterp.bat /?           :: every option, including /nobuild and /nobrowser
 ```
 
 The first start creates a private LocalDB instance, `STERPA08_demo`, from the demo dataset and maps your Windows login to
-SYSADM. The four services run in the background without windows, against that instance only, on ports 7140-7143. Their
+SYSADM. The five services run in the background without windows, against that instance only, on ports 7140-7144. Their
 logs are written to `hosts\<service>-<port base>.log` in the instance folder under `..\run\STERP-App-isolated-tests\`.
 The work is done by `scripts/run-sterp.ps1`, which also takes `-Name` and `-PortBase` to run a second, separate demo
 environment.
@@ -120,6 +124,7 @@ Then open:
 - GUI: <https://localhost:7140>. You are signed on as SYSADM (System Administrator), who can use "Continue as" to work as
   any other STERP user, as in the legacy client.
 - API Console: <https://localhost:7143>
+- GUIv2: <https://localhost:7144>, the bills of material in 3D over the same APIs ([README](src/Hosts/STERP.GUIv2/README.md))
 - Health: `https://localhost:7141/health/ready` (Api), `https://localhost:7142/health/ready` (Jobs)
 
 The same steps by hand, from the repository root:
@@ -229,12 +234,12 @@ with its binding production configuration and refuses to start without an approv
 ## Repository layout
 
 ```text
-run-sterp.bat    one-step demo launcher: start, stop, restart, reset and status of the four services
+run-sterp.bat    one-step demo launcher: start, stop, restart, reset and status of the five services
 contracts\       binding contracts served by the hosts: 13 OpenAPI documents, frozen data contract, GUI routes,
                  SQL object mapping
 docs\            deployment runbook, developer guide, demo workflows and demo dataset
 scripts\         isolated LocalDB instances, host start/stop, smoke check, parity runs, publish
-src\Hosts\       STERP.Api, STERP.Jobs, STERP.Web (+ STERP.Web.Client), STERP.ApiPortal
+src\Hosts\       STERP.Api, STERP.Jobs, STERP.Web (+ STERP.Web.Client), STERP.ApiPortal, STERP.GUIv2 (3D BOM front end)
 src\Modules\     one project per slice (Ap Ar Bom Cst Fin Itm Kit Platform Po So Xmd) + Composition
 src\Platform\    STERP.Platform.Kernel (COBOL semantics, kernel services), STERP.Platform.Hosting (pipeline, jobs, health)
 src\Web\         STERP.Web.Framework and the Blazor page library of each slice

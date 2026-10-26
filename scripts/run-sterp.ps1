@@ -1,24 +1,26 @@
 <#
 .SYNOPSIS
-  Starts, stops, restarts, resets or reports the four STERP services of the demo environment in one command.
+  Starts, stops, restarts, resets or reports the five STERP services of the demo environment in one command.
   run-sterp.bat in the repository root is the double-clickable front end.
 
 .DESCRIPTION
   The demo environment is the README quick start in one step: the isolated LocalDB instance STERPA08_demo, restored from
-  the demo dataset with your Windows login mapped to SYSADM, and the four services on ports 7140-7143: STERP.Web (GUI),
-  STERP.Api (online API), STERP.Jobs (batch jobs API) and STERP.ApiPortal (API Console). The services run hidden in the
-  background through run-host.ps1, so only the isolated database is used. Their console output is written to
-  <instance folder>\hosts\<service>-<port base>.log (isolated-paths.ps1).
+  the demo dataset with your Windows login mapped to SYSADM, and the five services on ports 7140-7144: STERP.Web (GUI),
+  STERP.Api (online API), STERP.Jobs (batch jobs API), STERP.ApiPortal (API Console) and STERP.GUIv2 (the 3D bill of
+  materials front end over the same APIs). The services run hidden in the background through run-host.ps1, so only the
+  isolated database is used. Their console output is written to <instance folder>\hosts\<service>-<port base>.log
+  (isolated-paths.ps1).
 
   Start    builds STERP.Modernized.slnx in Release (not with -NoBuild, and not while a STERP host of this repository still
            runs on the binaries), creates the demo instance on the first start (new-isolated-env.ps1), starts every
-           service that is not running, waits until each one is ready, checks your sign-on and opens the GUI.
+           service that is not running, waits until each one is ready, checks your sign-on and opens the GUI and GUIv2.
+           The GUIv2 front end is built with Node.js; without Node.js the build only warns and GUIv2 shows how to fix it.
   Stop     stops the services on the demo ports that were started from this repository. It refuses while STERP.Jobs is
            executing batch runs, because a job host stopped mid-run marks those runs LOST on its next start; -Force stops
            it anyway.
   Restart  Stop, then Start.
   Reset    Stop, restore the demo dataset (many demo steps are one-shot), then Start.
-  Status   reports each service with its process and readiness. Exit code 0 only when all four are up and ready.
+  Status   reports each service with its process and readiness. Exit code 0 only when all five are up and ready.
 
 .EXAMPLE
   ./scripts/run-sterp.ps1
@@ -32,9 +34,9 @@ param(
     [switch]$NoBuild,
     [switch]$NoBrowser,
     [switch]$Force,
-    # the demo environment: LocalDB instance STERPA08_<Name>, ports PortBase to PortBase+3, your Windows login mapped to User
+    # the demo environment: LocalDB instance STERPA08_<Name>, ports PortBase to PortBase+4, your Windows login mapped to User
     [ValidatePattern('^[a-z0-9]{1,12}$')][string]$Name = 'demo',
-    [ValidateRange(1024, 65532)][int]$PortBase = 7140,
+    [ValidateRange(1024, 65531)][int]$PortBase = 7140,
     [ValidatePattern('^[A-Z0-9_]{1,20}$')][string]$User = 'SYSADM',
     [ValidateRange(30, 1800)][int]$TimeoutSeconds = 180
 )
@@ -52,10 +54,11 @@ $svcWeb = [pscustomobject]@{ Key = 'Web'; Project = 'STERP.Web'; Label = 'GUI'; 
 $svcApi = [pscustomobject]@{ Key = 'Api'; Project = 'STERP.Api'; Label = 'Online API'; Port = $PortBase + 1; Database = $true }
 $svcJobs = [pscustomobject]@{ Key = 'Jobs'; Project = 'STERP.Jobs'; Label = 'Batch jobs'; Port = $PortBase + 2; Database = $true }
 $svcPortal = [pscustomobject]@{ Key = 'Portal'; Project = 'STERP.ApiPortal'; Label = 'API Console'; Port = $PortBase + 3; Database = $false }
-$services = @($svcWeb, $svcApi, $svcJobs, $svcPortal)
+$svcGuiV2 = [pscustomobject]@{ Key = 'GUIv2'; Project = 'STERP.GUIv2'; Label = 'GUIv2'; Port = $PortBase + 4; Database = $false }
+$services = @($svcWeb, $svcApi, $svcJobs, $svcPortal, $svcGuiV2)
 # the API hosts start first, so the API Console finds them when it first looks; they stop last
-$startOrder = @($svcApi, $svcJobs, $svcWeb, $svcPortal)
-$stopOrder = @($svcPortal, $svcWeb, $svcJobs, $svcApi)
+$startOrder = @($svcApi, $svcJobs, $svcWeb, $svcGuiV2, $svcPortal)
+$stopOrder = @($svcPortal, $svcGuiV2, $svcWeb, $svcJobs, $svcApi)
 
 function Say([string]$Text = '', [string]$Color = '') {
     if ($Color) { Write-Host $Text -ForegroundColor $Color } else { Write-Host $Text }
@@ -176,7 +179,7 @@ function Invoke-Stop {
     }
     $active = @($states | Where-Object { $_.State -in 'up', 'starting' })
     if ($active.Count -eq 0) {
-        Say ("  Nothing to stop: no STERP service of this folder runs on ports {0}-{1}." -f $PortBase, ($PortBase + 3))
+        Say ("  Nothing to stop: no STERP service of this folder runs on ports {0}-{1}." -f $PortBase, ($PortBase + 4))
         return $true
     }
     $jobs = $active | Where-Object { $_.Service -eq $svcJobs -and $_.State -eq 'up' }
@@ -284,14 +287,23 @@ function Show-Ready {
     Say ''
     # only addresses that open in a browser: the API hosts are web services without pages, browsed in the API Console
     Say ("    {0,-12} {1}" -f $svcWeb.Label, (Url $svcWeb))
+    Say ("    {0,-12} {1,-36} 3D bills of material over the same APIs" -f $svcGuiV2.Label, (Url $svcGuiV2))
     Say ("    {0,-12} {1,-36} browse and try every Online API and Batch jobs operation" -f $svcPortal.Label, (Url $svcPortal))
     foreach ($svc in $svcApi, $svcJobs) {
         Say ("    {0,-12} {1,-36} web service without pages: its health check" -f $svc.Label, "$(Url $svc)/health/ready")
     }
     Say ''
+    $frontEnd = Invoke-Probe "$(Url $svcGuiV2)/health/ready" 15
+    $bundle = if ($frontEnd -and $frontEnd.Json) { @($frontEnd.Json.checks) | Where-Object { $_.name -eq 'front-end' } | Select-Object -First 1 }
+    if ($bundle -and $bundle.status -ne 'Healthy') {
+        Say '  GUIv2 runs without its front end, because Node.js was not found when it was built.' Yellow
+        Say '  Install Node.js LTS (winget install OpenJS.NodeJS.LTS), open a new window, then "run-sterp.bat /restart".' Yellow
+        Say ''
+    }
     if (-not $NoBrowser) {
-        Say '  Opening the GUI in your browser ...'
+        Say '  Opening the GUI and GUIv2 in your browser ...'
         Start-Process (Url $svcWeb)
+        Start-Process (Url $svcGuiV2)
     }
     Say "  The services run in the background without windows; their logs are in $hostsDir."
     Say '  "run-sterp.bat /stop" stops them and "run-sterp.bat /status" shows how they are.'
@@ -395,7 +407,7 @@ function Show-Banner {
     Say '  STERP - Supply Chain Management (modernized)'
     Say "  Root:      $root"
     Say "  Database:  STERP on (localdb)\$instance - demo dataset, your Windows login = $User"
-    Say ("  Ports:     GUI {0}, Online API {1}, Batch jobs {2}, API Console {3}" -f $svcWeb.Port, $svcApi.Port, $svcJobs.Port, $svcPortal.Port)
+    Say ("  Ports:     GUI {0}, Online API {1}, Batch jobs {2}, API Console {3}, GUIv2 {4}" -f $svcWeb.Port, $svcApi.Port, $svcJobs.Port, $svcPortal.Port, $svcGuiV2.Port)
     Say ''
 }
 
@@ -428,7 +440,7 @@ function Show-Status {
     }
     Say ''
     if (@($states | Where-Object { $_.State -eq 'up' }).Count) {
-        Say ("    GUI {0}    API Console {1}" -f (Url $svcWeb), (Url $svcPortal))
+        Say ("    GUI {0}    GUIv2 {1}    API Console {2}" -f (Url $svcWeb), (Url $svcGuiV2), (Url $svcPortal))
         Say "    Logs: $hostsDir"
         Say ''
     }
@@ -439,7 +451,7 @@ function Show-Help {
     Say ''
     Say '  run-sterp.bat - start and stop the STERP demo services'
     Say ''
-    Say '    run-sterp.bat              build, start all four services, wait until ready, open the GUI'
+    Say '    run-sterp.bat              build, start all five services, wait until ready, open the GUI and GUIv2'
     Say '    run-sterp.bat /nobuild     start without rebuilding'
     Say '    run-sterp.bat /stop        stop the services'
     Say '    run-sterp.bat /restart     stop, then start again (rebuilds unless /nobuild)'
@@ -448,11 +460,12 @@ function Show-Help {
     Say '    run-sterp.bat /?           this help'
     Say ''
     Say '  Options'
-    Say '    /nobrowser   do not open the GUI in the browser'
+    Say '    /nobrowser   do not open the GUI and GUIv2 in the browser'
     Say '    /force       stop even while STERP.Jobs is executing batch runs (they are marked LOST)'
     Say ''
     Say "  Services - database STERP on (localdb)\$instance, demo dataset, your Windows login = $User"
     Say ("    {0}  {1}" -f (Row $svcWeb), (Url $svcWeb))
+    Say ("    {0}  {1} - 3D bills of material over the same APIs (front end built with Node.js)" -f (Row $svcGuiV2), (Url $svcGuiV2))
     Say ("    {0}  {1} - browse and try the Online API and Batch jobs" -f (Row $svcPortal), (Url $svcPortal))
     foreach ($svc in $svcApi, $svcJobs) { Say ("    {0}  web service without pages ({1}/health/ready)" -f (Row $svc), (Url $svc)) }
     Say ''

@@ -2,15 +2,16 @@
 rem ============================================================================
 rem  STERP - Supply Chain Management (modernized) - demo launcher
 rem
-rem  Starts the four STERP services on the isolated demo database, and stops
+rem  Starts the five STERP services on the isolated demo database, and stops
 rem  them again. Double-click it to start everything.
 rem     STERP.Web         GUI           https://localhost:7140
+rem     STERP.GUIv2       GUIv2         https://localhost:7144  (3D bills of material over the same APIs)
 rem     STERP.ApiPortal   API Console   https://localhost:7143  (browse and try the APIs)
 rem     STERP.Api         online API    port 7141 (web service, no pages)
 rem     STERP.Jobs        batch jobs    port 7142 (web service, no pages)
 rem
 rem  Usage:
-rem     run-sterp.bat              build, start everything, wait until ready, open the GUI
+rem     run-sterp.bat              build, start everything, wait until ready, open the GUI and GUIv2
 rem     run-sterp.bat /nobuild     start the existing binaries without rebuilding
 rem     run-sterp.bat /stop        stop the services
 rem     run-sterp.bat /restart     stop, then start again
@@ -19,7 +20,7 @@ rem     run-sterp.bat /status      report whether each service is up and ready
 rem     run-sterp.bat /?           show this help
 rem
 rem  Options:
-rem     /nobrowser   do not open the GUI in the browser
+rem     /nobrowser   do not open the GUI and GUIv2 in the browser
 rem     /force       stop even while STERP.Jobs is executing batch runs
 rem
 rem  The services run in the background without windows. The first start
@@ -30,6 +31,8 @@ rem  demo environment.
 rem
 rem  Requires: .NET 10 SDK, PowerShell 7, SQL Server LocalDB and the dataset
 rem  backups (README.md, Prerequisites). No shared database is ever used.
+rem  GUIv2's front end is built with Node.js LTS (winget install
+rem  OpenJS.NodeJS.LTS); without it everything else still starts.
 rem ============================================================================
 
 setlocal EnableExtensions

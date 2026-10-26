@@ -41,6 +41,7 @@
     <Project Path="src/Hosts/STERP.Web.Client/STERP.Web.Client.csproj" />
     <Project Path="src/Hosts/STERP.Web/STERP.Web.csproj" />
     <Project Path="src/Hosts/STERP.ApiPortal/STERP.ApiPortal.csproj" />
+    <Project Path="src/Hosts/STERP.GUIv2/STERP.GUIv2.csproj" />
   </Folder>
   <Folder Name="/verification/">
     <Project Path="verification/STERP.Kernel.Tests/STERP.Kernel.Tests.csproj" />

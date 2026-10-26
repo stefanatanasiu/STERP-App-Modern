@@ -1,0 +1,169 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource-variable/fraunces";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter Variable", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "Cascadia Code", Consolas, ui-monospace, monospace;
+  --font-display: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
+
+  --color-ink-950: #05070d;
+  --color-ink-925: #080b14;
+  --color-ink-900: #0b0f1a;
+  --color-ink-850: #0f1422;
+  --color-ink-800: #141b2c;
+  --color-ink-750: #1a2236;
+  --color-ink-700: #212a41;
+  --color-ink-600: #2c3753;
+  --color-ink-500: #47526e;
+  --color-ink-400: #6c7690;
+  --color-ink-300: #9aa3ba;
+  --color-ink-200: #c4cada;
+  --color-ink-100: #e8ebf4;
+  --color-ink-50: #f5f7fc;
+
+  --color-made: #a78bfa;
+  --color-bought: #22d3ee;
+  --color-service: #34d399;
+  --color-phantom: #94a3b8;
+  --color-byproduct: #fbbf24;
+  --color-note: #64748b;
+  --color-root: #f9a8d4;
+
+  --shadow-glass: 0 1px 0 0 rgb(255 255 255 / 0.06) inset, 0 24px 60px -24px rgb(0 0 0 / 0.65);
+  --shadow-glow: 0 0 0 1px rgb(167 139 250 / 0.35), 0 10px 40px -10px rgb(139 92 246 / 0.55);
+
+  --animate-aurora-a: aurora-a 22s ease-in-out infinite alternate;
+  --animate-aurora-b: aurora-b 28s ease-in-out infinite alternate;
+  --animate-aurora-c: aurora-c 34s ease-in-out infinite alternate;
+  --animate-shimmer: shimmer 1.8s linear infinite;
+  --animate-pulse-ring: pulse-ring 2.4s cubic-bezier(0.2, 0.6, 0.2, 1) infinite;
+  --animate-spin-slow: spin 9s linear infinite;
+
+  @keyframes aurora-a {
+    0% { transform: translate3d(-8%, -6%, 0) scale(1); }
+    100% { transform: translate3d(10%, 8%, 0) scale(1.18); }
+  }
+  @keyframes aurora-b {
+    0% { transform: translate3d(12%, 4%, 0) scale(1.1); }
+    100% { transform: translate3d(-6%, -10%, 0) scale(0.92); }
+  }
+  @keyframes aurora-c {
+    0% { transform: translate3d(0, 10%, 0) scale(0.95); }
+    100% { transform: translate3d(-12%, -4%, 0) scale(1.15); }
+  }
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+  @keyframes pulse-ring {
+    0% { transform: scale(0.8); opacity: 0.7; }
+    80%, 100% { transform: scale(2.2); opacity: 0; }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--color-ink-950);
+    color: var(--color-ink-100);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: rgb(167 139 250 / 0.35);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 0.14) transparent;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(167 139 250 / 0.9);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(0.8);
+    opacity: 0.7;
+    cursor: pointer;
+  }
+  input[type="number"]::-webkit-inner-spin-button {
+    opacity: 0.4;
+  }
+}
+
+/* frosted surface used by every panel */
+@utility glass {
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.065), rgb(255 255 255 / 0.025));
+  border: 1px solid rgb(255 255 255 / 0.085);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
+
+@utility glass-strong {
+  background: linear-gradient(180deg, rgb(20 27 44 / 0.92), rgb(11 15 26 / 0.94));
+  border: 1px solid rgb(255 255 255 / 0.1);
+  box-shadow: var(--shadow-glass);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+
+@utility text-gradient {
+  background: linear-gradient(92deg, #ddd6fe 0%, #c4b5fd 22%, #93c5fd 55%, #67e8f9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility text-gradient-warm {
+  background: linear-gradient(92deg, #fde68a 0%, #f9a8d4 50%, #c4b5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility skeleton {
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.04) 25%, rgb(255 255 255 / 0.1) 50%, rgb(255 255 255 / 0.04) 75%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@utility hairline {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.14), transparent);
+  height: 1px;
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

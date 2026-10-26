@@ -67,8 +67,9 @@ repository root).
 
 For a demonstration with the Agent 07 demo dataset and your Windows login mapped to SYSADM, run `run-sterp.bat` in the
 repository root (README "Quick start"): it provisions the isolated instance `STERPA08_demo` on the first start, starts
-the four hosts on ports 7140-7143 in the background and checks your sign-on; `/stop`, `/restart`, `/reset` and `/status`
-manage them. By hand: `./scripts/new-isolated-env.ps1 -Name demo -Dataset demo -MapLoginTo SYSADM`, then
+the four hosts on ports 7140-7143 and the additional GUIv2 front end on port 7144 in the background and checks your
+sign-on; `/stop`, `/restart`, `/reset` and `/status` manage them. By hand:
+`./scripts/new-isolated-env.ps1 -Name demo -Dataset demo -MapLoginTo SYSADM`, then
 `./scripts/run-local.ps1 -Instance STERPA08_demo -PortBase 7140`.
 
 `run-local.ps1` prints the process ids; stop with `Stop-Process -Id <id>` (or `run-sterp.bat /stop` on ports 7140-7143).
